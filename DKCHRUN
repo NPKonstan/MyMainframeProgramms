@@ -1,0 +1,122 @@
+ /*******************************************************************/
+ /* SELECT стом пимайа CTDKRUN еам упаявеи еццяажг ME COD_FLAG=0 TOY*/
+ /* JOB поу диабафеи апо паяалетяо    циа THN тяевоуса гл/миа */
+ /* AUTHOR   : еуаццекос йоукгс   */
+ /* CREATION : лазос 2003         */
+ /*******************************************************************/
+ DKCHRUN: PROC(ARGS) OPTIONS(MAIN);
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+ /*-----------------------------------------------------------*/
+ /*               BUILTIN  FUNCTIONS                          */
+ /*-----------------------------------------------------------*/
+ DCL  NULL BUILTIN;
+ DCL  ADDR BUILTIN;
+ DCL  SUBSTR BUILTIN;
+ DCL  VERIFY BUILTIN;
+
+ /*******  DCLGEN   *******/
+ EXEC SQL INCLUDE CTDKRUN;
+ EXEC SQL INCLUDE SQLCA;
+
+ /***********************************************************/
+ DCL  ARGS  CHAR(8) VARYING; /*INPUT PARAMETER FROM JCL*/
+ /***********************************************************/
+ DCL  CURRENT_DATE  CHAR(10)  INIT('');
+ DCL  CURRENT_TIME  CHAR(08)  INIT('');
+ DCL  CURRENT_TIMESTAMP  CHAR(26)  INIT('');
+ DCL  WS_JOBID CHAR(8) INIT('');
+
+ /************************************/
+ /* пяосдиояислос, пеяицяажг аявеиым */
+ /************************************/
+
+ DCL  PRINT    FILE RECORD SEQUENTIAL OUTPUT
+      ENV(FB RECSIZE(133) CTLASA);
+
+ DCL    LINE            CHAR (133)   INIT(' ');
+
+ DCL  1  LINE1 BASED(ADDR(LINE)),
+        2  CTLCHR1  CHAR(1)  INIT(' '),
+        2  GRAMMH  CHAR(132)  INIT(' ');
+
+ /*************************************************/
+
+ % PAGE;
+
+ OPEN  FILE(PRINT);
+
+     EXEC SQL
+         SET :CURRENT_TIMESTAMP = CURRENT TIMESTAMP;
+
+     CURRENT_DATE = SUBSTR(CURRENT_TIMESTAMP,9,2)!!'.'!!
+                    SUBSTR(CURRENT_TIMESTAMP,6,2)!!'.'!!
+                    SUBSTR(CURRENT_TIMESTAMP,1,4);
+
+     CURRENT_TIME = SUBSTR(CURRENT_TIMESTAMP,12,8);
+
+     IF CURRENT_TIME > '00.00.00' & CURRENT_TIME < '08.00.00' THEN DO;
+           EXEC SQL
+               SET :CURRENT_DATE = CURRENT DATE - 1 DAY;
+     END;
+
+     WS_JOBID = ARGS;
+
+     EXEC SQL
+         SELECT DAT_JOBRUN,
+                TIM_JOBRUN,
+                AMT_EGGRAFES,
+                SUM_POSOA
+         INTO   :DAT_JOBRUN,
+                :TIM_JOBRUN,
+                :AMT_EGGRAFES,
+                :SUM_POSOA
+         FROM   CTDKRUN
+         WHERE  COD_JOBID  = :WS_JOBID  AND
+                DAT_JOBRUN = :CURRENT_DATE AND
+                COD_FLAG = 0
+         WITH UR;
+
+         IF SQLCODE = 0 THEN DO;
+              GRAMMH= 'то JOB '!!WS_JOBID!!' евеи гдг ейтекестеи тгм '!!
+                      SUBSTR(TIM_JOBRUN,9,2)!!'/'!!
+                      SUBSTR(TIM_JOBRUN,6,2)!!'/'!!
+                      SUBSTR(TIM_JOBRUN,1,4)!!
+                      ' йаи ыяа: '!!SUBSTR(TIM_JOBRUN,12,8);
+              WRITE FILE(PRINT) FROM(LINE) ;
+              GRAMMH= 'циа тис вяеыпистысеис тгс '!!DAT_JOBRUN;
+              WRITE FILE(PRINT) FROM(LINE) ;
+              GRAMMH= 'аяихлос еццяажым= '!!AMT_EGGRAFES!!
+                      ' сумокийо посо= '!!SUM_POSOA;
+              WRITE FILE(PRINT) FROM(LINE) ;
+              CALL USER_ABEND;
+         END;
+         ELSE IF SQLCODE ^= 100 THEN DO;
+                 GRAMMH= 'SELECT ERROR сто пимайа CTDKRUN, SQLCODE= '!!
+                         SQLCODE;
+                 WRITE FILE(PRINT) FROM(LINE) ;
+                 CALL USER_ABEND;
+              END;
+              ELSE DO;
+                 GRAMMH= 'то JOB '!!WS_JOBID!!' епитяепетаи ма '!!
+                         'ейтекестеи тгм '!! CURRENT_DATE;
+                 WRITE FILE(PRINT) FROM(LINE) ;
+              END;
+
+ /**********************************/
+ /* USER ABEND                     */
+ /**********************************/
+  USER_ABEND  :PROC ;
+
+ DCL FIVE FIXED(1) INIT(5);/*NPK CHANGES FOR ENTERPLISE PLI 21-05-2007*/
+
+       WS_ABEND = FIVE/0;
+  END USER_ABEND;
+
+ /*************************************************/
+ TELOS:
+
+      CLOSE FILE(PRINT);
+
+ END DKCHRUN;
+
+

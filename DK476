@@ -1,0 +1,641 @@
+ /********************************************************************/ 00010000
+ /*****                PROGRAM NAME : DK476                      *****/ 00020000
+ /*****                                                          *****/ 00031000
+ /*****  TITLE      :  DK476 INTERFACE FOR CONDOR+               *****/ 00032000
+ /*****                Προετοιμασία γιά Cash Flow Deal (CFD)     *****/ 00032100
+ /*****                                                          *****/ 00032200
+ /*****  DATE       : 03/11/2004                                 *****/ 00033000
+ /*****                                                          *****/ 00034000
+ /*****  REVISED BY :                                            *****/ 00035000
+ /*****  DATE       :                                            *****/ 00036000
+ /*****                                                          *****/ 00037000
+ /********************************************************************/ 00038000
+ /***** 6-11-2008 npk Make it faster ,forget between             *****/ 00037000
+ /********************************************************************/ 00038000
+ DK476: PROC OPTIONS(MAIN, REENTRANT);                                  00040000
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+
+  %INCLUDE RECTAM20;
+
+ DCL TAM20 FILE RECORD SEQUENTIAL INPUT
+     ENV(FB RECSIZE(33)                                            );
+
+ DCL CARD   FILE RECORD SEQUENTIAL INPUT
+     ENV(FB RECSIZE(80)                                            );
+
+ DCL PRT   FILE RECORD OUTPUT ENV(                    FB
+           RECSIZE(133)            CTLASA);
+ /****************   GLOBAL VARIABLES  ******************************/  00123200
+ DCL 1 CC_CARD,
+       2 CC1                CHAR(01),
+       2 CC_FOLDER_NAME     CHAR(10),
+       2 CC2                CHAR(69);
+
+ DCL 1 ERLINE  ,
+       2 ERLIN1    CHAR(1)  INIT(' ')       ,
+       2 ERLIN2    CHAR(132);
+
+ DCL LAT      CHAR(24) INIT ('ABcdEZHhIKkMNnOpPrTYuXwx');
+ DCL GRE      CHAR(24) INIT ('ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ');
+
+ DCL DATE       BUILTIN ;
+ DCL SUBSTR     BUILTIN ;
+ DCL ADDR       BUILTIN ;
+ DCL LENGTH     BUILTIN ;
+ DCL TRANSLATE  BUILTIN ;
+ DCL DATETIME   BUILTIN;
+
+ /******************************************/                           00127700
+ /*        DB2 DECLARATIONS                */                           00127700
+ /******************************************/                           00127700
+ EXEC SQL INCLUDE CTBKANTI;/* ΚΙΝΗΣΕΙΣ */
+ EXEC SQL INCLUDE CTBKKON1;/* CONDOR   */
+ EXEC SQL INCLUDE SQLCA;
+                                                                        00136900
+ /********************************************************************/ 00216100
+ /***     MAIN PROGRAMM STARTS HERE                                ***/ 00216200
+ /********************************************************************/ 00216300
+ DCL   LT_EUR    CHAR(03) INIT('EUR');
+ DCL   LT_70     CHAR(02) INIT('70');
+ DCL   LT_KK11   CHAR(04) INIT('KK11');
+ DCL   LT_5600   CHAR(04) INIT('5600');
+ DCL   LT_KATHOL CHAR(11) INIT('5600');
+
+ DCL   WS_COUNT       DEC FIXED(15)   INIT(0);
+ DCL   WS_FIRST_TIME  DEC FIXED(1)    INIT(0);
+ DCL   WS_PENDING     DEC FIXED(1)    INIT(0);
+ DCL   WS_XREWSH      DEC FIXED(15,2) INIT(0);
+ DCL   WS_PISTWSH     DEC FIXED(15,2) INIT(0);
+ DCL   WS_POSON       DEC FIXED(15,2) INIT(0);
+ DCL   WS_TIMESTAMP   CHAR(26)        INIT('');
+ DCL   WS_MSG         CHAR(132)       INIT('');
+ DCL   EOF            CHAR(1)        INIT('0');
+
+ DCL   WS_MNTH       FIXED DEC(2,0)   INIT(0);
+ DCL   WS_MNTH2      FIXED DEC(2,0)   INIT(0);
+ DCL   WS_TIME       CHAR(26)        INIT(' ');
+
+ DCL   IND_PISTWSH  BIN FIXED(15)   INIT(0);
+ DCL   IND_XREWSH    BIN FIXED(15)   INIT(0);
+ DCL   IND_TIMESTAMP BIN FIXED(15)   INIT(0);
+
+ OPEN FILE(TAM20), FILE(CARD);
+
+ ON ENDFILE(TAM20)  BEGIN;
+        EOF = '1';
+ END;
+
+ ON ENDFILE(CARD) BEGIN;
+     WS_MSG = 'ΠΡΟΣΟΧΗ ΛΑΘΟΣ,ΔΕΝ ΒΡΕΘΗΚΕ ΚΟΝΤΡΟΛ ΚΑΡΤΑ. ΤΟ ΠΡΟΓΡΑΜΜ'!!
+                 'Α DK476 ΘΑ ΣΚΑΣΕΙ !!!  ';
+     CALL ERROR(WS_MSG); /*         */
+
+ END;
+
+       ERLIN1='1';
+       ERLIN2='***************************************************';
+       WRITE FILE(PRT) FROM(ERLINE);
+       ERLIN1='0';
+
+       ERLIN2=' * Εναρξη προγράμματος  ***********  DK476 ' ;
+       WRITE FILE(PRT) FROM(ERLINE);
+       ERLIN2=' * ΗΜΕΡΑ ΚΑΙ ΩΡΑ ΡΟΗΣ:      ' !! DATETIME();
+       WRITE FILE(PRT) FROM(ERLINE);
+
+
+ CALL  START_PROCESS;
+
+ IF WS_FIRST_TIME = 1 THEN DO;
+      CALL LOAD_FROM_FILE;
+ END;
+ ELSE DO;
+      CALL LOAD_FROM_DB2 ;
+ END;
+
+ CALL  INSERT_MSG ;
+
+ /********************************************************************/ 00216100
+ /* START  START_PROCESS                                             */ 00216200
+ /********************************************************************/ 00216300
+ /*                                                              *****/ 00216300
+ /********************************************************************/ 00216300
+ START_PROCESS : PROC;
+
+       /*GET CURRENT MONTH,CURRENT TIMESTAMP FIRST*/
+       CALL  GET_MONTH  ;
+
+       READ  FILE(CARD) INTO(CC_CARD);
+
+       EXEC SQL SELECT COUNT(*)
+       INTO :WS_COUNT
+       FROM CTBKKON1
+       WHERE COD_FOLDER  = :CC_FOLDER_NAME   AND
+              COD_APPLIC = :LT_70
+       WITH  UR;
+
+       IF SQLCODE =   0  THEN DO;
+           IF WS_COUNT = 0  THEN DO;/*Ειναι πρώτη φορά,διάβασε αρχείο*/
+               WS_FIRST_TIME = 1 ;
+           END;
+           ELSE DO;
+              WS_FIRST_TIME = 0 ;
+           END;
+       END;
+       ELSE DO ;
+        WS_MSG = 'ΛΑΘΟΣ TO ΠΡΟΓΡΑΜΜΑ ΘΑ ΣΚΑΣΕΙ '!!
+                 'PROC = START_PROCESS '!!
+                 'SQLCODE = '!!SQLCODE!!
+                 'TABLE = CTBKKON1 '!!
+                 'CC_FOLDER_NAME = '!!CC_FOLDER_NAME;
+           CALL ERROR(WS_MSG); /*db2 error*/
+       END;
+
+  END  START_PROCESS     ;
+ /********************************************************************/ 00216100
+ /* END START_PROCESS                                                */ 00216200
+ /********************************************************************/ 00216300
+ /********************************************************************/ 00216100
+ /* START  LOAD_FROM_FILE                                            */ 00216200
+ /********************************************************************/ 00216300
+ /* 1) Αθροισμα ποσών υπολοίπου απ το αρχειο TAM20 .                 */ 00216300
+ /* 2) Προετοιμασία φόρτωμα πεδίων για Insert στον πίνακα CTBKKON1   */ 00216300
+ /*                                                              *****/ 00216300
+ /********************************************************************/ 00216300
+ LOAD_FROM_FILE : PROC;
+
+ /* ************************************************************** */   00216300
+ /*  Αθροισμα ποσών υπολοίπου απ το αρχειο TAM20 .                 */   00216300
+ /* ************************************************************** */   00216300
+    WS_POSON = 0;
+
+    READ  FILE(TAM20) INTO(RECTAM20);
+    DO WHILE (EOF = '0');
+
+ /*  Μόνο λογαριασμούς καταθέσεων ,όχι ταμιευτηρίου                */   00216300
+      IF RECTAM20.ARLOG > 80000000 THEN DO;
+          WS_POSON = WS_POSON + RECTAM20.POSON ;
+       END;
+
+      READ  FILE(TAM20) INTO(RECTAM20);
+    END;
+
+ /* ************************************************************** */   00216300
+ /*  Προετοιμασία φόρτωμα-πεδίων για Insert στον πίνακα CTBKKON1   */   00216300
+ /* ************************************************************** */   00216300
+    BKKON1 = '';
+    BKKON1.COD_MSGID      = 'CFD';
+    BKKON1.COD_FOLDER     = CC_FOLDER_NAME;
+    BKKON1.COD_APPLIC     = LT_70;
+    BKKON1.COD_KATHOL     = LT_KATHOL;
+    BKKON1.COD_CURRENCY   = 'EUR';
+    BKKON1.CHR_CALL_ACCT  = '';
+    BKKON1.AMT_POSO       = WS_POSON;
+                              /*YYYY-MM-DD-HH.MM.SS.NNNNNN */
+    BKKON1.TIM_ANTI_TIMESTAMP = GET_MAX_TIME(
+                                CONVERT_DATE(RECTAM20.HMEROMHNIA));
+    BKKON1.COD_STATUS     = 'P';
+    BKKON1.COD_REPLY_ERR  = '';
+
+  END  LOAD_FROM_FILE    ;
+ /********************************************************************/ 00216100
+ /* END LOAD_FROM_FILE                                               */ 00216200
+ /********************************************************************/ 00216300
+ /********************************************************************/ 00216100
+ /* START  LOAD_FROM_DB2                                           */   00216200
+ /********************************************************************/ 00216300
+ /* 1) Eλεγχος αν υπάρχουν μη επιστραφέντα μηνύματα.                 */ 00216300
+ /* 2) Ευρεση του μεγαλύτερου timestamp μυνήμ.που εχει status = S    */ 00216300
+ /* 3) Ευρεση του μεγαλύτερου timestamp ,των συνολων χρέωσης,πιστωσης*/ 00216300
+ /* 4) Προετοιμασία φόρτωμα πεδίων για Insert στον πίνακα CTBKKON1   */ 00216300
+ /********************************************************************/ 00216300
+ LOAD_FROM_DB2: PROC;
+
+ /* ************************************************************* */    00216300
+ /* Eλεγχος αν υπάρχουν μη επιστραφέντα μηνύματα.                 */    00216300
+ /* ************************************************************* */    00216300
+       EXEC SQL SELECT COUNT(*)
+       INTO :WS_COUNT
+       FROM CTBKKON1
+       WHERE
+             COD_APPLIC = :LT_70           AND
+             COD_FOLDER  = :CC_FOLDER_NAME AND
+             COD_STATUS  = 'P'
+       WITH  UR;
+
+       IF SQLCODE =   0  THEN DO;
+           IF WS_COUNT = 0  THEN DO;/*Δεν βρέθηκε μηνυμα 'P'         */
+               WS_PENDING   = 0 ;   /*Mπορεί το πρόγραμμα να συνεχισει*/
+           END;
+           ELSE DO;
+              WS_PENDING    = 1 ;
+           END;
+       END;
+       ELSE DO ;
+        WS_MSG = 'PROC = LOAD_FROM_DB2 '!!
+                 'SQLCODE = '!!SQLCODE!!
+                 'TABLE = CTBKKON1 '!!
+                 'CC_FOLDER_NAME = '!!CC_FOLDER_NAME;
+           CALL ERROR(WS_MSG); /*db2 error*/
+       END;
+
+  IF WS_PENDING    = 1 THEN DO;/*ΥΠΑΡΧΟΥΝ ΜΗ ΕΠΕΣΤΡΑΦΕΝΤΑ ΜΥΝΗΜΑΤΑ*/
+        WS_MSG = 'ΛΑΘΟΣ:'!!
+                 ' ΥΠΑΡΧΕΙ PENDING MSG' !!
+                 ' STATUS= P'!!
+                 ' PROC= LOAD_FROM_DB2'!!
+                 ' FOLDER_NAME = '!!CC_FOLDER_NAME;
+           CALL ERROR(WS_MSG); /*db2 error*/
+  END;
+
+ /* ************************************************************* */    00216300
+ /* Ευρεση του μεγαλύτερου timestamp μυνήμ.που εχει status = S    */    00216300
+ /* ************************************************************* */    00216300
+
+    BKKON1 = '';
+
+    BKKON1.COD_MSGID      = 'CFD';
+    BKKON1.COD_FOLDER     = CC_FOLDER_NAME;
+    BKKON1.COD_APPLIC     = LT_70;
+    BKKON1.COD_KATHOL     = LT_KATHOL;
+    BKKON1.COD_CURRENCY   = 'EUR';
+    BKKON1.COD_STATUS     = 'S';
+
+    EXEC SQL SELECT  MAX(TIM_ANTI_TIMESTAMP)
+         INTO  :WS_TIMESTAMP  :IND_TIMESTAMP
+         FROM  CTBKKON1
+    WHERE    COD_MSGID     = :BKKON1.COD_MSGID     AND
+             COD_FOLDER    = :BKKON1.COD_FOLDER    AND
+             COD_APPLIC    = :BKKON1.COD_APPLIC    AND
+             COD_KATHOL    = :BKKON1.COD_KATHOL    AND
+             COD_CURRENCY  = :BKKON1.COD_CURRENCY  AND
+             COD_STATUS    = :BKKON1.COD_STATUS    ;
+
+    IF IND_TIMESTAMP < 0 THEN DO; /*ERROR*/
+           WS_MSG = 'SQLCODE = '!!SQLCODE!!
+                    ' TABLE = CTBKKON1 '!!
+                    'COD_FOLDER = '!!BKKON1.COD_FOLDER !!
+                    'COD_MSGID  = '!!BKKON1.COD_MSGID  !!
+                    'COD_STATUS = '!!BKKON1.COD_STATUS ;
+           CALL ERROR(WS_MSG); /*db2 error*/
+         END;                                                              00216
+
+ /* ************************************************************* */    00216300
+ /* Ευρεση του μεγαλύτερου timestamp ,των συνολων χρέωσης,πιστωσης*/    00216300
+ /* ************************************************************* */    00216300
+ BKANTI = '';
+
+ BKANTI.KEY_TIMESTAMP = WS_TIMESTAMP;
+ WS_TIMESTAMP = '';
+
+
+ EXEC SQL SELECT
+             SUM(NUM_XREWSH)    ,
+             SUM(NUM_PISTWSH)   ,
+             MAX(KEY_TIMESTAMP)
+ INTO
+            :WS_XREWSH     :IND_XREWSH,
+            :WS_PISTWSH    :IND_PISTWSH,
+            :WS_TIMESTAMP  :IND_TIMESTAMP
+   FROM  CTBKANTI
+  /*06-11-2008 WHERE(NUM_MHNAS BETWEEN :WS_MNTH2  AND :WS_MNTH)  AND */
+     WHERE (NUM_MHNAS = :WS_MNTH2  OR NUM_MHNAS =:WS_MNTH)  AND
+              KEY_TIMESTAMP    > :BKANTI.KEY_TIMESTAMP
+              AND
+              KEY_TIMESTAMP    < :WS_TIME
+              AND
+              COD_MOV          = :LT_EUR
+              AND
+              KEY_COD_EFARM    = :LT_70
+     WITH UR;
+
+      IF IND_TIMESTAMP < 0 THEN DO; /*ERROR*/
+        WS_MSG = 'IND =  '!!IND_TIMESTAMP!!
+                 ' SQLCODE = '!!SQLCODE!!
+                 ' TABLE = CTBKANTI '!!
+                 'KEY_TIMESTAMP = '!!BKANTI.KEY_TIMESTAMP ;
+           CALL ERROR(WS_MSG); /*db2 error*/
+
+      END;                                                              00216400
+
+      /*
+      ERLIN2='IND                      = '!!IND_TIMESTAMP ;
+      WRITE FILE(PRT) FROM(ERLINE);
+      ERLIN2='WS-XREOSH                = '!!WS_XREWSH;
+      WRITE FILE(PRT) FROM(ERLINE);
+      ERLIN2='WS_PISTWSH               = '!!WS_PISTWSH ;
+      WRITE FILE(PRT) FROM(ERLINE);
+      ERLIN2='WS_TIMESTAMP     = '!!WS_TIMESTAMP ;
+      WRITE FILE(PRT) FROM(ERLINE);
+      */
+ /* ************************************************************* */    00216300
+ /* Προετοιμασία-φόρτωμα πεδίων για Insert στον πίνακα CTBKKON1   */    00216300
+ /* ************************************************************* */    00216300
+
+    BKKON1 = '';
+
+    BKKON1.COD_MSGID      = 'CFD';
+    BKKON1.COD_FOLDER     = CC_FOLDER_NAME;
+    BKKON1.COD_APPLIC     = LT_70;
+    BKKON1.COD_KATHOL     = LT_KATHOL;
+    BKKON1.COD_CURRENCY   = 'EUR';
+    BKKON1.CHR_CALL_ACCT  = '';
+    BKKON1.AMT_POSO       =  WS_PISTWSH - WS_XREWSH;
+    BKKON1.TIM_ANTI_TIMESTAMP = WS_TIMESTAMP;
+    BKKON1.COD_STATUS     = 'P';
+    BKKON1.COD_REPLY_ERR  = '';
+
+  END  LOAD_FROM_DB2   ;
+ /********************************************************************/ 00216100
+ /* END LOAD_FROM_DB2                                              */   00216200
+ /********************************************************************/ 00216300
+ /********************************************************************/ 00216300
+ /* START INSERT_MSG                                                 */ 00216200
+ /********************************************************************/ 00216300
+ INSERT_MSG          : PROC;
+
+     EXEC SQL INSERT  INTO CTBKKON1
+                 ( COD_MSGID         ,
+                   COD_FOLDER        ,
+                   COD_APPLIC        ,
+                   COD_KATHOL        ,
+                   KEY_TIMESTAMP     ,
+                   COD_CURRENCY      ,
+                   CHR_CALL_ACCT     ,
+                   AMT_POSO          ,
+                   TIM_ANTI_TIMESTAMP,
+                   COD_STATUS        ,
+                   COD_REPLY_ERR     )
+           VALUES
+          (:BKKON1.COD_MSGID         ,
+           :BKKON1.COD_FOLDER        ,
+           :BKKON1.COD_APPLIC        ,
+           :BKKON1.COD_KATHOL        ,
+           :WS_TIME                  ,
+           :BKKON1.COD_CURRENCY      ,
+           :BKKON1.CHR_CALL_ACCT     ,
+           :BKKON1.AMT_POSO          ,
+           :BKKON1.TIM_ANTI_TIMESTAMP,
+           :BKKON1.COD_STATUS        ,
+           :BKKON1.COD_REPLY_ERR    );
+
+       IF SQLCODE ^= 0 THEN DO;
+        WS_MSG = 'PROC= INSERT_MSG '!!
+                 ' SQL= '!!SQLCODE!!
+                 ' ID= '!!BKKON1.COD_MSGID         !!
+                 ' FLDR= '!!BKKON1.COD_FOLDER        !!
+                 ' TMSTAMP= '!!BKKON1.TIM_ANTI_TIMESTAMP!!
+                 ' ST.= '!!BKKON1.COD_STATUS        ;
+
+           CALL ERROR(WS_MSG); /*db2 error*/
+       END;                                                                 0029
+                                                                        00293000
+ END INSERT_MSG            ;
+ /********************************************************************/ 00216100
+ /* END INSERT_MSG                                                   */ 00216200
+ /********************************************************************/ 00291500
+ /**************************************************************
+ *  CONVERT_DATE                    START                      *
+ **************************************************************/
+     CONVERT_DATE :PROC (DATE_INP) RETURNS (CHAR(10) );
+        DCL DATE_INP  FIXED (7)  ;
+        DCL DATE_OUT CHAR  (10)  ;
+
+        DCL DATE_IN   FIXED (7) INIT(0) ;
+        DCL YYMMDD   PIC '(6)9' INIT (0);
+        DCL STR_YYMMDD CHAR(6)  BASED(ADDR(YYMMDD     ));
+
+        DCL AYYMMDD   PIC '(7)9' INIT (0000000);
+        DCL STR_AYYMMDD CHAR(7)  BASED(ADDR(AYYMMDD     ));
+        /*ΕΑΝ Η ΗΜΕΡΟΜΗΝΙΑ ΕΙΝΑΙ ΜΙΚΡΟΤΕΡΗ ΑΠΟ 1000000  */
+        /*ΘΕΩΡΕΙΤΑΙ ΠΑΛΙΑ ΗΜΕΡΟΜΗΝΙΑ ΚΑΙ ΕΧΕΙ ΣΑΝ ΑΙΩΝΑ 19 */
+        DATE_IN = DATE_INP  ;
+
+        AYYMMDD = DATE_IN;
+        STR_AYYMMDD=AYYMMDD;
+
+        IF DATE_IN < 1000000  THEN DO ;
+
+             YYMMDD = DATE_IN ;
+             DATE_OUT = '19'!!SUBSTR(STR_YYMMDD,1,2)   !!
+                        '-' !!SUBSTR(STR_YYMMDD,3,2)   !!
+                        '-' !!SUBSTR(STR_YYMMDD,5,2)   ;
+        END ;
+        ELSE DO;
+
+             DATE_IN = DATE_IN -1000000; /*CUT FIRST DIGIT*/
+             YYMMDD = DATE_IN ;
+             DATE_OUT = '20'!!SUBSTR(STR_YYMMDD,1,2)   !!
+                        '-' !!SUBSTR(STR_YYMMDD,3,2)   !!
+                        '-' !!SUBSTR(STR_YYMMDD,5,2)   ;
+        END;
+        RETURN(DATE_OUT);
+
+     END CONVERT_DATE ;
+  /**************************************************************
+  *  CONVERT_DATE                    END                        *
+  **************************************************************/
+
+ /**************************************************************
+ *   GET_MAX_TIME                   START                      *
+ **************************************************************/
+      GET_MAX_TIME:PROC (DT_INP) RETURNS (CHAR(26) );
+
+        DCL DT_INP         CHAR(10)    ;/*INPUT DATE*/
+        DCL MY_TIMESTAMP   CHAR  (26)  ;
+
+        EXEC SQL
+        SELECT MAX(KEY_TIMESTAMP)
+        INTO  :MY_TIMESTAMP  :IND_TIMESTAMP
+           FROM    CTBKANTI
+           WHERE
+    /*06-11-2008(NUM_MHNAS BETWEEN :WS_MNTH2  AND :WS_MNTH)  AND */
+           (NUM_MHNAS = :WS_MNTH2  OR NUM_MHNAS =:WS_MNTH)  AND
+     KEY_COD_EFARM = '70' AND
+     KEY_DAT_HMNIA = :DT_INP
+     WITH UR;
+
+        IF IND_TIMESTAMP < 0 THEN DO; /*ERROR*/
+           WS_MSG = 'PROC= GET_MAX_TIME '!!
+                 ' SQL= '!!SQLCODE!!
+                 ' KEY_DAT_HMNIA = '!!DT_INP ;
+           CALL ERROR(WS_MSG); /*db2 error*/
+        END;                                                                0029
+
+        RETURN(MY_TIMESTAMP);
+
+     END  GET_MAX_TIME;
+  /**************************************************************
+  *   GET_MAX_TIME                   END                        *
+  **************************************************************/
+ /**************************************************************
+ *   GET_MONTH                      START                      *
+ **************************************************************/
+  GET_MONTH   :PROC ;
+
+      EXEC SQL
+          SELECT MONTH(CURRENT DATE), CURRENT TIMESTAMP
+          INTO :WS_MNTH, :WS_TIME
+          FROM SYSIBM.SYSDUMMY1;
+
+      IF SQLCODE ^= 0 THEN DO;
+            WS_MSG = 'ERROR SELECTING CURRENT TIMESTAMP '!!
+                     'SQLCODE= '!!SQLCODE;
+              CALL ERROR(WS_MSG); /*db2 error*/
+      END;
+      IF WS_MNTH > 1 THEN
+         WS_MNTH2 = WS_MNTH - 1; /*KAI O PROIGOUMENOS MHNAS*/
+      ELSE
+         WS_MNTH2 = 12;
+
+   END  GET_MONTH   ;
+  /**************************************************************
+  *   GET_MONTH                      END                        *
+  **************************************************************/
+
+ /**************************************************************
+ *  ERROR                           START                      *
+ **************************************************************/
+ ERROR        :PROC (MSG     ) ;
+    DCL MSG      CHAR  (132)  ;
+
+
+    DCL WS_BOOM   FIXED(1) INIT(1);
+    DCL WS_ZERO   FIXED(1) INIT(0);
+
+
+       ERLIN1='1';
+       ERLIN2='***************************************************';
+       WRITE FILE(PRT) FROM(ERLINE);
+       ERLIN1='0';
+
+       ERLIN2=' * DK476  ΗΜΕΡΑ ΚΑΙ ΩΡΑ ΡΟΗΣ = '!!DATETIME();
+       WRITE FILE(PRT) FROM(ERLINE);
+
+       ERLIN2='ΠΡΟΒΛΗΜΑ ΣΤΟ ΠΡΟΓΡΑΜΜΑ DK476 ΤΟ ΠΡΟΓΡΑΜΜΑ ΘΑ ΣΚΑΣΕΙ';
+       WRITE FILE(PRT) FROM(ERLINE);
+
+       ERLIN2=MSG;
+       WRITE FILE(PRT) FROM(ERLINE);
+
+       ERLIN2='***************************************************';
+       WRITE FILE(PRT) FROM(ERLINE);
+
+       WS_BOOM = WS_BOOM /  WS_ZERO  ; /*JUST CRASH*/
+
+
+   END ERROR        ;
+  /**************************************************************
+  *  ERROR                           END                        *
+  **************************************************************/
+
+ TELOS:;
+       ERLIN1='1';
+       ERLIN2='***************************************************';
+       WRITE FILE(PRT) FROM(ERLINE);
+       ERLIN1='0';
+
+       ERLIN2=' * ΕΠΙΤΥΧΕΣ ΤΕΛOS ΠΡΟΓΡΑΜΜΑΤΟΣ       DK476 ' ;
+       WRITE FILE(PRT) FROM(ERLINE);
+       ERLIN2=' * ΗΜΕΡΑ ΚΑΙ ΩΡΑ ΡΟΗΣ:      ' !! DATETIME();
+       WRITE FILE(PRT) FROM(ERLINE);
+       ERLIN2=' * ΠΕΡΙΕΧΟΜΕΝΑ CC-ΚΑΡΤΑΣ:  ' !! CC_FOLDER_NAME ;
+       WRITE FILE(PRT) FROM(ERLINE);
+
+       ERLIN2='***************************************************';
+       WRITE FILE(PRT) FROM(ERLINE);
+
+       ERLIN2='* ΣΤΟΝ ΠΙΝΑΚΑ CTBKKON1    ΓΡΑΦΤΗΚΑΝ ΤΑ ΠΑΡΑΚΑΤΩ ***';
+      WRITE FILE(PRT) FROM(ERLINE);
+
+      ERLIN2='BKKON1.COD_MSGID          = '!!BKKON1.COD_MSGID         ;
+      WRITE FILE(PRT) FROM(ERLINE);
+      ERLIN2='BKKON1.COD_FOLDER         = '!!BKKON1.COD_FOLDER        ;
+      WRITE FILE(PRT) FROM(ERLINE);
+      ERLIN2='BKKON1.COD_APPLIC         = '!!BKKON1.COD_APPLIC        ;
+      WRITE FILE(PRT) FROM(ERLINE);
+      ERLIN2='BKKON1.COD_KATHOL         = '!!BKKON1.COD_KATHOL        ;
+      WRITE FILE(PRT) FROM(ERLINE);
+      ERLIN2='BKKON1.COD_CURRENCY       = '!!BKKON1.COD_CURRENCY      ;
+      WRITE FILE(PRT) FROM(ERLINE);
+      ERLIN2='BKKON1.CHR_CALL_ACCT      = '!!BKKON1.CHR_CALL_ACCT     ;
+      WRITE FILE(PRT) FROM(ERLINE);
+      ERLIN2='BKKON1.AMT_POSO           = '!!BKKON1.AMT_POSO          ;
+      WRITE FILE(PRT) FROM(ERLINE);
+      ERLIN2='BKKON1.TIM_ANTI_TIMESTAMP = '!!BKKON1.TIM_ANTI_TIMESTAMP;
+      WRITE FILE(PRT) FROM(ERLINE);
+      ERLIN2='BKKON1.COD_STATUS         = '!!BKKON1.COD_STATUS        ;
+      WRITE FILE(PRT) FROM(ERLINE);
+ END DK476;                                                             00300000
+   /*
+ EXEC SQL DECLARE CTBKANTI TABLE
+           ( KEY_COD_EFARM                  CHAR(2) NOT NULL,
+             KEY_COD_ARLOG                  DECIMAL(9,0) NOT NULL,
+             KEY_DAT_HMNIA                  DATE NOT NULL,
+             KEY_NUM_ARTRS                  DECIMAL(5,0) NOT NULL,
+             KEY_NUM_SEIRA                  DECIMAL(3,0) NOT NULL,
+             COD_KATMA                      DECIMAL(5,0) NOT NULL,
+             COD_KATHO                      DECIMAL(5,0) NOT NULL,
+             NUM_AREPIT                     DECIMAL(9,0) NOT NULL,
+             CHR_KAIT                       CHAR(3) NOT NULL,
+             NUM_XREWSH                     DECIMAL(15,2) NOT NULL,
+             NUM_PISTWSH                    DECIMAL(15,2) NOT NULL,
+             NUM_YPOLOIPO                   DECIMAL(15,2) NOT NULL,
+             COD_MOV                        CHAR(3) NOT NULL,
+             CHR_TRANID                     CHAR(4) NOT NULL,
+             CHR_TERMID                     CHAR(7) NOT NULL,
+             DAT_VALEUR                     DATE NOT NULL,
+             NUM_MHNAS                      DECIMAL(2,0) NOT NULL,
+             KEY_TIMESTAMP                  TIMESTAMP NOT NULL,
+             VAR_AITIOL                     VARCHAR(50)
+           ) ;
+
+ DCL 1 BKANTI,
+      5 KEY_COD_EFARM  CHAR(2),
+      5 KEY_COD_ARLOG  DEC FIXED(9,0),
+      5 KEY_DAT_HMNIA  CHAR(10),
+      5 KEY_NUM_ARTRS  DEC FIXED(5,0),
+      5 KEY_NUM_SEIRA  DEC FIXED(3,0),
+      5 COD_KATMA  DEC FIXED(5,0),
+      5 COD_KATHO  DEC FIXED(5,0),
+      5 NUM_AREPIT  DEC FIXED(9,0),
+      5 CHR_KAIT CHAR(3),
+      5 NUM_XREWSH  DEC FIXED(15,2),
+      5 NUM_PISTWSH  DEC FIXED(15,2),
+      5 NUM_YPOLOIPO  DEC FIXED(15,2),
+      5 COD_MOV  CHAR(3),
+      5 CHR_TRANID  CHAR(4),
+      5 CHR_TERMID  CHAR(7),
+      5 DAT_VALEUR  CHAR(10),
+      5 NUM_MHNAS  DEC FIXED(2,0),
+      5 KEY_TIMESTAMP  CHAR(26),
+      5 VAR_AITIOL  CHAR(50) VAR;
+   */
+ /* PLI DECLARATION FOR TABLE TCBOGDB2.CTBKKON1                       */
+ /*********************************************************************/
+ /*
+ DCL 1 BKKON1,
+      5 COD_MSGID          CHAR(3),
+      5 COD_FOLDER         CHAR(10),
+      5 COD_APPLIC         CHAR(2),
+      5 COD_KATHOL         CHAR(11),
+      5 KEY_TIMESTAMP      CHAR(26),
+      5 COD_CURRENCY       CHAR(3),
+      5 CHR_CALL_ACCT      CHAR(10),
+      5 AMT_POSO           DEC FIXED(15,2),
+      5 TIM_ANTI_TIMESTAMP CHAR(26),
+      5 COD_STATUS         CHAR(1),
+      5 COD_REPLY_ERR      CHAR(5);
+   */
+   /*
+         DCL 1  RECTAM20,
+              2 ARLOG      FIXED(9)   ,   APIhMOr kOcAPIArMOY
+              2 KATMA      FIXED(5)   ,   KATArTHMA kOcPIArMOY
+              2 EPAGELMA   CHAR(2)    ,   KxdIKOr EpAccEkMATOr
+              2 POSON      FIXED(13,2),   YpOkOIpO kOcAPIArMOY
+              2 HMEROMHNIA FIXED(7)   ,   HMEP/NIA dHMIOYPcIAr TAM20
+              2 KATHO      FIXED(5)   ,   KAhOkIKO kOcAPIArMOY
+              2 HMTS       FIXED(7)   ,   HMEP/NIA TEk.rYNAkkAcHr
+              2 HMTA       FIXED(7)   ,   HMEP/NIA KkEIrIMATOr
+              2 DEH        CHAR(1);       ENdEInH OTI EXEI rYMBArH
+   */
+

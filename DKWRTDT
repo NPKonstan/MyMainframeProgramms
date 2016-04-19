@@ -1,0 +1,416 @@
+*PROCESS XOPTS(CICS);
+ DKWRTDT: PROC OPTIONS(MAIN,REENTRANT);
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+
+ DCL (TWAPTR,KWADSPTR,TWADSPTR,CUADSPTR,DTWRPTR) PTR INIT(NULL);
+
+ DCL  1  TWA_AREA  BASED(TWAPTR),
+ % INCLUDE  EFHDLIDS  ;
+ % INCLUDE  EFHTFDS   ;
+ % INCLUDE  EFHCUADS  ;
+ % INCLUDE  EFHKWADS  ;
+ % INCLUDE  EFHTWADS  ;
+ % INCLUDE  EFHDTWRS  ;
+ % INCLUDE  FBUILTIN  ;
+
+ % INCLUDE  CMQEPP;
+ % INCLUDE  CMQP;
+ /********************************************************************/
+ /********************************************************************/
+ DCL  ABEND_CODE CHAR(4)     INIT('0000');
+ DCL  MSG        CHAR(130)   INIT(' ');
+
+ DCL  IS_TEST    CHAR(4)     INIT('YES');/* ¡Õ≈ ‘œ Õœ ”‘«Õ –¡—¡√Ÿ√«*/
+
+ /* ************************************************************ */
+ /* ************** FIELDS FOR INITIALIZATION  *********************/
+ /* ***************************************************************/
+
+ DCL  CUATELB   BIT(8)   BASED(ADDR(CUATELOS));
+ DCL  TWAAREPB  BIT(40)  BASED(ADDR(TWAAREP));
+ DCL  TWAAITIB  BIT(400) BASED(ADDR(TWAAITI1));
+ DCL  KWAAREPB  BIT(40)  BASED(ADDR(KWAAREP));
+ DCL  KWAAITIB  BIT(400) BASED(ADDR(KWAAITI1));
+
+ /* ************************************************************ */
+ /* ************** FIELDS FOR CALLING ANALYZER START **************/
+ /* ***************************************************************/
+
+ DCL  INPUT_BUFFER   CHAR(200);
+
+ DCL 1 COM_REGION AUTOMATIC,
+       2 COMAREA_ANLZR  CHAR(200);
+
+ DCL  COM_LEN_ANLZR FIXED BIN(15)  INIT(200);
+
+ /* ***************************************************************/
+ /* ************** FIELDS FOR CALLING ANALYZER END   **************/
+ /* ***************************************************************/
+
+ DCL  MY_LEN        FIXED BIN(15)  INIT(0);
+ DCL  ANLZ_ERROR    PIC '999'      INIT(0);
+ DCL  DMPCODE       CHAR(4)        INIT('    ');
+ DCL  WS_PROGRAM    CHAR(8)        INIT((8)' ');
+ DCL  WS_INV_PROG   CHAR(8)        INIT((8)' ');
+ DCL  WS_JOBNAME    CHAR(8)        INIT((8)' ');
+
+ DCL  TRNCODE       CHAR(4)        INIT('    ');
+ DCL  MYCICS        CHAR(8)        INIT(' ');
+ /* ***************************************************************/
+
+ dcl  MessageCount FIXED DEC(03)    INIT(0);
+ dcl  PutMsgCount  fixed binary(31) init(0);
+ dcl  ABENDCount   PIC '9999'       init(0);
+
+ /******************************************************************/
+ /***** Variables for MQ calls *************************************/
+ /******************************************************************/
+
+ DCL CompCodeMQGET   fixed binary(31) init(0);
+ DCL CompCodeINP     fixed binary(31) init(0);
+ DCL ReasonINP       fixed binary(31) init(0);
+
+ DCL 1 ObjDescINP    LIKE   MQOD; /* Object descriptor for GET */
+ DCL OpenOptionsINP  fixed binary(31) init(0);
+ DCL HobjINP         fixed binary(31) init(0); /*HANDLER FOR GET  */
+
+
+ DCL  QueueManager  char(MQ_Q_MGR_NAME_LENGTH) init('');
+ dcl  Inp_Queue     char(MQ_Q_NAME_LENGTH)     init('');
+ dcl  ERR_QUEUE     char(MQ_Q_NAME_LENGTH)     init('');
+
+ dcl Hconn    fixed binary(31) init(0);    /* Connection handle */
+ dcl CompCode fixed binary(31) init(0);    /* Completion code   */
+ dcl Reason   fixed binary(31) init(0);    /* Qualifying reason */
+
+
+ dcl O_options fixed binary(31) init (0);/* MQOPEN options   */
+ dcl 1 gmo like MQGMO;
+ dcl 1 pmo like MQPMO;              /* put message options     */
+ dcl 1 mdG  like MQMD;    /* Message descriptor MQGET   */
+ dcl Inp_DataLength fixed binary(31) init(0); /* Length of Inp msg */
+ dcl Inp_BuffLength fixed binary(31) init(200);/*Length of Input*/
+ dcl Inp_Buffer char(Inp_BuffLength) init(''); /* Area of Input data */
+
+ /********************************************************************/
+ /*                       MAIN  PROGRAM                              */
+ /********************************************************************/
+ /* CHECK IN WHAT CICS WE ARE RUNING */
+  EXEC CICS ASSIGN APPLID(MYCICS);
+  SELECT (MYCICS);
+      WHEN ('CICSTEST') /* INTEGRATION TEST*/
+      DO;
+        QueueManager  ='MQST';
+        Inp_Queue     ='CO.T.LQ.DISCTERM';
+        Err_Queue     ='CO.T.LQ.DISCERR';
+      END;
+      WHEN ('FNDAORRB') /* PRE-PRODUCTION */
+      DO;
+        QueueManager  ='MQSP';
+        Inp_Queue     ='CO.R.LQ.DISCTERM';
+        Err_Queue     ='CO.R.LQ.DISCERR';
+      END;
+      WHEN ('DBDCCICS')  /* –¡—¡√Ÿ√«       */
+      DO;
+
+        QueueManager  ='MQSP';
+        Inp_Queue     ='CO.P.LQ.DISCTERM';
+        Err_Queue     ='CO.P.LQ.DISCERR';
+      END;
+      OTHERWISE  GO TO TELOS;
+  END;
+
+ /****************** CICS ADDRESING     *****************************/
+ DCL  1  TWA_CLEAR  BASED(TWAPTR),
+         2 TWA_BIT(8000) BIT(1);/*TWA IS 1000 BYTES THEN 8000BITS*/
+
+
+ EXEC CICS ADDRESS TWA (TWAPTR) ;
+
+ CUADSPTR = ADDR(TFDSEND) ;
+ KWADSPTR = ADDR(CUAATWAA);
+ TWADSPTR = ADDR(CUAATWAA);
+ DTWRPTR  = ADDR(TWAATM1);
+
+ /****************** HANDLE ABEND       *****************************/
+   EXEC CICS HANDLE ABEND PROGRAM('DKWRTDT') ;
+   EXEC CICS ASSIGN ABCODE(DMPCODE)
+                    ABPROGRAM(WS_PROGRAM);
+
+
+   IF DMPCODE ^= ''   THEN DO;
+      /*
+      PUT SKIP LIST('******* DKWRTDT ABEND ERROR  START *****');
+      PUT SKIP LIST('PROGRAM = ' ,WS_PROGRAM               );
+      PUT SKIP LIST('EIBDS   = ' ,EIBDS                 );
+      PUT SKIP LIST('******* DKWRTDT ABEND ERROR  END   *****');
+      */
+        EXEC CICS SYNCPOINT
+                  ROLLBACK; /*UNDO CHANGES UNTIL LAST SUNCPOINT*/
+        CALL WRITE_ERR_Q ('CICS ABEND= '!!DMPCODE !!' '
+                          !!WS_PROGRAM
+                          !!' EIBDS= '!!EIBDS
+                          !!'  '!! SUBSTR(COM_AREA,1,200));
+
+        EXEC CICS START TRANSID('DTWR') INTERVAL(000002);
+        EXEC CICS RETURN;
+   END;
+
+ /****************** MAIN PROGRAM START *****************************/
+  CALL OPEN_QUEUE ;
+  CompCodeMQGET = MQCC_OK  ;
+
+  DO WHILE  ( CompCodeMQGET = MQCC_OK );
+       /*≈¡Õ ‘œ –À«»œ” Ã’Õ«Ã¡‘ŸÕ ≈…Õ¡… Ã≈√¡Àœ Œ¡Õ¡Œ≈ …Õ¡ ‘«Õ*/
+       /*…ƒ…¡ ”’Õ¡À¡√« (¡–œ÷’√« –—œ¬À«Ã¡‘ŸÕ ÃÕ«Ã«”)         */
+       IF (TRNCODE = 'KH19' & MessageCount > 10 ) !
+          (MessageCount > 200 )
+       THEN DO;
+
+           MessageCount = 0;
+
+           CALL CLOSE_QUEUE ;
+           EXEC CICS START TRANSID('DTWR') INTERVAL(000002);
+           EXEC CICS RETURN;
+
+       END;
+       ELSE DO;/* WE CAN CONTINUE WORKING */
+           MY_LEN = 0;
+
+           CALL GET_INPUT_MSG;
+
+           IF   ( CompCodeMQGET = MQCC_OK ) THEN DO;
+
+             /*SAVE INPUT HERE IN ORDER TO HAVE IT AFTER SOME ABEND*/
+             SUBSTR(COM_AREA,1,200) = INPUT_BUFFER;
+
+             EIBTRMID  = SUBSTR (INPUT_BUFFER,5,4);
+
+             CALL CALL_ANLZR ;
+           END;
+       END;
+  END; /* WHILE */
+
+
+  CALL CLOSE_QUEUE ;
+  GO TO TELOS;
+  /**************************************************************/
+
+  /**********************************/
+  /* OPEN_QUEUE               START */
+  /**********************************/
+  OPEN_QUEUE          : PROC;
+
+  /*OPEN INPUT QUEUE FOR MQGET*/
+
+      ObjDescINP.ObjectQMgrName = QueueManager;/* GIVE QUEUE MANAGER */
+      ObjDescINP.ObjectName = Inp_Queue; /*GIVE QUEUE NAME*/
+
+      OpenOptionsINP  = MQOO_INPUT_SHARED    + MQOO_FAIL_IF_QUIESCING;
+
+      call MQOPEN(MQHC_DEF_HCONN ,
+                  ObjDescINP,
+                  OpenOptionsINP,
+                  HobjINP,
+                  CompCodeINP,
+                  ReasonINP);
+
+   IF (CompCodeINP ^= MQCC_OK) ! (ReasonINP ^= MQRC_NONE) THEN DO;
+           MSG='ERR.OPEN Queue: '!!Inp_Queue       ;
+           EXEC CICS WRITEQ TD QUEUE('CSMT') FROM (MSG) LENGTH(130);
+           MSG='Code='!!CompcodeINP;
+           EXEC CICS WRITEQ TD QUEUE('CSMT') FROM (MSG) LENGTH(130);
+           MSG='Reason='!!ReasonINP;
+           EXEC CICS WRITEQ TD QUEUE('CSMT') FROM (MSG) LENGTH(130);
+
+           EXEC CICS RETURN;
+
+           END;
+
+     END OPEN_QUEUE          ;
+  /**********************************/
+  /* OPEN_QUEUE               END   */
+  /**********************************/
+
+  /**********************************/
+  /* GET_INPUT_MSG            START */
+  /**********************************/
+  GET_INPUT_MSG       : PROC;
+
+     INPUT_BUFFER ='';
+     TRNCODE = '';
+
+     gmo.Options = MQGMO_NO_WAIT              +
+            /*     MQGMO_SYNCPOINT            +     */
+                   MQGMO_NO_SYNCPOINT         +
+                   MQGMO_CONVERT              +
+                   MQGMO_FAIL_IF_QUIESCING;
+
+    gmo.MatchOptions = MQMO_NONE;
+
+    mdG.CodedCharSetId = MQCCSI_Q_MGR;
+
+    mdG.MSGID    = MQMI_NONE;
+    mdG.CORRELID = MQCI_NONE;
+
+    call MQGET(MQHC_DEF_HCONN ,
+              HobjINP,
+              mdG,
+              gmo,
+              200           ,
+              INPUT_BUFFER  ,
+              Inp_DataLength,
+              CompCodeMQGET,
+              Reason);
+   IF  (Reason     = MQRC_NONE)  THEN DO;
+     TRNCODE = substr(INPUT_BUFFER,1,4);
+
+   END;
+   /*
+   IF CompCodeMQGET = MQCC_OK  THEN DO;
+       MessageCount = MessageCount + 1;
+   END;
+   ELSE DO;
+   IF  (Reason    ^= MQRC_NONE)  THEN DO;
+           MSG='get err  reason '!! reason;
+           EXEC CICS WRITEQ TD QUEUE('CSMT') FROM (MSG) LENGTH(130);
+   END;
+   END;
+   */
+   END GET_INPUT_MSG       ;
+  /**********************************/
+  /* GET_INPUT_MSG            END   */
+  /**********************************/
+  /**********************************/
+  /*  WRITE_ERR_Q          START    */
+  /**********************************/
+   WRITE_ERR_Q :PROC(INP) ;
+   DCL INP CHAR(243)          ;
+
+   DCL ObjDescPUT       like MQOD;
+   DCL MsgDescPUT       like MQMD;
+   DCL PutMsgOptsPUT    like MQPMO;
+   DCL BufferLengthPUT  fixed bin(31);
+   DCL BufferPUT        char(243);
+   DCL CompCodePUT      fixed bin(31);
+   DCL ReasonPUT        fixed bin(31);
+
+   ObjDescPUT.ObjectQMgrName = QueueManager; /* GIVE QUEUE MANAGER   */
+   ObjDescPUT.ObjectName     = Err_Queue;    /* GIVE ERROR QUEUE NAME*/
+
+   MsgDescPUT.MsgType     = MQMT_DATAGRAM    ;
+   MsgDescPUT.MsgId       = MQMI_NONE        ;
+   MsgDescPUT.CorrelId    = MQCI_NONE        ;
+   MsgDescPUT.Persistence = MQPER_PERSISTENT ;
+
+   PutMsgOptsPUT.Options = MQPMO_NO_SYNCPOINT    +
+                           MQPMO_DEFAULT_CONTEXT +
+                      /*   MQPMO_NEW_MSG_ID      +   */
+                           MQPMO_FAIL_IF_QUIESCING ;
+
+
+   BufferLengthPUT       = 243;
+   BufferPUT             = INP;
+
+
+   CALL MQPUT1 ( MQHC_DEF_HCONN ,
+                 ObjDescPUT,
+                 MsgDescPUT,
+                 PutMsgOptsPUT,
+                 BufferLengthPUT,
+                 BufferPUT,
+                 CompCodePUT,
+                 ReasonPUT);
+
+   IF CompCodePUT ^=  MQCC_OK  THEN DO;
+           MSG='Error MQPut1 CompCodePut= '!! CompCodePut  ;
+           EXEC CICS WRITEQ TD QUEUE('CSMT') FROM (MSG) LENGTH(130);
+           MSG='Error MQPut1 ReasonPUT  = '!! ReasonPUT    ;
+           EXEC CICS WRITEQ TD QUEUE('CSMT') FROM (MSG) LENGTH(130);
+           MSG='Error MQPut1 BufferPut  = '!! BufferPUT    ;
+           EXEC CICS WRITEQ TD QUEUE('CSMT') FROM (MSG) LENGTH(130);
+           EXEC CICS RETURN;
+   END;
+
+   END  WRITE_ERR_Q ;
+  /**********************************/
+  /*  WRITE_ERR_Q          END      */
+  /**********************************/
+
+  /**********************************/
+  /* CALL_ANLZR              START  */
+  /**********************************/
+  CALL_ANLZR          : PROC;
+
+      DCL I FIXED(5) ;
+
+      COMAREA_ANLZR  = SUBSTR(INPUT_BUFFER ,9, 192 );
+
+      MessageCount = MessageCount + 1;
+
+      EXEC CICS LINK PROGRAM('PCTANLZ')
+                     COMMAREA(COMAREA_ANLZR) LENGTH(COM_LEN_ANLZR);
+
+
+      ANLZ_ERROR = SUBSTR(COMAREA_ANLZR,1,3)  ;
+
+      IF ANLZ_ERROR ^= '000'  THEN DO ; /*there is error*/
+
+            COM_AREA = '';
+            COM_AREA  = SUBSTR(COMAREA_ANLZR,1,43)!! INPUT_BUFFER ;
+            CALL WRITE_ERR_Q(COM_AREA);
+
+      END;
+      /*
+      DO I = 1 TO I = 8000 ;
+          TWA_BIT(I) = '0'B;
+     END;
+        */
+
+  /*************     *********************/
+  /*  œ’‘≈Õ‘¡ « Â‰˘ ·Ô Í·Ù˘  œ’‘≈Õ‘¡ « */
+  /******************    ****************/
+
+      CUATELB  = '0'B;
+      TWAAREPB = '0'B;
+      TWAAITIB = '0'B;
+      KWAAREPB = '0'B;
+      KWAAITIB = '0'B;
+
+      CUAMSGST = '';
+      EXEC CICS SYNCPOINT  ;
+
+  END CALL_ANLZR     ;
+  /**********************************/
+  /* CALL_ANLZR              END    */
+  /**********************************/
+
+  /**********************************/
+  /* CLOSE_QUEUE             START  */
+  /**********************************/
+  CLOSE_QUEUE         : PROC;
+
+  /*CLOSE INPUT QUEUE*/
+  call MQCLOSE(MQHC_DEF_HCONN ,
+                 HobjINP  ,
+                 MQCO_NONE,
+                 CompCode,
+                 Reason);
+
+    if ((CompCode ^= MQCC_OK) ! (Reason ^= MQRC_NONE)) then do;
+       MSG='Error on MQCLOSE Input queue, Compcode='!!compcode;
+       EXEC CICS WRITEQ TD QUEUE('CSMT') FROM (MSG) LENGTH(130);
+       MSG='Reason='!!Reason;
+       EXEC CICS WRITEQ TD QUEUE('CSMT') FROM (MSG) LENGTH(130);
+       EXEC CICS RETURN;
+    end;
+
+   END CLOSE_QUEUE         ;
+  /**********************************/
+  /* CLOSE_QUEUE             END    */
+  /**********************************/
+ TELOS:
+ EXEC CICS RETURN;
+
+ END DKWRTDT;
+

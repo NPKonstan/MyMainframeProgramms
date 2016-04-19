@@ -1,0 +1,1151 @@
+*PROCESS LIMITS (FIXEDDEC(15,31));                                      00010000
+ DDDEL40: PROCEDURE OPTIONS(MAIN);                                      00020000
+ /********************************************************************/ 00030000
+ /* –—œ√—¡ÃÃ¡ PLI KAI DB2                                            */ 00040000
+ /********************************************************************/ 00050000
+ /*–—œ√—¡ÃÃ¡  DELETE ROWS FROM CTDDMD10 BASED ON CASES               */ 00060000
+ /********************************************************************/ 00070000
+ /********************************************************************/ 00080000
+ /* Input :                                                          */ 00090000
+ /*                                                                  */ 00100000
+ /*  Output:                                                         */ 00110000
+ /*      AÒ˜ÂﬂÔ                                                      */ 00120000
+ /*                                                                  */ 00130000
+ /*                                                                  */ 00140000
+ /********************************************************************/ 00150000
+ /********************************************************************/ 00160000
+ /*           PROGRAM NAME: DDDEL40    LOAD MODULE: DDDEL40          */ 00170000
+ /********************************************************************/ 00180000
+ /* 12-08-2009                                                       */ 00190000
+ /********************************************************************/ 00200000
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');                    00210000
+ % INCLUDE  RECDDD01;                                                   00220000
+                                                                        00230000
+ DCL     PRT FILE     SEQUENTIAL OUTPUT ENV(FB RECSIZE(133) CTLASA);    00240000
+ DCL     LINE                CHAR (133);                                00250000
+ DCL 1   LNX                 BASED(ADDR(LINE)),                         00260000
+      2  CTLCHR              CHAR(1)      INIT('1'),                    00270000
+      2  GRAMH               CHAR(132)    INIT(' ');                    00280000
+ DCL  GRAM                   CHAR(133)    INIT(' ');                    00290000
+                                                                        00300000
+  DCL 1 CTL_CARD,                                                       00310000
+        2 CTL_CHAR           CHAR ( 01 ), /* C,R                 */     00320000
+        2 CTL_APO            PIC '( 8 )9',/* APO YYYYMMDD        */     00330000
+        2 CTL_CHAR1          CHAR ( 01 ), /*                     */     00340000
+        2 CTL_EOS            PIC '( 8 )9',/* EOS YYYYMMDD        */     00350000
+        2 CTL_CHAR2          CHAR ( 01 ), /*                     */     00360000
+        2 CTL_VALEUR         PIC '( 8 )9',/* EOS YYYYMMDD        */     00370000
+        2 CTL_CHAR3          CHAR ( 01 ), /*                     */     00380000
+        2 CTL_GROUP_TYPE     CHAR ( 03 ), /*                     */     00390000
+        2 CTL_CHAR4          CHAR ( 01 ), /*                     */     00400000
+        2 CTL_DIRECTION      CHAR ( 01 ), /*                     */     00410000
+        2 CTL_CHAR5          CHAR ( 01 ), /*                     */     00420000
+        2 CTL_STATUS_PROCESS CHAR ( 01 ), /*                     */     00430000
+        2 CTL_CHAR6          CHAR ( 01 ), /*                     */     00440000
+        2 CTL_TEST_CODE      CHAR ( 01 ), /*                     */     00450000
+        2 CTL_FILLER         CHAR ( 43 );                               00460000
+  DCL 1 CTL_CARDB,                                                      00470000
+        2 CTL_CHARB           CHAR ( 01 ), /* C,R                 */    00480000
+        2 CTL_FILE_ID_TODIAS CHAR ( 08 ), /*                     */     00490000
+        2 CTL_FILLERB         CHAR ( 71 );                              00500000
+ DCL 1   ERLINE              ,                                          00510000
+      2  ERLIN1       CHAR(1)      INIT('1'),                           00520000
+      2  ERLIN2       CHAR(132)    INIT(' ');                           00530000
+                                                                        00540000
+ DCL WS_MSG                  CHAR (132);                                00550000
+ DCL CTL_APO10               CHAR (10) INIT (' ');                      00560000
+ DCL CTL_EOS10               CHAR (10) INIT (' ');                      00570000
+ DCL DEC_INTRB_SETL_DAT_APO  DEC FIXED(8,0) INIT (0);                   00580000
+ DCL DEC_INTRB_SETL_DAT_EOS  DEC FIXED(8,0) INIT (99999999);            00590000
+ DCL DEC_GROUP_TYPE_CTL      DEC FIXED(3,0) INIT (0);                   00600000
+ DCL CHR_FILE_ID_TODIAS_CTL  CHAR (8)       INIT (' ');                 00610000
+ DCL FLG_DIRECTION_CTL       CHAR (1)       INIT (' ');                 00620000
+ DCL FLG_STATUS_PROCESS_CTL  CHAR (1)       INIT (' ');                 00630000
+ DCL FLG_LOCAL_INSTR         CHAR (35)      INIT (' ');                 00640000
+ DCL KEEP_CHR_FILE_ID        CHAR (8)       INIT (' ');                 00650000
+ DCL START_DAT_DATETIME_PROC CHAR(26)       INIT (' ');                 00660000
+ DCL END_DAT_DATETIME_PROC   CHAR(26)       INIT (' ');                 00670000
+ DCL SUM_POSON               FIXED(15,2)    INIT (0);                   00680000
+ DCL SUM_POSON_010           FIXED(15,2) INIT (0);                      00690000
+                                                                        00700000
+ /********************************************************************/ 00710000
+ /*œÕœÃ¡  ¡… –≈—…√—¡÷π INPUT                   /                        00720000
+ /********************************************************************/ 00730000
+ DCL FDI FILE  SEQUENTIAL OUTPUT ENV(FB RECSIZE(1480));                 00740000
+ DCL READER   FILE RECORD INPUT  ENV(FB RECSIZE(80));                   00750000
+ /********************************************************************/ 00760000
+ /***************************/                                          00770000
+ /*DB2 DECLARATIONS         */                                          00780000
+ /***************************/                                          00790000
+ EXEC SQL INCLUDE CTDDMD10;/*C31+C32+C33+C34...*/                       00810000
+ EXEC SQL INCLUDE CTddmd15;/*                  */                       00820003
+ EXEC SQL INCLUDE SQLCA;                                                00830000
+ /********************************************************************/ 00840000
+ /* –ÂÒÈ„Ò·ˆﬁ records                                               */  00850000
+ /********************************************************************/ 00860000
+ /*     C31   FILE_HEADER                                           */  00870000
+ /*     C32   GROUP_HEADER                                          */  00880000
+ /*     C33   DETAIL_COLLECTION                                     */  00890000
+ /*     C34   ELECTONIC_SIGNATURE                                   */  00900000
+ /*     C35   DETAIL_STAND_ALONE_MANDAT                             */  00910000
+ /*     C36   DETAIL_R_MSG                                          */  00920000
+ /*     C37   GROUP_TRAILER                                         */  00930000
+ /*     C38   FILE_TRAILER                                          */  00940000
+ /********************************************************************/ 00950000
+ DCL  S31   LIKE C31 ;                                                  00960000
+ DCL  S32   LIKE C32 ;                                                  00970000
+ DCL  S33   LIKE C33 ;                                                  00980000
+ DCL  S34   LIKE C34 ;                                                  00990000
+ DCL  S35   LIKE C35 ;                                                  01000000
+ DCL  S36   LIKE C36 ;                                                  01010000
+ DCL  S37   LIKE C37 ;                                                  01020000
+ DCL  S38   LIKE C38 ;                                                  01030000
+                                                                        01040000
+ DCL  LIMIT             FIXED (5)  INIT (1000);                         01050000
+ DCL  COUNT_NEW         FIXED (15) INIT (0000);                         01060000
+ DCL  COUNT             FIXED (15) INIT (0000);                         01070000
+ DCL  MYSTEP            FIXED (3)  INIT (050);                          01080000
+                                                                        01090000
+ DCL  1 TABL_NEW(*) CONTROLLED,                                         01100000
+        2  MY_GROUP_HEADER          LIKE C32,                           01110000
+        2  MY_GROUP_TRAILER         LIKE C37;                           01120000
+ DCL  1 MY_MIRROR(*) CONTROLLED,                                        01130000
+        2  MY_GROUP_HEADER          LIKE C32,                           01140000
+        2  MY_GROUP_TRAILER         LIKE C37;                           01150000
+                                                                        01160000
+ DCL    MY_FILE_HEADER          LIKE C31;                               01170000
+ ALLOCATE TABL_NEW(LIMIT);                                              01180000
+ ALLOCATE MY_MIRROR(LIMIT);                                             01190000
+ DCL  1   REC_C3F   BASED(ADDR(REC_C3 )) ,                              01200000
+          2 REC_TYPE4  ,                                                01210000
+            3 REC_TYPE1 PIC'9' ,                                        01220000
+            3 REC_TYPE3 PIC'999' ,                                      01230000
+          2 FILLER  CHAR(1476);                                         01240000
+ DCL EOF_GETDATA_101 PIC'9'     INIT(0);                                01250000
+ DCL EOF_GETDATA_102 PIC'9'     INIT(0);                                01260000
+ DCL EOF_GETDATA_104 PIC'9'     INIT(0);                                01270000
+ DCL EOF_GETDATA_106 PIC'9'     INIT(0);                                01280000
+ DCL EOF_GETDATA_040 PIC'9'     INIT(0);                                01290000
+ DCL TYPE_CURR1 PIC'9'     INIT(0);                                     01300000
+ DCL TYPE_PREV1 PIC'9'     INIT(0);                                     01310000
+ DCL TYPE_PREV4 PIC'9999'  INIT(0);                                     01320000
+ DCL TYPE_CURR4 PIC'9999'  INIT(0);                                     01330000
+ DCL WNUM_FILE_ID        PIC'999999'  INIT(0);                          01340000
+ DCL WNUM_FILE_ID_NN     PIC'99'      INIT(0);                          01350000
+ DCL WDEC_FILE_ID_TO_DIA PIC'99999999' INIT(0);                         01360000
+ DCL WDATE               PIC'999999' INIT(0);                           01370000
+ DCL CDATE               CHAR (6)   INIT (' ');                         01380000
+ DCL WNN                 PIC'99' INIT(0);                               01390000
+ DCL LEKTIKO               CHAR(50) INIT (' ');                         01400000
+ /********************************************************************/ 01410000
+ DCL FOUND_4010 FIXED (1) INIT(0);                                      01420000
+ DCL FOUND_5010 FIXED (1) INIT(0);                                      01430000
+ DCL FOUND_5140 FIXED (1) INIT(0);                                      01440000
+ DCL FOUND_4030 FIXED (1) INIT(0);                                      01450000
+ DCL FOUND_4040 FIXED (1) INIT(0);                                      01460000
+ DCL FOUND_4103 FIXED (1) INIT(0);                                      01470000
+ DCL FOUND_4105 FIXED (1) INIT(0);                                      01480000
+ DCL FOUND_4150 FIXED (1) INIT(0);                                      01490000
+ DCL FOUND_4140 FIXED (1) INIT(0);                                      01500000
+ /********************************************************************/ 01510000
+ DCL FDI_EOF    FIXED (1) INIT(0);                                      01520000
+                                                                        01530000
+ DCL   MY_FILE    PIC '999999B99';                                      01540000
+ DCL 1   REC_COUNTERS,                                                  01550000
+      2  WNUM_OF_GROUPS      FIXED (08)  INIT(0),                       01560000
+      2  REC_APO             FIXED (15)  INIT(0),                       01570000
+      2  REC_CNT             FIXED (15)  INIT(0),                       01580000
+      2  REC_ROOT            FIXED (15)  INIT(0),                       01590000
+      2  REC_TOT             FIXED (15)  INIT(0),                       01600000
+      2  REC_ERROR           FIXED (15)  INIT(0),                       01610000
+      2  REC_CONTROL         FIXED (15)  INIT(0),                       01620000
+      2  TOT_NORMAL_REC      FIXED (15)  INIT(0),                       01630000
+      2  REC_OUT                FIXED (07)  INIT(0),                    01640000
+      2  CNT_AA                 FIXED (07)  INIT(0),                    01650000
+      2  CNT_AKYR_ALLH_MERA     FIXED (07)  INIT(0),                    01660001
+      2  CNT_AKYR_IDIA_MERA     FIXED (07)  INIT(0),                    01670001
+      2  CNT_Insert_DB2         FIXED (07)  INIT(0),                    01680000
+      2  CNT_UPDATE_DB2         FIXED (07)  INIT(0),                    01690000
+      2  CNT_Insert_MV01        FIXED (07)  INIT(0),                    01700000
+      2  CNT_UPDATE_MV01        FIXED (07)  INIT(0),                    01710000
+      2  CNT_UPDATE_MV05        FIXED (07)  INIT(0),                    01720000
+      2  CNT_UPDATE_RM20        FIXED (07)  INIT(0),                    01730000
+      2  CNT_UPDATE_MD10        FIXED (07)  INIT(0),                    01740000
+      2  CNT_UPDATE_MD15        FIXED (07)  INIT(0),                    01750000
+      2  CNT_Insert_MV05        FIXED (07)  INIT(0),                    01760000
+      2  CNT_Insert_RM20        FIXED (07)  INIT(0),                    01770000
+      2  CNT_Insert_MV01DB      FIXED (07)  INIT(0),                    01780000
+      2  CNT_Insert_MVDB        FIXED (07)  INIT(0),                    01790000
+      2  CNT_Insert_MV01CR      FIXED (07)  INIT(0),                    01800000
+      2  CNT_Insert_MVCR        FIXED (07)  INIT(0),                    01810000
+      2  CNT_Insert_MD10        FIXED (07)  INIT(0),                    01820000
+      2  CNT_delete_MD10        FIXED (07)  INIT(0),                    01821003
+      2  CNT_delete_db2         FIXED (07)  INIT(0),                    01822003
+      2  CNT_Insert_MD15        FIXED (07)  INIT(0),                    01830000
+      2  CNT_DETAIL_ALL         FIXED (07)  INIT(0),                    01840000
+      2  CNT_DETAIL_040         FIXED (07)  INIT(0),                    01850000
+      2  CNT_DETAIL_ALL_040     FIXED (07)  INIT(0),                    01860000
+      2  CNT_GROUP_102          FIXED (07)  INIT(0),                    01870000
+      2  CNT_GROUP_104          FIXED (07)  INIT(0),                    01880000
+      2  CNT_GROUP_106          FIXED (07)  INIT(0),                    01890000
+      2  CNT_GROUP_040          FIXED (07)  INIT(0),                    01900000
+      2  CNT_Records_Write      FIXED (07)  INIT(0),                    01910000
+      2  CNT_Records_READ       FIXED (07)  INIT(0),                    01920000
+      2  CNT_File_Header        FIXED (07)  INIT(0),                    01930000
+      2  CNT_GROUP_Header       FIXED (07)  INIT(0),                    01940000
+      2  CNT_Detail_Record      FIXED (07)  INIT(0),                    01950000
+      2  SAVE_Detail_Record     FIXED (07)  INIT(0),                    01960000
+      2  CNT_Detail_Record_Sup  FIXED (07)  INIT(0),                    01970000
+      2  SAVE_Detail_Record_Sup FIXED (07)  INIT(0),                    01980000
+      2  CNT_Group_Trailer      FIXED (07)  INIT(0),                    01990000
+      2  CNT_FILE_Trailer       FIXED (07)  INIT(0);                    02000000
+ DCL     CNT                    PIC   'Z.ZZZ.ZZZ' INIT(0);              02010000
+ DCL     MYPROC CHAR(40);                                               02020000
+ DCL     MYMSG CHAR(132);                                               02030000
+ DCL     MYLINE   PIC  '99999';                                         02040000
+ DCL     RC       BIT(1) INIT('1'B);                                    02050000
+ DCL     II       PIC  '99';                                            02060000
+                                                                        02070000
+ DCL   WAPPLICODE        CHAR(12) INIT('CNT_TODIAS  ');                 02080000
+ DCL   WAPPLICODE1       CHAR(12) INIT('CNT_TODIAS  ');                 02090000
+ DCL   WS_LAST_DATE      CHAR(10) INIT('');                             02100000
+ DCL   OT_DATETIME       PIC '99999999999999';                          02110000
+       OT_DATETIME =     SUBSTR(DATETIME(),1,14) ;                      02120000
+ DCL     MY_DATE             PIC '(7)9' INIT(0);                        02130000
+ DCL 1   MY_DATEX            BASED(ADDR(MY_DATE)),                      02140000
+      2  MY_CENTURY         CHAR(01),                                   02150000
+      2  MY_YEAR            CHAR(02),                                   02160000
+      2  MY_MONTH           PIC '99',                                   02170000
+      2  MY_DAY             CHAR(02);                                   02180000
+                                                                        02190000
+                                                                        02200000
+   DCL POS FIXED(15) INIT(0);                                           02210000
+   DCL    WS_KEY_ACCN1      DEC FIXED(9,0);                             02220000
+   DCL    WS_KEY_YEAR       DEC FIXED(5,0);                             02230000
+   DCL    WS_KEY_MONTH      DEC FIXED(3,0);                             02240000
+   DCL    WS_KEY_YEAR_PREV  DEC FIXED(5,0);                             02250000
+   DCL    WS_KEY_MONTH_PREV DEC FIXED(3,0);                             02260000
+  /**                                                   *****/          02270000
+   DCL 1 WW_DATE_WRK,                                                   02280000
+        2   WS_DD_WRK PIC '(2)9',                                       02290000
+        2   F1                  CHAR(1)              INIT('.'),         02300000
+        2   WS_MM_WRK PIC '(2)9',                                       02310000
+        2   F2                  CHAR(1)              INIT('.'),         02320000
+        2   WS_YY_WRK PIC '(4)9';                                       02330000
+  /** LAST WORKING DATE OF A GIVEN MONTH ********************/          02340000
+   DCL WS_DATE_WRK CHAR(10) BASED(ADDR(WW_DATE_WRK));                   02350000
+                                                                        02360000
+  /** LAST WORKING DATE OF A GIVEN MONTH IN 7 CHARS FORMAT **/          02370000
+ /* A YYMMDD A=1-->2000 A=0-->1900  */                                  02380000
+  DCL MYDATE      PIC'(7)9' BASED(ADDR(PIC_MYDATE));                    02390000
+  DCL 1 PIC_MYDATE  ,                                                   02400000
+             2 PFF  PIC'9' ,                                            02410000
+             2 PYY  PIC'99',                                            02420000
+             2 PMM  PIC'99',                                            02430000
+             2 PDD  PIC'99';                                            02440000
+ /*ÃﬁÌ·Ú ≈ÙÔÚ ¡Ì·ˆÔÒ‹Ú -”ıÌﬁË˘Ú Ô ÒÔÁ„Ô˝ÏÂÌÔÚ ÏﬁÌ·Ú ÙÔı ÏﬁÌ· ÒÔﬁÚ*/    02450000
+ DCL   WS_MNTH       FIXED DEC(2,0)   INIT(0);                          02460000
+ DCL   WS_YEAR       FIXED DEC(5,0)   INIT(0);                          02470000
+ DCL TODAY       PIC'(6)9' INIT (0);                                    02480000
+ DCL TODAYX      CHAR(8);                                               02490000
+ DCL  1 SYSDATE  BASED(ADDR(TODAYX)),                                   02500000
+             2 SYSYY  CHAR(4),                                          02510000
+             2 SYSMM  CHAR(2),                                          02520000
+             2 SYSDD  CHAR(2);                                          02530000
+ DCL  1 PICDATE  BASED(ADDR(SYSDATE)),                                  02540000
+             2 PICYY  PIC'(4)9',                                        02550000
+             2 PICMM  PIC'(2)9',                                        02560000
+             2 PICDD  PIC'(2)9';                                        02570000
+ /****************************************/                             02580000
+ /*Variables For Contolling Test-Printing*/                             02590000
+ /****************************************/                             02600000
+  DCL TEST_COUNT FIXED(3) INIT(0);                                      02610000
+  DCL TEST_LIMIT FIXED(3) INIT(10);                                     02620000
+                                                                        02630000
+ DCL SUBSTR       BUILTIN;                                              02640000
+ DCL DATE         BUILTIN;                                              02650000
+ DCL TRANSLATE    BUILTIN;                                              02660000
+ DCL ADDR         BUILTIN;                                              02670000
+ DCL ABS          BUILTIN;                                              02680000
+ DCL DIVIDE       BUILTIN;                                              02690000
+ DCL ROUND        BUILTIN;                                              02700000
+ DCL DATETIME     BUILTIN;                                              02710000
+ DCL FILEDDWORD   BUILTIN;                                              02720000
+ DCL PROCEDURENAME BUILTIN;                                             02730000
+ DCL SOURCELINE    BUILTIN;                                             02740000
+                                                                        02750000
+   ON ENDFILE (READER) BEGIN;                                           02760000
+            GO TO TELOS;                                                02770000
+                       END;                                             02780000
+                                                                        02790000
+                                                                        02800000
+    /*----------------------------------------------------------*/      02810000
+    /*                    MAIN  PROGRAM                         */      02820000
+    /*----------------------------------------------------------*/      02830000
+    OPEN FILE(FDI);                                                     02840000
+    OPEN FILE(PRT) ;                                                    02850000
+    OPEN FILE ( READER  );                                              02860000
+    TODAY = DATE();                                                     02870000
+    READ  FILE ( READER  ) INTO ( CTL_CARD );                           02880000
+    READ  FILE ( READER  ) INTO ( CTL_CARDB);                           02890000
+    IF CTL_APO = '00000000' THEN DO;                                    02931007
+       WDATE = DATE;                                                    02932007
+       CTL_APO = 20000000 + 091102;                                     02933008
+       CTL_EOS = 20000000 + WDATE;                                      02934007
+    END;                                                                02935007
+    PUT SKIP LIST('ƒ≈ƒœÃ≈Õ¡  ¡—‘¡” ¡–œ «Ã≈—.  :',CTL_APO);              02940000
+    PUT SKIP LIST('ƒ≈ƒœÃ≈Õ¡  ¡—‘¡” ≈Ÿ” «Ã≈—.  :',CTL_EOS);              02950000
+    PUT SKIP LIST('ƒ≈ƒœÃ≈Õ¡  ¡—‘¡” VALEUR     :',CTL_VALEUR);           02960000
+    PUT SKIP LIST('ƒ≈ƒœÃ≈Õ¡  ¡—‘¡” GROUP_TYPE :',CTL_GROUP_TYPE);       02970000
+    PUT SKIP LIST('ƒ≈ƒœÃ≈Õ¡  ¡—‘¡” DIRECTION  :',CTL_DIRECTION);        02980000
+    PUT SKIP LIST('ƒ≈ƒœÃ≈Õ¡  ¡—‘¡” STATUS_PROC:',CTL_STATUS_PROCESS);   02990000
+    PUT SKIP LIST('ƒ≈ƒœÃ≈Õ¡  ¡—‘¡” TEST_CODE  :',CTL_TEST_CODE);        03000000
+    PUT SKIP LIST('ƒ≈ƒœÃ≈Õ¡  ¡—‘¡” FILEID     :',CTL_FILE_ID_TODIAS);   03010000
+    CALL CHECKD ;                                                       03020000
+    IF ^( CTL_CHAR = 'C' ! CTL_CHAR = 'R' ) THEN DO;                    03030000
+       PUT SKIP LIST('À¡»œ” ‘«Õ  ¡—‘¡, œ◊… C, OXI R ');                 03040000
+       REC_OUT = REC_OUT / 0;                                           03050000
+    END;                                                                03060000
+    IF ^( CTL_TEST_CODE = 'T' ! CTL_TEST_CODE = 'P' ) THEN DO;          03070000
+       PUT SKIP LIST('À¡»œ” TEST_CODE, œ◊… T, OXI P ');                 03080000
+       REC_OUT = REC_OUT / 0;                                           03090000
+    END;                                                                03100000
+    SUBSTR(CTL_APO10,1,4) = SUBSTR(CTL_APO,1,4);                        03160000
+    SUBSTR(CTL_APO10,5,1) = '-';                                        03170000
+    SUBSTR(CTL_APO10,6,2) = SUBSTR(CTL_APO,5,2);                        03180000
+    SUBSTR(CTL_APO10,8,1) = '-';                                        03190000
+    SUBSTR(CTL_APO10,9,2) = SUBSTR(CTL_APO,7,2);                        03200000
+    SUBSTR(CTL_EOS10,1,4) = SUBSTR(CTL_EOS,1,4);                        03210000
+    SUBSTR(CTL_EOS10,5,1) = '-';                                        03220000
+    SUBSTR(CTL_EOS10,6,2) = SUBSTR(CTL_EOS,5,2);                        03230000
+    SUBSTR(CTL_EOS10,8,1) = '-';                                        03240000
+    SUBSTR(CTL_EOS10,9,2) = SUBSTR(CTL_EOS,7,2);                        03250000
+    PUT SKIP LIST('ƒ≈ƒœÃ≈Õ¡ DB2    ¡–œ «Ã≈—.  :',CTL_APO10);            03260000
+    PUT SKIP LIST('ƒ≈ƒœÃ≈Õ¡ DB2    ≈Ÿ” «Ã≈—.  :',CTL_EOS10);            03270000
+    II = 1;                                                             03280000
+    FLG_LOCAL_INSTR         = 'CORE';                                   03290000
+    CNT_DETAIL_040 = 0;                                                 03300000
+    CALL CURSOR_040 ;                                                   03310000
+    CALL OPEN_040 ;                                                     03320000
+    CALL GROUP_040 ;                                                    03330000
+    II = 2;                                                             03340000
+    FLG_LOCAL_INSTR         = 'B2B ';                                   03350000
+    CNT_DETAIL_040 = 0;                                                 03360000
+    CALL CURSOR_040 ;                                                   03370000
+    CALL OPEN_040 ;                                                     03380000
+    CALL GROUP_040 ;                                                    03390000
+    II = 3;                                                             03400000
+    FLG_LOCAL_INSTR         = 'B2CU';                                   03410000
+    CNT_DETAIL_040 = 0;                                                 03420000
+    CALL CURSOR_040 ;                                                   03430000
+    CALL OPEN_040 ;                                                     03440000
+    CALL GROUP_040 ;                                                    03450000
+    II = 4;                                                             03460000
+    FLG_LOCAL_INSTR         = 'B2BU';                                   03470000
+    CNT_DETAIL_040 = 0;                                                 03480000
+    CALL CURSOR_040 ;                                                   03490000
+    CALL OPEN_040 ;                                                     03500000
+    CALL GROUP_040 ;                                                    03510000
+    GO TO TELOS;                                                        03520000
+                                                                        03530000
+   CURSOR_040: proc;                                                    03540009
+     MYPROC = PROCEDURENAME();                                          03560000
+         DEC_GROUP_TYPE_CTL      = CTL_GROUP_TYPE;                      03570000
+         FLG_DIRECTION_CTL       = CTL_DIRECTION;                       03580000
+         FLG_STATUS_PROCESS_CTL  = CTL_STATUS_PROCESS;                  03590000
+         IF CTL_FILE_ID_TODIAS ^= '00000000' THEN DO;                   03600000
+            CHR_FILE_ID_TODIAS_CTL  = CTL_FILE_ID_TODIAS;               03610000
+         END;                                                           03620000
+         EXEC SQL                                                       03630000
+            DECLARE GETDATA_040 CURSOR WITH HOLD FOR                    03640000
+      SELECT DEC_FILL                          ,                        03650003
+             CHR_SEND_INST                     ,                        03660003
+             CHR_RECV_INST                     ,                        03670003
+             CHR_SERV_ID                       ,                        03680003
+             CHR_TEST_CODE                     ,                        03690003
+             CHR_FILE_TYPE                     ,                        03700003
+             CHR_FILE_ID                       ,                        03710003
+             DEC_GROUP_TYPE                    ,                        03720003
+             DEC_CREAT_DAT_TIME                ,                        03730003
+             DEC_INTRB_SETL_DAT                ,                        03740003
+             CHR_SETTL_METHOD                  ,                        03750003
+             CHR_CLEAR_SYSTEM                  ,                        03760003
+             CHR_INSTRN_AG                     ,                        03770003
+             CHR_INSTRT_AG                     ,                        03780003
+             DEC_RECORD_TYPE                   ,                        03790003
+             DEC_MSG_TYPE                      ,                        03800003
+             CHR_INSTR_ID                      ,                        03810003
+             CHR_TR_ID                         ,                        03820003
+             CHR_SERV_LEVEL                    ,                        03830003
+             CHR_LOCAL_INSTR                   ,                        03840003
+             CHR_SEQ_TYPE                      ,                        03850003
+             CHR_MANDAT_ID                     ,                        03860003
+             DEC_DAT_OF_SIGN                   ,                        03870003
+             CHR_AMEND_IND                     ,                        03880003
+             CHR_O_M_I_511                     ,                        03890003
+             CHR_O_C_S_I_N_512                 ,                        03900003
+             CHR_O_C_S_I_I_513                 ,                        03910003
+             CHR_O_C_S_I_I_514                 ,                        03920003
+             CHR_O_D_A_IBAN_515                ,                        03930003
+             CHR_O_D_A_PROP_516                ,                        03940003
+             CHR_C_S_I_I_517                   ,                        03950003
+             CHR_C_S_I_I_T_518                 ,                        03960003
+             CHR_CR_NAME                       ,                        03970003
+             CHR_CR_ADDR_LINE1                 ,                        03980003
+             CHR_CR_ADDR_LINE2                 ,                        03990003
+             CHR_CR_ADDR_CNTRY                 ,                        04000003
+             CHR_ULT_CR_NAME                   ,                        04010003
+             CHR_ULT_CR_ID                     ,                        04020003
+             CHR_DB_NAME                       ,                        04030003
+             CHR_DB_ADDR_LINE1                 ,                        04040003
+             CHR_DB_ADDR_LINE2                 ,                        04050003
+             CHR_DB_ADDR_CNTRY                 ,                        04060003
+             CHR_DB_ID                         ,                        04070003
+             CHR_DB_ACC_IBAN                   ,                        04080003
+             CHR_DB_AG                         ,                        04090003
+             CHR_DB_AG_BR_ID                   ,                        04100003
+             CHR_ULT_DB_NAME                   ,                        04110003
+             CHR_ULT_DB_ID                     ,                        04120003
+             DEC_CIDB_CUST                     ,                        04130003
+             CHR_USER                          ,                        04140003
+             FLG_DIRECTION                     ,                        04150003
+             FLG_STATUS_PROCESS                ,                        04160003
+             FLG_CANCEL                        ,                        04170003
+             CHR_ERROR_DIAS                    ,                        04180003
+             CHR_ERROR_CBOG                    ,                        04190003
+             CHR_FILE_ID_TODIAS                ,                        04200003
+             DAT_DATETIME_INIT                 ,                        04210003
+             DAT_DATETIME_PROC                 ,                        04220003
+             DEC_AA                            ,                        04230003
+             DEC_AA_RM20                       ,                        04240003
+             AMT_LIMIT                         ,                        04250003
+             CHR_TERMID_REFUSAL                ,                        04260003
+             CHR_TERMID_REFUND                 ,                        04270003
+             CHR_TERMID_AUTHOR                 ,                        04280003
+             CHR_INFORM                        ,                        04290003
+             DEC_DAT_REFUSAL                   ,                        04300003
+             DEC_DAT_REFUND                    ,                        04310003
+             DEC_DAT_AUTHOR                    ,                        04320003
+             DEC_TIME_REFUSAL                  ,                        04330003
+             DEC_TIME_REFUND                   ,                        04340003
+             DEC_TIME_AUTHOR                   ,                        04350003
+             FLG_STATUS_REFUSAL                ,                        04360003
+             FLG_STATUS_REFUND                 ,                        04370003
+             FLG_STATUS_AUTHOR                 ,                        04380003
+             CHR_VALID                         ,                        04390003
+             DEC_NUM_REFUSAL                   ,                        04400003
+             CHR_OK_REFUSAL                    ,                        04410003
+             CHR_OK_AUTHOR                     ,                        04420003
+             CHR_CODE_BRANCH                                            04430003
+            FROM CTDDMD10                                               04440000
+            WHERE                                                       04450000
+                  DEC_GROUP_TYPE      = :DEC_GROUP_TYPE_CTL             04460000
+              AND FLG_DIRECTION       = :FLG_DIRECTION_CTL              04470000
+              AND CHR_LOCAL_INSTR     = :FLG_LOCAL_INSTR                04480000
+              AND CHR_SEQ_TYPE        = 'FNAL'                          04481010
+              AND DATE(DAT_DATETIME_PROC) >= :CTL_APO10                 04490000
+              AND DATE(DAT_DATETIME_PROC) <= :CTL_EOS10                 04500000
+              AND SUBSTR(CHR_USER,1,1)     = 'U';                       04510003
+   END CURSOR_040;                                                      04590000
+   OPEN_040: proc;                                                      04600000
+     MYPROC = PROCEDURENAME();                                          04620000
+     EXEC SQL                                                           04630000
+          OPEN GETDATA_040;                                             04640000
+     IF SQLCODE ^= 0 THEN DO;                                           04650000
+        MYLINE = SOURCELINE();                                          04660000
+        MYMSG  = "À¡»œ” ”‘œ OPEN ‘œ’ CURSOR CTDDMD10"!!                 04670000
+               " SQLCODE = "!! CHAR(SQLCODE);                           04680000
+        CALL ERROR1(MYPROC,MYLINE,MYMSG);                               04690000
+     END;                                                               04700000
+     EOF_GETDATA_040 = 0;                                               04710000
+   END OPEN_040;                                                        04720000
+   GROUP_040: proc;                                                     04730000
+     MYPROC = PROCEDURENAME();                                          04750000
+     DO WHILE (EOF_GETDATA_040 = 0);                                    04760000
+        CALL FETCH_040 ;                                                04780000
+     END;                                                               04790000
+     IF CNT_DETAIL_040 > 0 THEN DO;                                     04800000
+     END;                                                               04810000
+   END  GROUP_040;                                                      04820000
+   FETCH_040: proc;                                                     04830000
+   FETCH_040R:                                                          04840000
+       EXEC SQL FETCH GETDATA_040                                       04850000
+       INTO                                                             04860003
+       :CTDDMD10.DEC_FILL                          ,                    04870003
+       :CTDDMD10.CHR_SEND_INST                     ,                    04880003
+       :CTDDMD10.CHR_RECV_INST                     ,                    04890003
+       :CTDDMD10.CHR_SERV_ID                       ,                    04900003
+       :CTDDMD10.CHR_TEST_CODE                     ,                    04910003
+       :CTDDMD10.CHR_FILE_TYPE                     ,                    04920003
+       :CTDDMD10.CHR_FILE_ID                       ,                    04930003
+       :CTDDMD10.DEC_GROUP_TYPE                    ,                    04940003
+       :CTDDMD10.DEC_CREAT_DAT_TIME                ,                    04950003
+       :CTDDMD10.DEC_INTRB_SETL_DAT                ,                    04960003
+       :CTDDMD10.CHR_SETTL_METHOD                  ,                    04970003
+       :CTDDMD10.CHR_CLEAR_SYSTEM                  ,                    04980003
+       :CTDDMD10.CHR_INSTRN_AG                     ,                    04990003
+       :CTDDMD10.CHR_INSTRT_AG                     ,                    05000003
+       :CTDDMD10.DEC_RECORD_TYPE                   ,                    05010003
+       :CTDDMD10.DEC_MSG_TYPE                      ,                    05020003
+       :CTDDMD10.CHR_INSTR_ID                      ,                    05030003
+       :CTDDMD10.CHR_TR_ID                         ,                    05040003
+       :CTDDMD10.CHR_SERV_LEVEL                    ,                    05050003
+       :CTDDMD10.CHR_LOCAL_INSTR                   ,                    05060003
+       :CTDDMD10.CHR_SEQ_TYPE                      ,                    05070003
+       :CTDDMD10.CHR_MANDAT_ID                     ,                    05080003
+       :CTDDMD10.DEC_DAT_OF_SIGN                   ,                    05090003
+       :CTDDMD10.CHR_AMEND_IND                     ,                    05100003
+       :CTDDMD10.CHR_O_M_I_511                     ,                    05110003
+       :CTDDMD10.CHR_O_C_S_I_N_512                 ,                    05120003
+       :CTDDMD10.CHR_O_C_S_I_I_513                 ,                    05130003
+       :CTDDMD10.CHR_O_C_S_I_I_514                 ,                    05140003
+       :CTDDMD10.CHR_O_D_A_IBAN_515                ,                    05150003
+       :CTDDMD10.CHR_O_D_A_PROP_516                ,                    05160003
+       :CTDDMD10.CHR_C_S_I_I_517                   ,                    05170003
+       :CTDDMD10.CHR_C_S_I_I_T_518                 ,                    05180003
+       :CTDDMD10.CHR_CR_NAME                       ,                    05190003
+       :CTDDMD10.CHR_CR_ADDR_LINE1                 ,                    05200003
+       :CTDDMD10.CHR_CR_ADDR_LINE2                 ,                    05210003
+       :CTDDMD10.CHR_CR_ADDR_CNTRY                 ,                    05220003
+       :CTDDMD10.CHR_ULT_CR_NAME                   ,                    05230003
+       :CTDDMD10.CHR_ULT_CR_ID                     ,                    05240003
+       :CTDDMD10.CHR_DB_NAME                       ,                    05250003
+       :CTDDMD10.CHR_DB_ADDR_LINE1                 ,                    05260003
+       :CTDDMD10.CHR_DB_ADDR_LINE2                 ,                    05270003
+       :CTDDMD10.CHR_DB_ADDR_CNTRY                 ,                    05280003
+       :CTDDMD10.CHR_DB_ID                         ,                    05290003
+       :CTDDMD10.CHR_DB_ACC_IBAN                   ,                    05300003
+       :CTDDMD10.CHR_DB_AG                         ,                    05310003
+       :CTDDMD10.CHR_DB_AG_BR_ID                   ,                    05320003
+       :CTDDMD10.CHR_ULT_DB_NAME                   ,                    05330003
+       :CTDDMD10.CHR_ULT_DB_ID                     ,                    05340003
+       :CTDDMD10.DEC_CIDB_CUST                     ,                    05350003
+       :CTDDMD10.CHR_USER                          ,                    05360003
+       :CTDDMD10.FLG_DIRECTION                     ,                    05370003
+       :CTDDMD10.FLG_STATUS_PROCESS                ,                    05380003
+       :CTDDMD10.FLG_CANCEL                        ,                    05390003
+       :CTDDMD10.CHR_ERROR_DIAS                    ,                    05400003
+       :CTDDMD10.CHR_ERROR_CBOG                    ,                    05410003
+       :CTDDMD10.CHR_FILE_ID_TODIAS                ,                    05420003
+       :CTDDMD10.DAT_DATETIME_INIT                 ,                    05430003
+       :CTDDMD10.DAT_DATETIME_PROC                 ,                    05440003
+       :CTDDMD10.DEC_AA                            ,                    05450003
+       :CTDDMD10.DEC_AA_RM20                       ,                    05460003
+       :CTDDMD10.AMT_LIMIT                         ,                    05470003
+       :CTDDMD10.CHR_TERMID_REFUSAL                ,                    05480003
+       :CTDDMD10.CHR_TERMID_REFUND                 ,                    05490003
+       :CTDDMD10.CHR_TERMID_AUTHOR                 ,                    05500003
+       :CTDDMD10.CHR_INFORM                        ,                    05510003
+       :CTDDMD10.DEC_DAT_REFUSAL                   ,                    05520003
+       :CTDDMD10.DEC_DAT_REFUND                    ,                    05530003
+       :CTDDMD10.DEC_DAT_AUTHOR                    ,                    05540003
+       :CTDDMD10.DEC_TIME_REFUSAL                  ,                    05550003
+       :CTDDMD10.DEC_TIME_REFUND                   ,                    05560003
+       :CTDDMD10.DEC_TIME_AUTHOR                   ,                    05570003
+       :CTDDMD10.FLG_STATUS_REFUSAL                ,                    05580003
+       :CTDDMD10.FLG_STATUS_REFUND                 ,                    05590003
+       :CTDDMD10.FLG_STATUS_AUTHOR                 ,                    05600003
+       :CTDDMD10.CHR_VALID                         ,                    05610003
+       :CTDDMD10.DEC_NUM_REFUSAL                   ,                    05620003
+       :CTDDMD10.CHR_OK_REFUSAL                    ,                    05630003
+       :CTDDMD10.CHR_OK_AUTHOR                     ,                    05640003
+       :CTDDMD10.CHR_CODE_BRANCH;                                       05650003
+       MYLINE = SOURCELINE();                                           05670000
+       IF SQLCODE = 100 THEN DO;                                        05680000
+          EOF_GETDATA_040 = 1;                                          05690000
+          EXEC SQL                                                      05710000
+               CLOSE GETDATA_040;                                       05720000
+               END;                                                     05730000
+       ELSE                                                             05740000
+          IF SQLCODE ^= 0 THEN DO;                                      05750000
+             MYMSG  = "ERROR ”‘œ FETCH ‘œ’ CURSOR CTDDMD10"!!           05760000
+                 " SQLCODE = "!! CHAR(SQLCODE);                         05770000
+             CALL ERROR1(MYPROC,MYLINE,MYMSG);                          05780000
+             GO TO TELOS;                                               05790000
+          END;                                                          05800000
+       IF EOF_GETDATA_040 = 0 THEN DO;                                  05810000
+          IF CTL_GROUP_TYPE ^= '000' THEN DO;                           05860000
+             IF CTL_GROUP_TYPE ^= CTDDMD10.DEC_GROUP_TYPE THEN DO;      05870000
+                put skip list("ALLOS TYPOS",CTDDMD10.DEC_GROUP_TYPE);   05880000
+                GO TO FETCH_040R;                                       05890000
+             END;                                                       05900000
+          END;                                                          05910000
+          IF CTDDMD10.FLG_STATUS_PROCESS = '3' &                        05920003
+             ( SUBSTR(CTDDMD10.DAT_DATETIME_INIT,1,10) =                05930000
+               SUBSTR(CTDDMD10.DAT_DATETIME_PROC,1,10) ) THEN DO;       05940000
+             put skip list("¡ ’—ŸÃ.…ƒ…¡ Ã≈RA",CTDDMD10.CHR_MANDAT_ID);  05950000
+             CNT_AKYR_IDIA_MERA = CNT_AKYR_IDIA_MERA + 1;               05960000
+             CALL INSERT_CTDDMD10_AKYR;                                 05970003
+             GO TO FETCH_040R;                                          05980000
+          END;                                                          05990000
+          IF CTDDMD10.FLG_STATUS_PROCESS = '3' &                        06000003
+             ( SUBSTR(CTDDMD10.DAT_DATETIME_INIT,1,10) <                06001010
+               SUBSTR(CTDDMD10.DAT_DATETIME_PROC,1,10) ) THEN DO;       06002010
+       /*    SUBSTR(CTDDMD10.DAT_DATETIME_PROC,1,10) <  CTL_EOS10       06010010
+                                                         THEN DO;*/     06020010
+             put skip list("¡ ’—ŸÃ≈Õ« TODAY  ",CTDDMD10.CHR_MANDAT_ID); 06030010
+             CNT_AKYR_ALLH_MERA = CNT_AKYR_ALLH_MERA + 1;               06040001
+             CALL INSERT_CTDDMD10_AKYR;                                 06050003
+             GO TO FETCH_040R;                                          06060001
+          END;                                                          06070001
+       END;                                                             06140000
+   END  FETCH_040;                                                      06150000
+                                                                        06160000
+   INSERT_CTDDMD10_AKYR: PROC;                                          06170003
+   IF CTL_CHAR = 'C' THEN DO;                                           06180001
+      put skip list("MANDAT_ID      =",CTDDMD10.CHR_MANDAT_ID);         06181008
+      put skip list("CHR_ERROR_CBOG =",CTDDMD10.CHR_ERROR_CBOG);        06182008
+      put skip list("CHR_DB_ACC_IBAN=",CTDDMD10.CHR_DB_ACC_IBAN);       06183008
+      put skip list("DATETIME_INIT  =",CTDDMD10.DAT_DATETIME_INIT);     06184010
+      put skip list("DATETIME_PROC  =",CTDDMD10.DAT_DATETIME_PROC);     06185010
+       CTDDMD15 = CTDDMD10, BY NAME;                                    06190003
+       CTDDMD15.FLG_DIRECTION = 'D';                                    06200003
+       CALL INSERT_CTDDMD15;                                            06210003
+       CALL DELETE_CTDDMD10;                                            06211003
+   END;                                                                 06220001
+   END INSERT_CTDDMD10_AKYR;                                            06230003
+ /**************************************************************        06240003
+ *    INSERT_CTDDMD15               START                      *        06250003
+ **************************************************************/        06260003
+  INSERT_CTDDMD15:PROC   ;                                              06270003
+   put skip list("---------> INSERT_CTDDMD15");                         06280003
+    EXEC SQL INSERT INTO CTDDMD15                                       06290003
+     (                                                                  06300003
+             DEC_FILL                         ,                         06310003
+             CHR_SEND_INST                    ,                         06320003
+             CHR_RECV_INST                    ,                         06330003
+             CHR_SERV_ID                      ,                         06340003
+             CHR_TEST_CODE                    ,                         06350003
+             CHR_FILE_TYPE                    ,                         06360003
+             CHR_FILE_ID                      ,                         06370003
+             DEC_GROUP_TYPE                   ,                         06380003
+             DEC_CREAT_DAT_TIME               ,                         06390003
+             DEC_INTRB_SETL_DAT               ,                         06400003
+             CHR_SETTL_METHOD                 ,                         06410003
+             CHR_CLEAR_SYSTEM                 ,                         06420003
+             CHR_INSTRN_AG                    ,                         06430003
+             CHR_INSTRT_AG                    ,                         06440003
+             DEC_RECORD_TYPE                  ,                         06450003
+             DEC_MSG_TYPE                     ,                         06460003
+             CHR_INSTR_ID                     ,                         06470003
+             CHR_TR_ID                        ,                         06480003
+             CHR_SERV_LEVEL                   ,                         06490003
+             CHR_LOCAL_INSTR                  ,                         06500003
+             CHR_SEQ_TYPE                     ,                         06510003
+             CHR_MANDAT_ID                    ,                         06520003
+             DEC_DAT_OF_SIGN                  ,                         06530003
+             CHR_AMEND_IND                    ,                         06540003
+             CHR_O_M_I_511                    ,                         06550003
+             CHR_O_C_S_I_N_512                ,                         06560003
+             CHR_O_C_S_I_I_513                ,                         06570003
+             CHR_O_C_S_I_I_514                ,                         06580003
+             CHR_O_D_A_IBAN_515               ,                         06590003
+             CHR_O_D_A_PROP_516               ,                         06600003
+             CHR_C_S_I_I_517                  ,                         06610003
+             CHR_C_S_I_I_T_518                ,                         06620003
+             CHR_CR_NAME                      ,                         06630003
+             CHR_CR_ADDR_LINE1                ,                         06640003
+             CHR_CR_ADDR_LINE2                ,                         06650003
+             CHR_CR_ADDR_CNTRY                ,                         06660003
+             CHR_ULT_CR_NAME                  ,                         06670003
+             CHR_ULT_CR_ID                    ,                         06680003
+             CHR_DB_NAME                      ,                         06690003
+             CHR_DB_ADDR_LINE1                ,                         06700003
+             CHR_DB_ADDR_LINE2                ,                         06710003
+             CHR_DB_ADDR_CNTRY                ,                         06720003
+             CHR_DB_ID                        ,                         06730003
+             CHR_DB_ACC_IBAN                  ,                         06740003
+             CHR_DB_AG                        ,                         06750003
+             CHR_DB_AG_BR_ID                  ,                         06760003
+             CHR_ULT_DB_NAME                  ,                         06770003
+             CHR_ULT_DB_ID                    ,                         06780003
+             DEC_CIDB_CUST                    ,                         06790003
+             CHR_USER                         ,                         06800003
+             FLG_DIRECTION                    ,                         06810003
+             FLG_STATUS_PROCESS               ,                         06820003
+             FLG_CANCEL                       ,                         06830003
+             CHR_ERROR_DIAS                   ,                         06840003
+             CHR_ERROR_CBOG                   ,                         06850003
+             CHR_FILE_ID_TODIAS               ,                         06860003
+             DAT_DATETIME_INIT                ,                         06870003
+             DAT_DATETIME_PROC                ,                         06880003
+             DEC_AA                           ,                         06890003
+             DEC_AA_RM20                      ,                         06891003
+             AMT_LIMIT                        ,                         06892003
+             CHR_TERMID_REFUSAL               ,                         06893003
+             CHR_TERMID_REFUND                ,                         06894003
+             CHR_TERMID_AUTHOR                ,                         06895003
+             CHR_INFORM                       ,                         06896003
+             DEC_DAT_REFUSAL                  ,                         06897003
+             DEC_DAT_REFUND                   ,                         06898003
+             DEC_DAT_AUTHOR                   ,                         06899003
+             DEC_TIME_REFUSAL                 ,                         06899103
+             DEC_TIME_REFUND                  ,                         06899203
+             DEC_TIME_AUTHOR                  ,                         06899303
+             FLG_STATUS_REFUSAL               ,                         06899403
+             FLG_STATUS_REFUND                ,                         06899503
+             FLG_STATUS_AUTHOR                ,                         06899603
+             CHR_VALID                        ,                         06899703
+             DEC_NUM_REFUSAL                  ,                         06899803
+             CHR_OK_REFUSAL                   ,                         06899903
+             CHR_OK_AUTHOR                    ,                         06900003
+             CHR_CODE_BRANCH                                            06900103
+     )                                                                  06901003
+     VALUES                                                             06910003
+    (                                                                   06920003
+          :CTDDMD15.DEC_FILL                 ,                          06921003
+          :CTDDMD15.CHR_SEND_INST            ,                          06922003
+          :CTDDMD15.CHR_RECV_INST            ,                          06923003
+          :CTDDMD15.CHR_SERV_ID              ,                          06924003
+          :CTDDMD15.CHR_TEST_CODE            ,                          06925003
+          :CTDDMD15.CHR_FILE_TYPE            ,                          06926003
+          :CTDDMD15.CHR_FILE_ID              ,                          06927003
+          :CTDDMD15.DEC_GROUP_TYPE           ,                          06928003
+          :CTDDMD15.DEC_CREAT_DAT_TIME       ,                          06929003
+          :CTDDMD15.DEC_INTRB_SETL_DAT       ,                          06929103
+          :CTDDMD15.CHR_SETTL_METHOD         ,                          06929203
+          :CTDDMD15.CHR_CLEAR_SYSTEM         ,                          06929303
+          :CTDDMD15.CHR_INSTRN_AG            ,                          06929403
+          :CTDDMD15.CHR_INSTRT_AG            ,                          06929503
+          :CTDDMD15.DEC_RECORD_TYPE          ,                          06929603
+          :CTDDMD15.DEC_MSG_TYPE             ,                          06929703
+          :CTDDMD15.CHR_INSTR_ID             ,                          06929803
+          :CTDDMD15.CHR_TR_ID                ,                          06929903
+          :CTDDMD15.CHR_SERV_LEVEL           ,                          06930003
+          :CTDDMD15.CHR_LOCAL_INSTR          ,                          06930103
+          :CTDDMD15.CHR_SEQ_TYPE             ,                          06930203
+          :CTDDMD15.CHR_MANDAT_ID            ,                          06930303
+          :CTDDMD15.DEC_DAT_OF_SIGN          ,                          06930403
+          :CTDDMD15.CHR_AMEND_IND            ,                          06930503
+          :CTDDMD15.CHR_O_M_I_511            ,                          06930603
+          :CTDDMD15.CHR_O_C_S_I_N_512        ,                          06930703
+          :CTDDMD15.CHR_O_C_S_I_I_513        ,                          06930803
+          :CTDDMD15.CHR_O_C_S_I_I_514        ,                          06930903
+          :CTDDMD15.CHR_O_D_A_IBAN_515       ,                          06931003
+          :CTDDMD15.CHR_O_D_A_PROP_516       ,                          06931103
+          :CTDDMD15.CHR_C_S_I_I_517          ,                          06931203
+          :CTDDMD15.CHR_C_S_I_I_T_518        ,                          06931303
+          :CTDDMD15.CHR_CR_NAME              ,                          06931403
+          :CTDDMD15.CHR_CR_ADDR_LINE1        ,                          06931503
+          :CTDDMD15.CHR_CR_ADDR_LINE2        ,                          06931603
+          :CTDDMD15.CHR_CR_ADDR_CNTRY        ,                          06931703
+          :CTDDMD15.CHR_ULT_CR_NAME          ,                          06931803
+          :CTDDMD15.CHR_ULT_CR_ID            ,                          06931903
+          :CTDDMD15.CHR_DB_NAME              ,                          06932003
+          :CTDDMD15.CHR_DB_ADDR_LINE1        ,                          06932103
+          :CTDDMD15.CHR_DB_ADDR_LINE2        ,                          06932203
+          :CTDDMD15.CHR_DB_ADDR_CNTRY        ,                          06932303
+          :CTDDMD15.CHR_DB_ID                ,                          06932403
+          :CTDDMD15.CHR_DB_ACC_IBAN          ,                          06932503
+          :CTDDMD15.CHR_DB_AG                ,                          06932603
+          :CTDDMD15.CHR_DB_AG_BR_ID          ,                          06932703
+          :CTDDMD15.CHR_ULT_DB_NAME          ,                          06932803
+          :CTDDMD15.CHR_ULT_DB_ID            ,                          06932903
+          :CTDDMD15.DEC_CIDB_CUST            ,                          06933003
+          :CTDDMD15.CHR_USER                 ,                          06933103
+          :CTDDMD15.FLG_DIRECTION            ,                          06933203
+          :CTDDMD15.FLG_STATUS_PROCESS       ,                          06933303
+          :CTDDMD15.FLG_CANCEL               ,                          06933403
+          :CTDDMD15.CHR_ERROR_DIAS           ,                          06933503
+          :CTDDMD15.CHR_ERROR_CBOG           ,                          06933603
+          :CTDDMD15.CHR_FILE_ID_TODIAS       ,                          06933703
+          :CTDDMD15.DAT_DATETIME_INIT        ,                          06933803
+          CURRENT TIMESTAMP                  ,                          06933911
+          :CTDDMD15.DEC_AA                   ,                          06934003
+          :CTDDMD15.DEC_AA_RM20              ,                          06934103
+          :CTDDMD15.AMT_LIMIT                ,                          06934203
+          :CTDDMD15.CHR_TERMID_REFUSAL       ,                          06934303
+          :CTDDMD15.CHR_TERMID_REFUND        ,                          06934403
+          :CTDDMD15.CHR_TERMID_AUTHOR        ,                          06934503
+          :CTDDMD15.CHR_INFORM               ,                          06934603
+          :CTDDMD15.DEC_DAT_REFUSAL          ,                          06934703
+          :CTDDMD15.DEC_DAT_REFUND           ,                          06934803
+          :CTDDMD15.DEC_DAT_AUTHOR           ,                          06934903
+          :CTDDMD15.DEC_TIME_REFUSAL         ,                          06935003
+          :CTDDMD15.DEC_TIME_REFUND          ,                          06935103
+          :CTDDMD15.DEC_TIME_AUTHOR          ,                          06935203
+          :CTDDMD15.FLG_STATUS_REFUSAL       ,                          06935303
+          :CTDDMD15.FLG_STATUS_REFUND        ,                          06935403
+          :CTDDMD15.FLG_STATUS_AUTHOR        ,                          06935503
+          :CTDDMD15.CHR_VALID                ,                          06935603
+          :CTDDMD15.DEC_NUM_REFUSAL          ,                          06935703
+          :CTDDMD15.CHR_OK_REFUSAL           ,                          06935803
+          :CTDDMD15.CHR_OK_AUTHOR            ,                          06935903
+          :CTDDMD15.CHR_CODE_BRANCH );                                  06936003
+                                                                        06937003
+        IF SQLCODE = 0 THEN DO;                                         07540003
+           put skip list("---> OKINSERT_CTDDMD15 ",                     07550009
+               CTDDMD15.CHR_MANDAT_ID," ",CTDDMD15.CHR_C_S_I_I_517);    07551009
+           CNT_Insert_DB2 = CNT_Insert_DB2 + 1;                         07570003
+           CNT_Insert_MD15 = CNT_Insert_MD15 + 1;                       07580003
+        END;                                                            07590003
+        IF SQLCODE ^= 0 THEN DO;                                        07600003
+           put skip list("*******> NOTOKINSERT_CTDDMD15 ",              07601009
+               CTDDMD15.CHR_MANDAT_ID," ",CTDDMD15.CHR_C_S_I_I_517);    07601109
+         MYLINE = SOURCELINE();                                         07620003
+         MYMSG  = "À¡»œ” ”‘«Õ ≈…”¡√Ÿ√« ”‘œ –…Õ¡ ¡_CTDDMD15"!!           07630003
+                  " SQLCODE = "!! CHAR(SQLCODE);                        07640003
+         CALL ERROR1(MYPROC,MYLINE,MYMSG);                              07690003
+        END;                                                            07700003
+  END INSERT_CTDDMD15     ;                                             07710003
+  /**************************************************************       07720003
+  *  INSERT_CTDDMD15                 END                        *       07730003
+  **************************************************************/       07740003
+ /**************************************************************        07741003
+ *    DELETE_CTDDMD10               START                      *        07742003
+ **************************************************************/        07743003
+  DELETE_CTDDMD10:PROC   ;                                              07744003
+   put skip list("---------> DELETE_CTDDMD10");                         07745003
+    EXEC SQL DELETE FROM CTDDMD10                                       07746003
+        WHERE                                                           07765003
+           CTDDMD10.CHR_MANDAT_ID   = :CTDDMD15.CHR_MANDAT_ID   AND     07765103
+           CTDDMD10.CHR_C_S_I_I_517 = :CTDDMD15.CHR_C_S_I_I_517 AND     07765203
+           CTDDMD10.FLG_DIRECTION   = :FLG_DIRECTION_CTL        AND     07765306
+           CTDDMD10.DEC_GROUP_TYPE  = :CTDDMD15.DEC_GROUP_TYPE  AND     07765405
+           CTDDMD10.DEC_RECORD_TYPE = :CTDDMD15.DEC_RECORD_TYPE;        07765505
+        IF SQLCODE = 0 THEN DO;                                         07765605
+           put skip list("-----> OKDELETE_CTDDMD10 ",                   07765709
+               CTDDMD15.CHR_MANDAT_ID," ",CTDDMD15.CHR_C_S_I_I_517);    07765909
+           CNT_DELETE_DB2 = CNT_DELETE_DB2 + 1;                         07766009
+           CNT_DELETE_MD10 = CNT_DELETE_MD10 + 1;                       07766109
+        END;                                                            07766209
+        IF SQLCODE ^= 0 THEN DO;                                        07766309
+           put skip list("*******> NOTOKDELETE_CTDDMD10 ",              07766409
+               CTDDMD15.CHR_MANDAT_ID," ",CTDDMD15.CHR_C_S_I_I_517);    07766509
+         MYLINE = SOURCELINE();                                         07766705
+         MYMSG  = "À¡»œ” ”‘O DELETE CTDDMD10"!!                         07766809
+                  " SQLCODE = "!! CHAR(SQLCODE)!!' '!!                  07766905
+                  CTDDMD15.CHR_MANDAT_ID;                               07767005
+         CALL ERROR1(MYPROC,MYLINE,MYMSG);                              07767105
+        END;                                                            07767205
+  END DELETE_CTDDMD10     ;                                             07767305
+  /**************************************************************       07767405
+  *  DELETE_CTDDMD10                 END                        *       07767505
+  **************************************************************/       07767605
+                                                                        07767705
+ ERROR1:PROC (PRC,LINE,MSG  ) ;                                         07768003
+    DCL PRC      CHAR (40)   ;                                          07770000
+    DCL LINE     PIC '99999'  ;                                         07780000
+    DCL MSG      CHAR  (132)  ;                                         07790000
+    DCL WS_BOOM   FIXED(1) INIT(1);                                     07800000
+    DCL WS_ZERO   FIXED(1) INIT(0);                                     07810000
+                                                                        07820000
+       ERLIN1='1';                                                      07830000
+       ERLIN2='***************************************************';    07840000
+       WRITE FILE(PRT) FROM(ERLINE);                                    07850000
+       ERLIN1='0';                                                      07860000
+                                                                        07870000
+       ERLIN2=' * DDDEL40  «Ã≈—¡ —œ«”         = '!!DATE ();             07880000
+       WRITE FILE(PRT) FROM(ERLINE);                                    07890000
+       ERLIN1=' ';                                                      07900000
+                                                                        07910000
+       ERLIN2='–—œ¬À«Ã¡ ”‘œ –—œ√—¡ÃÃ¡ DDDEL40 Tœ –—œ√—¡ÃÃ¡ »¡ ” ¡”≈…';  07920000
+       WRITE FILE(PRT) FROM(ERLINE);                                    07930000
+       ERLIN2='–—œ¬À«Ã¡ ”‘HN PROCEDURE : '!!PRC;                        07940000
+       WRITE FILE(PRT) FROM(ERLINE);                                    07950000
+       ERLIN2='”‘œ RECORD Ã≈ ¡—…»Ãœ    :  '!!CHAR(CNT_Records_Read);    07960000
+       WRITE FILE(PRT) FROM(ERLINE);                                    07970000
+       ERLIN2='PROBLEM IS SOURCE LINE = '!!CHAR(CNT_Records_Read);      07980000
+       WRITE FILE(PRT) FROM(ERLINE);                                    07990000
+       ERLIN2=MSG;                                                      08000000
+       WRITE FILE(PRT) FROM(ERLINE);                                    08010000
+       ERLIN2='***************************************************';    08020000
+       WRITE FILE(PRT) FROM(ERLINE);                                    08030000
+       REC_OUT = REC_OUT / 0;                                           08030103
+   END ERROR1       ;                                                   08040000
+   CHECKD: PROC;                                                        08050000
+    IF CTL_EOS < CTL_APO THEN DO;                                       08060000
+       GRAM = 'kAhOr HMEPOMHNIEr '!!CTL_EOS!!' < '!!CTL_APO;            08070000
+       WRITE FILE (PRT) FROM (LINE);                                    08080000
+       REC_OUT = REC_OUT / 0;                                           08090000
+       GO TO TELOS;                                                     08100000
+      END;                                                              08110000
+    IF CTL_APO < 20010101 THEN DO;                                      08120000
+       GRAM = 'kAhOr HMEPOMHNIEr '!!CTL_APO;                            08130000
+       WRITE FILE (PRT) FROM (LINE);                                    08140000
+       REC_OUT = REC_OUT / 0;                                           08150000
+       GO TO TELOS;                                                     08160000
+      END;                                                              08170000
+    IF SUBSTR(CTL_APO,1,4) < 2001 THEN DO;                              08180000
+       GRAM = 'kAhOr ETOr        '!!CTL_APO;                            08190000
+       WRITE FILE (PRT) FROM (LINE);                                    08200000
+       REC_OUT = REC_OUT / 0;                                           08210000
+       GO TO TELOS;                                                     08220000
+      END;                                                              08230000
+    IF SUBSTR(CTL_APO,5,2) > '12' THEN DO;                              08240000
+       GRAM = 'kAhOr MHNAr       '!!CTL_APO;                            08250000
+       WRITE FILE (PRT) FROM (LINE);                                    08260000
+       REC_OUT = REC_OUT / 0;                                           08270000
+       GO TO TELOS;                                                     08280000
+      END;                                                              08290000
+    IF SUBSTR(CTL_APO,7,2) > '31' THEN DO;                              08300000
+       GRAM = 'kAhOr HMEPA       '!!CTL_APO;                            08310000
+       WRITE FILE (PRT) FROM (LINE);                                    08320000
+       REC_OUT = REC_OUT / 0;                                           08330000
+       GO TO TELOS;                                                     08340000
+      END;                                                              08350000
+    IF SUBSTR(CTL_EOS,5,2) > '12' THEN DO;                              08360000
+       GRAM = 'kAhOr MHNAr       '!!CTL_EOS;                            08370000
+       WRITE FILE (PRT) FROM (LINE);                                    08380000
+       REC_OUT = REC_OUT / 0;                                           08390000
+       GO TO TELOS;                                                     08400000
+      END;                                                              08410000
+    IF SUBSTR(CTL_EOS,7,2) > '31' THEN DO;                              08420000
+       GRAM = 'kAhOr HMEPA       '!!CTL_EOS;                            08430000
+       WRITE FILE (PRT) FROM (LINE);                                    08440000
+       REC_OUT = REC_OUT / 0;                                           08450000
+       GO TO TELOS;                                                     08460000
+      END;                                                              08470000
+    IF CTL_FILE_ID_TODIAS ^= '00000000' THEN DO;                        08480000
+    IF SUBSTR(CTL_FILE_ID_TODIAS,1,2) < '09' THEN DO;                   08490000
+       GRAM = 'kAhOr FILE_ID     '!!CTL_FILE_ID_TODIAS;                 08500000
+       WRITE FILE (PRT) FROM (LINE);                                    08510000
+       REC_OUT = REC_OUT / 0;                                           08520000
+       GO TO TELOS;                                                     08530000
+      END;                                                              08540000
+    IF SUBSTR(CTL_FILE_ID_TODIAS,3,2) > '12' THEN DO;                   08550000
+       GRAM = 'kAhOr FILE_ID     '!!CTL_FILE_ID_TODIAS;                 08560000
+       WRITE FILE (PRT) FROM (LINE);                                    08570000
+       REC_OUT = REC_OUT / 0;                                           08580000
+       GO TO TELOS;                                                     08590000
+      END;                                                              08600000
+    IF SUBSTR(CTL_FILE_ID_TODIAS,5,2) > '31' THEN DO;                   08610000
+       GRAM = 'kAhOr FILE_ID     '!!CTL_FILE_ID_TODIAS;                 08620000
+       WRITE FILE (PRT) FROM (LINE);                                    08630000
+       REC_OUT = REC_OUT / 0;                                           08640000
+       GO TO TELOS;                                                     08650000
+      END;                                                              08660000
+    IF SUBSTR(CTL_FILE_ID_TODIAS,7,2) = '00' THEN DO;                   08670000
+       GRAM = 'kAhOr FILE_ID     '!!CTL_FILE_ID_TODIAS;                 08680000
+       WRITE FILE (PRT) FROM (LINE);                                    08690000
+       REC_OUT = REC_OUT / 0;                                           08700000
+       GO TO TELOS;                                                     08710000
+      END;                                                              08720000
+    END;                                                                08730000
+ END CHECKD;                                                            08740000
+                                                                        08750000
+ TELOS :                                                                08760000
+   CTLCHR = '1';                                                        08770000
+   GRAMH =' *DELETE-UPDATE MANDATES CANCEL   DDDEL40 *';                08780001
+   WRITE FILE(PRT) FROM(LINE);                                          08790000
+   CTLCHR = ' ';                                                        08800000
+   GRAMH =                                                              08810000
+  ' *************************************************************** ' ; 08820000
+   WRITE FILE(PRT) FROM(LINE);                                          08830000
+   GRAMH =' *«Ï›Ò·  ·ﬂ ŸÒ· —ÔﬁÚ :  '!!OT_DATETIME;                      08840000
+   WRITE FILE(PRT) FROM(LINE);                                          08850000
+   GRAMH =                                                              08860000
+  ' *************************************************************** ' ; 08870000
+   WRITE FILE(PRT) FROM(LINE);                                          08880000
+   CNT = CNT_Records_WRITE ;                                            08890000
+   GRAMH =' √Ò‹ˆÙÁÍ·Ì   '!!CNT!!' Â„„Ò·ˆ›Ú ÛÙÔ ÙÔ ·Ò˜ÂﬂÔ : '            08900000
+          !!FILEDDWORD(FDI,'FILENAME');                                 08910000
+   WRITE FILE(PRT) FROM(LINE);                                          08920000
+   GRAMH =                                                              08930000
+  ' *************************************************************** ' ; 08940000
+   WRITE FILE(PRT) FROM(LINE);                                          08950000
+   GRAMH =' * ¡Ì·ÎıÙÈÍ‹ √Ò‹ˆÙÁÍ·Ì   ¡Ì· ‘˝Ô ≈„„Ò·ˆﬁÚ  *       ' ;      08960000
+   WRITE FILE(PRT) FROM(LINE);                                          08970000
+   GRAMH =                                                              08980000
+  ' *************************************************************** ' ; 08990000
+   WRITE FILE(PRT) FROM(LINE);                                          09000000
+   CNT = CNT_update_DB2 ;                                               09190000
+   GRAMH =' ≈ÌÁÏÂÒ˛ËÁÍ·Ì'!!CNT!!' Â„„Ò·ˆ›Ú ÛÙÔıÚ ﬂÌ·ÍÂÚ';              09200000
+   WRITE FILE(PRT) FROM(LINE);                                          09210000
+   CNT = CNT_DELETE_MD10;                                               09220003
+   GRAMH =' ƒÈ·„Ò‹ˆÙÁÍ·Ì'!!CNT!!' Â„„Ò·ˆ›Ú ÛÙÔÌ CTDDMD10';              09230003
+   WRITE FILE(PRT) FROM(LINE);                                          09240000
+   CNT = CNT_INSERT_MD15;                                               09250003
+   GRAMH =' ≈ÈÛﬁ˜ËÁÛ·Ì  '!!CNT!!' Â„„Ò·ˆ›Ú ÛÙÔÌ CTDDMD15';              09260003
+   WRITE FILE(PRT) FROM(LINE);                                          09270000
+   CTLCHR = '1';                                                        09280000
+   GRAMH =                                                              09290000
+   ' *************************************************************** ' ;09300000
+   WRITE FILE(PRT) FROM(LINE);                                          09310000
+   GRAMH =                                                              09320000
+   ' ***********  ≈ÍÙ˝˘ÛÁ ÛıÌ¸Î˘Ì ÒÔ„Ò‹ÏÏ·ÙÔÚ DDDEL40  *********** '; 09330000
+   WRITE FILE(PRT) FROM(LINE);                                          09340000
+   CTLCHR = ' ';                                                        09350000
+   GRAMH =                                                              09360000
+   ' *************************************************************** ' ;09370000
+   WRITE FILE(PRT) FROM(LINE);                                          09380000
+   GRAMH =                                                              09390000
+   ' ¡ÍıÒ˘Ï›ÌÂÚ ·Ì·Ë›ÛÂÈÚ ﬂ‰È·Ú ÁÏ›Ò·Ú '!!CNT_AKYR_IDIA_MERA;           09400000
+   WRITE FILE(PRT) FROM(LINE);                                          09410000
+   GRAMH =                                                              09420001
+   ' ¡ÍıÒ˘Ï›ÌÂÚ ·Ì·Ë›ÛÂÈÚ ‹ÎÎÁÚ ÁÏ›Ò·Ú '!!CNT_AKYR_ALLH_MERA;           09430001
+   WRITE FILE(PRT) FROM(LINE);                                          09440001
+                                                                        09450000
+                                                                        09460000
+   GRAMH =                                                              09470000
+   ' *************************************************************** ' ;09480000
+   WRITE FILE(PRT) FROM(LINE);                                          09490000
+                                                                        09500000
+   CLOSE FILE(FDI);                                                     09510000
+   CLOSE FILE(PRT) ;                                                    09520000
+   CLOSE FILE(READER) ;                                                 09530000
+  END  DDDEL40;                                                         09540000
+  /*                                                                    09550003
+ EXEC SQL DECLARE          CTDDMD10 TABLE                               09560003
+           ( DEC_FILL                       DECIMAL(3,0) NOT NULL,      09570003
+             CHR_SEND_INST                  CHAR(11) NOT NULL,          09580003
+             CHR_RECV_INST                  CHAR(11) NOT NULL,          09590003
+             CHR_SERV_ID                    CHAR(4) NOT NULL,           09600003
+             CHR_TEST_CODE                  CHAR(1) NOT NULL,           09610003
+             CHR_FILE_TYPE                  CHAR(3) NOT NULL,           09620003
+             CHR_FILE_ID                    CHAR(8) NOT NULL,           09630003
+             DEC_GROUP_TYPE                 DECIMAL(3,0) NOT NULL,      09640003
+             DEC_CREAT_DAT_TIME             CHAR(14) NOT NULL,          09650003
+             DEC_INTRB_SETL_DAT             CHAR(8) NOT NULL,           09660003
+             CHR_SETTL_METHOD               CHAR(4) NOT NULL,           09670003
+             CHR_CLEAR_SYSTEM               CHAR(35) NOT NULL,          09680003
+             CHR_INSTRN_AG                  CHAR(11) NOT NULL,          09690003
+             CHR_INSTRT_AG                  CHAR(11) NOT NULL,          09700003
+             DEC_RECORD_TYPE                DECIMAL(1,0) NOT NULL,      09710003
+             DEC_MSG_TYPE                   DECIMAL(3,0) NOT NULL,      09720003
+             CHR_INSTR_ID                   CHAR(35) NOT NULL,          09730003
+             CHR_TR_ID                      CHAR(35) NOT NULL,          09740003
+             CHR_SERV_LEVEL                 CHAR(4) NOT NULL,           09750003
+             CHR_LOCAL_INSTR                CHAR(35) NOT NULL,          09760003
+             CHR_SEQ_TYPE                   CHAR(4) NOT NULL,           09770003
+             CHR_MANDAT_ID                  CHAR(35) NOT NULL,          09780003
+             DEC_DAT_OF_SIGN                DECIMAL(8,0) NOT NULL,      09790003
+             CHR_AMEND_IND                  CHAR(1) NOT NULL,           09800003
+             CHR_O_M_I_511                  CHAR(35) NOT NULL,          09810003
+             CHR_O_C_S_I_N_512              CHAR(70) NOT NULL,          09820003
+             CHR_O_C_S_I_I_513              CHAR(35) NOT NULL,          09830003
+             CHR_O_C_S_I_I_514              CHAR(4) NOT NULL,           09840003
+             CHR_O_D_A_IBAN_515             CHAR(34) NOT NULL,          09850003
+             CHR_O_D_A_PROP_516             CHAR(5) NOT NULL,           09860003
+             CHR_C_S_I_I_517                CHAR(35) NOT NULL,          09870003
+             CHR_C_S_I_I_T_518              CHAR(4) NOT NULL,           09880003
+             CHR_CR_NAME                    CHAR(70) NOT NULL,          09890003
+             CHR_CR_ADDR_LINE1              CHAR(70) NOT NULL,          09900003
+             CHR_CR_ADDR_LINE2              CHAR(70) NOT NULL,          09910003
+             CHR_CR_ADDR_CNTRY              CHAR(2) NOT NULL,           09920003
+             CHR_ULT_CR_NAME                CHAR(70) NOT NULL,          09930003
+             CHR_ULT_CR_ID                  CHAR(37) NOT NULL,          09940003
+             CHR_DB_NAME                    CHAR(70) NOT NULL,          09950003
+             CHR_DB_ADDR_LINE1              CHAR(70) NOT NULL,          09960003
+             CHR_DB_ADDR_LINE2              CHAR(70) NOT NULL,          09970003
+             CHR_DB_ADDR_CNTRY              CHAR(2) NOT NULL,           09980003
+             CHR_DB_ID                      CHAR(37) NOT NULL,          09990003
+             CHR_DB_ACC_IBAN                CHAR(34) NOT NULL,          10000003
+             CHR_DB_AG                      CHAR(11) NOT NULL,          10010003
+             CHR_DB_AG_BR_ID                CHAR(35) NOT NULL,          10020003
+             CHR_ULT_DB_NAME                CHAR(70) NOT NULL,          10030003
+             CHR_ULT_DB_ID                  CHAR(37) NOT NULL,          10040003
+             DEC_CIDB_CUST                  DECIMAL(9,0) NOT NULL,      10050003
+             CHR_USER                       CHAR(8) NOT NULL,           10060003
+             FLG_DIRECTION                  CHAR(1) NOT NULL,           10070003
+             FLG_STATUS_PROCESS             CHAR(1) NOT NULL,           10080003
+             FLG_CANCEL                     CHAR(1) NOT NULL,           10090003
+             CHR_ERROR_DIAS                 CHAR(4) NOT NULL,           10100003
+             CHR_ERROR_CBOG                 CHAR(4) NOT NULL,           10110003
+             CHR_FILE_ID_TODIAS             CHAR(8) NOT NULL,           10120003
+             DAT_DATETIME_INIT              TIMESTAMP NOT NULL,         10130003
+             DAT_DATETIME_PROC              TIMESTAMP NOT NULL,         10140003
+             DEC_AA                         DECIMAL(17,0) NOT NULL,     10150003
+             DEC_AA_RM20                    DECIMAL(17,0) NOT NULL,     10160003
+             AMT_LIMIT                      DECIMAL(17,0) NOT NULL,     10170003
+             CHR_TERMID_REFUSAL             CHAR(7) NOT NULL,           10180003
+             CHR_TERMID_REFUND              CHAR(7) NOT NULL,           10190003
+             CHR_TERMID_AUTHOR              CHAR(7) NOT NULL,           10200003
+             CHR_INFORM                     CHAR(50) NOT NULL,          10210003
+             DEC_DAT_REFUSAL                CHAR(8) NOT NULL,           10220003
+             DEC_DAT_REFUND                 CHAR(8) NOT NULL,           10230003
+             DEC_DAT_AUTHOR                 CHAR(8) NOT NULL,           10240003
+             DEC_TIME_REFUSAL               CHAR(6) NOT NULL,           10250003
+             DEC_TIME_REFUND                CHAR(6) NOT NULL,           10260003
+             DEC_TIME_AUTHOR                CHAR(6) NOT NULL,           10270003
+             FLG_STATUS_REFUSAL             CHAR(1) NOT NULL,           10280003
+             FLG_STATUS_REFUND              CHAR(1) NOT NULL,           10290003
+             FLG_STATUS_AUTHOR              CHAR(1) NOT NULL,           10300003
+             CHR_VALID                      CHAR(1) NOT NULL,           10310003
+             DEC_NUM_REFUSAL                DECIMAL(2,0) NOT NULL,      10320003
+             CHR_OK_REFUSAL                 CHAR(1) NOT NULL,           10330003
+             CHR_OK_AUTHOR                  CHAR(1) NOT NULL,           10340003
+             CHR_CODE_BRANCH                CHAR(4) NOT NULL            10350003
+           ) ;                                                          10360003
+ DCL 1 CTDDMD10,                                                        10370003
+      5 DEC_FILL DEC FIXED(3,0),                                        10380003
+      5 CHR_SEND_INST  CHAR(11),                                        10390003
+      5 CHR_RECV_INST  CHAR(11),                                        10400003
+      5 CHR_SERV_ID  CHAR(4),                                           10410003
+      5 CHR_TEST_CODE  CHAR(1),                                         10420003
+      5 CHR_FILE_TYPE  CHAR(3),                                         10430003
+      5 CHR_FILE_ID  CHAR(8),                                           10440003
+      5 DEC_GROUP_TYPE  DEC FIXED(3,0),                                 10450003
+      5 DEC_CREAT_DAT_TIME  CHAR(14),                                   10460003
+      5 DEC_INTRB_SETL_DAT  CHAR(8),                                    10470003
+      5 CHR_SETTL_METHOD  CHAR(4),                                      10480003
+      5 CHR_CLEAR_SYSTEM  CHAR(35),                                     10490003
+      5 CHR_INSTRN_AG  CHAR(11),                                        10500003
+      5 CHR_INSTRT_AG  CHAR(11),                                        10510003
+      5 DEC_RECORD_TYPE  DEC FIXED(1,0),                                10520003
+      5 DEC_MSG_TYPE  DEC FIXED(3,0),                                   10530003
+      5 CHR_INSTR_ID  CHAR(35),                                         10540003
+      5 CHR_TR_ID  CHAR(35),                                            10550003
+      5 CHR_SERV_LEVEL  CHAR(4),                                        10560003
+      5 CHR_LOCAL_INSTR  CHAR(35),                                      10570003
+      5 CHR_SEQ_TYPE  CHAR(4),                                          10580003
+      5 CHR_MANDAT_ID  CHAR(35),                                        10590003
+      5 DEC_DAT_OF_SIGN  DEC FIXED(8,0),                                10600003
+      5 CHR_AMEND_IND  CHAR(1),                                         10610003
+      5 CHR_O_M_I_511  CHAR(35),                                        10620003
+      5 CHR_O_C_S_I_N_512  CHAR(70),                                    10630003
+      5 CHR_O_C_S_I_I_513  CHAR(35),                                    10640003
+      5 CHR_O_C_S_I_I_514  CHAR(4),                                     10650003
+      5 CHR_O_D_A_IBAN_515  CHAR(34),                                   10660003
+      5 CHR_O_D_A_PROP_516  CHAR(5),                                    10670003
+      5 CHR_C_S_I_I_517  CHAR(35),                                      10680003
+      5 CHR_C_S_I_I_T_518  CHAR(4),                                     10690003
+      5 CHR_CR_NAME  CHAR(70),                                          10700003
+      5 CHR_CR_ADDR_LINE1  CHAR(70),                                    10710003
+      5 CHR_CR_ADDR_LINE2  CHAR(70),                                    10720003
+      5 CHR_CR_ADDR_CNTRY  CHAR(2),                                     10730003
+      5 CHR_ULT_CR_NAME  CHAR(70),                                      10740003
+      5 CHR_ULT_CR_ID  CHAR(37),                                        10750003
+      5 CHR_DB_NAME  CHAR(70),                                          10760003
+      5 CHR_DB_ADDR_LINE1  CHAR(70),                                    10770003
+      5 CHR_DB_ADDR_LINE2  CHAR(70),                                    10780003
+      5 CHR_DB_ADDR_CNTRY  CHAR(2),                                     10790003
+      5 CHR_DB_ID  CHAR(37),                                            10800003
+      5 CHR_DB_ACC_IBAN  CHAR(34),                                      10810003
+      5 CHR_DB_AG  CHAR(11),                                            10820003
+      5 CHR_DB_AG_BR_ID  CHAR(35),                                      10830003
+      5 CHR_ULT_DB_NAME  CHAR(70),                                      10840003
+      5 CHR_ULT_DB_ID  CHAR(37),                                        10850003
+      5 DEC_CIDB_CUST  DEC FIXED(9,0),                                  10860003
+      5 CHR_USER CHAR(8),                                               10870003
+      5 FLG_DIRECTION  CHAR(1),                                         10880003
+      5 FLG_STATUS_PROCESS  CHAR(1),                                    10890003
+      5 FLG_CANCEL  CHAR(1),                                            10900003
+      5 CHR_ERROR_DIAS  CHAR(4),                                        10910003
+      5 CHR_ERROR_CBOG  CHAR(4),                                        10920003
+      5 CHR_FILE_ID_TODIAS  CHAR(8),                                    10930003
+      5 DAT_DATETIME_INIT  CHAR(26),                                    10940003
+      5 DAT_DATETIME_PROC  CHAR(26),                                    10950003
+      5 DEC_AA   DEC FIXED(17,0),                                       10960003
+      5 DEC_AA_RM20  DEC FIXED(17,0),                                   10970003
+      5 AMT_LIMIT  DEC FIXED(17,0),                                     10980003
+      5 CHR_TERMID_REFUSAL  CHAR(7),                                    10990003
+      5 CHR_TERMID_REFUND  CHAR(7),                                     11000003
+      5 CHR_TERMID_AUTHOR  CHAR(7),                                     11010003
+      5 CHR_INFORM  CHAR(50),                                           11020003
+      5 DEC_DAT_REFUSAL  CHAR(8),                                       11030003
+      5 DEC_DAT_REFUND  CHAR(8),                                        11040003
+      5 DEC_DAT_AUTHOR  CHAR(8),                                        11050003
+      5 DEC_TIME_REFUSAL  CHAR(6),                                      11060003
+      5 DEC_TIME_REFUND  CHAR(6),                                       11070003
+      5 DEC_TIME_AUTHOR  CHAR(6),                                       11080003
+      5 FLG_STATUS_REFUSAL  CHAR(1),                                    11090003
+      5 FLG_STATUS_REFUND  CHAR(1),                                     11100003
+      5 FLG_STATUS_AUTHOR  CHAR(1),                                     11110003
+      5 CHR_VALID  CHAR(1),                                             11120003
+      5 DEC_NUM_REFUSAL  DEC FIXED(2,0),                                11130003
+      5 CHR_OK_REFUSAL  CHAR(1),                                        11140003
+      5 CHR_OK_AUTHOR  CHAR(1),                                         11150003
+      5 CHR_CODE_BRANCH  CHAR(4);                                       11160003
+ */                                                                     11170003
+

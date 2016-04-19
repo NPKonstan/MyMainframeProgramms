@@ -1,0 +1,254 @@
+* PROCESS XOPTS(DLI);
+ DK570: PROC OPTIONS(MAIN);
+ /********************************************************************/
+ /*  SOURCE  NAME  : DK570                                           */
+ /********************************************************************/
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+ DCL CZX3VDAT CHAR(6); FETCH CZXDATEP;
+ DCL CZXDATEP ENTRY OPTIONS(INTER,ASM) ;
+
+ % INCLUDE DAYATNS;
+ % INCLUDE IGLREC6;
+ % INCLUDE BKR20TOK;
+ % INCLUDE RISBP2AF;
+ DCL RISBPD2A ENTRY(PTR); FETCH RISBPD2A TITLE('RISBPD2A');
+
+ /************ STRUCTURE FOR WRITING OUTPUT FILE ************/
+ DCL 1 LINE,
+      2 CTLCHAR       CHAR(1)      INIT('0') ,
+      2 LINEOUT       CHAR(132)    INIT(' ') ;
+
+ /*  DATE SIMULATION DEFINED FUNCTION  */
+ DATE: PROC IRREDUCIBLE RETURNS(CHAR(6)) ;
+        CALL CZXDATEP          ( CZX3VDAT) ;
+        RETURN (CZX3VDAT) ;
+        END DATE ;
+
+ DCL(TIME,DIVIDE,SUBSTR,NULL,ADDR)   BUILTIN;
+ DCL(PLIRETC,VERIFY)                 BUILTIN ;
+ /*      COUNTERS      */
+ DCL   (CNTREAD,CNTWRITE)  PIC'ZZZ.ZZZ.ZZ9'       INIT(0) ;
+ DCL   (CNTRJCT,CNTOVERD)  PIC'ZZZ.ZZZ.ZZ9'       INIT(0) ;
+ DCL   (CNTPROCCED)          PIC'ZZZ.ZZZ.ZZ9'       INIT(0) ;
+ DCL   WPOSO              PIC 'ZZZ.ZZZ.ZZZ.ZZ9V,99'  INIT(0);
+ DCL   SPOSO              PIC 'ZZZ.ZZZ.ZZZ.ZZ9V,99S' INIT(0);
+ DCL   TPOSO              PIC 'ZZZ.ZZZ.ZZZ.ZZ9V,99S' INIT(0);
+ DCL   TOT_OUT1           PIC 'ZZZ.ZZZ.ZZZ.ZZ9';
+ DCL   TOT_OUT            PIC 'ZZZ.ZZZ.ZZZ.ZZ9V,99S';
+
+ DCL EOF                 BIT(1)            INIT('0'B);
+ DCL WS_PIC_ARLOG   PIC '(8)9' INIT(0);
+ DCL CHR_LOGAR      CHAR(18) INIT(' ');
+ DCL WPELATH        DEC FIXED(9,0) INIT(0)  ;
+ DCL LEKTIKO        CHAR(06)       INIT(' ');
+ DCL TABLNAME       CHAR(20)       INIT(' ');
+ DCL WS_PIC_KATHO   PIC'9999';
+ DCL KATHOF5        FIXED(5,0)     INIT(0);
+ DCL KATHOL6        FIXED(7,0)     INIT(0);
+ DCL KATHOL10       FIXED(10,0)    INIT(0);
+ DCL PIC_ETOS       PIC'(4)9'      INIT(0);
+ DCL PIC_MONTH      PIC'(2)9'      INIT(0);
+ DCL PIC_KATMA      PIC'(4)9'      INIT(0);
+
+ DCL DKR4L10B EXTERNAL ENTRY(FIXED(5),
+                            CHAR(2),
+                            CHAR(1),
+                            FIXED(7),
+                            FIXED(10));
+ FETCH DKR4L10B TITLE('DKR4L10B');
+
+ DCL INCARD      FILE RECORD INPUT ;
+ DCL  1 INREC2,                                                         01001024
+        2 INC1     CHAR(01)      INIT('C'),                             01002024
+        2 FILL1    CHAR(01)      INIT(' '),                             01003024
+        2 INDATE   PIC'99999999' INIT(0),                               01006027
+        2 FILL2    CHAR(70)      INIT(' ');                             01005024
+ DCL  1 INRECA CHAR(80) BASED(ADDR(INREC2));                            01008024
+ DCL SYSOUT  FILE RECORD OUTPUT      ENV(FB RECSIZE(133) CTLASA);
+ DCL IGLFIL  FILE RECORD OUTPUT      ENV(FB RECSIZE(165));
+ DCL T20KTM  FILE RECORD SEQUENTIAL INPUT  ENV(FB RECSIZE(60));
+ DCL ERRORF  FILE RECORD SEQUENTIAL OUTPUT
+   ENV(FB RECSIZE(133)                               CTLASA) ;
+
+
+ /********************************************************************/ 01220000
+ /*          MAIN PROGRAM                                            */ 01230000
+ /********************************************************************/ 01240000
+
+ OPEN  FILE(SYSOUT);
+ OPEN  FILE(T20KTM);
+ OPEN  FILE(IGLFIL);
+ OPEN  FILE(INCARD);
+ OPEN  FILE(ERRORF);
+
+ ON ENDFILE(T20KTM) BEGIN;
+    LINEOUT = ' END OF FILE ';
+    WRITE FILE(SYSOUT) FROM(LINE);
+    EOF = '1'B;
+    GOTO END_OF_PROG;
+ END;
+
+   CALL READ_INCARD;
+
+ NEXT_READ:
+    READ FILE(T20KTM) INTO(T20REC);
+    IF T20ARLOGTAM < 80000000 THEN DO;
+       CNTRJCT = CNTRJCT + 1;
+       GOTO NEXT_READ;
+    END;
+    CNTREAD = CNTREAD + 1;
+    TPOSO  = TPOSO + T20POSON;
+    IF T20KATHO = 5060 ! T20KATHO = 5078 ! T20KATHO = 5114
+       THEN DO;
+       CNTOVERD = CNTOVERD + 1;
+       GOTO NEXT_READ;
+    END;
+    CALL WRITE_IGLFILE;
+
+ GOTO NEXT_READ;
+
+
+ WRITE_IGLFILE: PROC;
+     CALL FIND_CIDB;
+     IGL_COD_PELATH        = WPELATH;
+     KATHOF5               = T20KATHO ;
+     CALL DKR4L10B(KATHOF5,T20EPAGELMA,T20FN,KATHOL6,KATHOL10);
+     IGL_MSA_LOGAR         = KATHOL10;
+     IGL_COD_EFARM         = '70';
+     CHR_LOGAR = WS_PIC_ARLOG!!(8)' ';
+     IGL_NUM_AR_LOGAR      = CHR_LOGAR;
+     IGL_NUM_AR_SYNDIK     = '01';
+     IGL_PLHTHOS_LOGAR     = 1;
+     IGL_BOOK_BALANCE_EUR  = T20POSON;
+     IGL_CHA_NOM           = 'EUR';
+     IGL_BOOK_BALANCE_NOM  = T20POSON;
+     WS_PIC_KATHO          = T20KATHO;
+     IGL_PRODUCT           = WS_PIC_KATHO;
+     IGL_EXTR_DATE         = INDATE;
+     WRITE FILE(IGLFIL) FROM(IGLREC61);
+     CNTPROCCED            = CNTPROCCED + 1;
+     SPOSO                 = SPOSO + T20POSON;
+ END WRITE_IGLFILE;
+
+ READ_INCARD: PROC;                                                     01740328
+    READ FILE(INCARD) INTO(INRECA);                                     01748728
+    IF VERIFY(INDATE,'1234567890') ^= 0 THEN                            01748928
+       DO;                                                              01749028
+         CTLCHAR  = '0';                                                01749128
+         LINEOUT = ' кахос еисацыцг тилгс стгм глеяолгмиа ';            01749228
+         WRITE FILE(ERRORF) FROM(LINE);                                 01749328
+         STOP;                                                          01749628
+       END;                                                             01749728
+    IF SUBSTR(INDATE,1,4) = 0 ! SUBSTR(INDATE,1,4) <= 1990 !
+       SUBSTR(INDATE,1,4) > 2999 THEN
+       DO;
+         LINEOUT = '0 кахос тилгс сто етос ';
+         WRITE FILE(SYSOUT) FROM(LINE);
+         STOP;
+       END;
+    IF SUBSTR(INDATE,5,2) = 0 ! SUBSTR(INDATE,5,2) < 01 !
+       SUBSTR(INDATE,5,2) > 12 THEN
+       DO;
+         LINEOUT = '0 кахос тилг стом лгма ';
+         WRITE FILE(SYSOUT) FROM(LINE);
+         STOP;
+       END;
+    IF SUBSTR(INDATE,7,2) = 0 ! SUBSTR(INDATE,7,2) < 01 !
+       SUBSTR(INDATE,7,2) > 31 THEN
+       DO;
+         LINEOUT = '0 кахос тилг стгм глеяа ';
+         WRITE FILE(SYSOUT) FROM(LINE);
+         STOP;
+       END;
+ END READ_INCARD;                                                       01751428
+
+ FIND_CIDB : PROC;
+    PIC_ETOS     = SUBSTR(INDATE,1,4);
+    PIC_MONTH    = SUBSTR(INDATE,5,2);
+    PIC_KATMA    = T20KATMA;
+    WPELATH      = 0;                                                      05280
+    CHR_LOGAR    = ' ';
+    WS_PIC_ARLOG          = T20ARLOGTAM;
+    SUBSTR(CHR_LOGAR,1,8) = WS_PIC_ARLOG;
+    /*-----------------------------------------------------------*/
+    /*йкгсг тгс яоутимас RISBPD2A циа епистяожг тоу CIDB NUMBER  */
+    /*-----------------------------------------------------------*/
+    RISBP2AF_REC='';
+    RISBP2AF_REC_R.I_CALLING_APPL = '70';
+    RISBP2AF_REC_R.I_NUM_YEAR     = PIC_ETOS;
+    RISBP2AF_REC_R.I_NUM_MONTH    = PIC_MONTH;
+    RISBP2AF_REC_R.I_COD_PERSONA  = 0;
+    RISBP2AF_REC_R.I_COD_EFARM    = '70';
+    RISBP2AF_REC_R.I_NUM_AR_LOGAR   = CHR_LOGAR;
+    RISBP2AF_REC_R.I_NUM_PARTICIP   = '01';
+    RISBP2AF_REC_R.I_ACCOUNT_BRANCH = PIC_KATMA;
+    RISBP2AF_REC_R.I_TRANS_BRANCH   = PIC_KATMA;
+    RISBP2AF_REC_R.I_SERVICE_TYPE   = ' ';
+    CALL RISBPD2A ( ADDR(RISBP2AF_REC) );
+    IF RISBP2AF_REC_R.O_RETV    ^= 0    !
+       RISBP2AF_REC_R.O_SQLCODE ^= 0    !
+       RISBP2AF_REC_R.O_STATUS  ^= ' '  THEN DO;
+       CTLCHAR = ' ';
+       LINEOUT = 'кахос сTHN йкгсг THс POYTINAс RISBPD2A---> '  !!
+                 ', RETV=<'    !! RISBP2AF_REC_R.O_RETV    !! '>, ' !!
+                 ', SQLCODE=<' !! RISBP2AF_REC_R.O_SQLCODE !! '>, ' !!
+                 ', STATUS=<'  !! RISBP2AF_REC_R.O_STATUS  !! '>. ' !!
+                 ', LOGAR =<'  !! RISBP2AF_REC_R.I_NUM_AR_LOGAR    !!
+                 '>.';
+       WRITE FILE(ERRORF) FROM(LINE);                                   01749328
+       GOTO EXITPROC;
+    END;
+    IF O_COD_PERSONA_NEW > 0 THEN WPELATH = O_COD_PERSONA_NEW;
+    ELSE                          WPELATH = O_COD_PERSONA;
+ EXITPROC:
+ END  FIND_CIDB;
+
+ END_OF_PROG:
+    CTLCHAR = '1';
+    LINEOUT = (132)'*';
+    WRITE FILE(SYSOUT) FROM (LINE);
+    CTLCHAR = ' ';
+    LINEOUT = (15)' ' !! ' лгмиаиа сулжымиа аявеиоу IGL NO 6 ';
+    WRITE FILE(SYSOUT) FROM(LINE) ;
+    LINEOUT = (132)' ';
+    WRITE FILE(SYSOUT) FROM(LINE);
+    LINEOUT = (32)' ' !! ' тгс ' !!
+              SUBSTR(INDATE,7,2)!!'.'!!
+              SUBSTR(INDATE,5,2)!!'.'!!
+              SUBSTR(INDATE,1,4);
+    WRITE FILE(SYSOUT) FROM(LINE) ;
+    LINEOUT = (132)' ';
+    WRITE FILE(SYSOUT) FROM(LINE);
+    LINEOUT = (20)' ' !! ' ежаялоцг : й а т а х е с е и с ';
+    WRITE FILE(SYSOUT) FROM(LINE) ;
+    LINEOUT = (132)'-';
+    WRITE FILE(SYSOUT) FROM(LINE);
+
+    TOT_OUT1 = CNTREAD;
+    LINEOUT = 'сумоко диабасхемтым еццяажым йатахесеым   апо TAM20  :'
+             !! (03)' '!! TOT_OUT1;
+    WRITE FILE(SYSOUT) FROM(LINE) ;
+    TOT_OUT= TPOSO;
+    LINEOUT = 'сумоко посоу диабасхемтым ецця.йатахесеым апо TAM20  :'
+             !! TOT_OUT;
+     WRITE FILE(SYSOUT) FROM(LINE) ;
+    TOT_OUT1 = CNTPROCCED;
+    LINEOUT = 'сYмоко еццяажемтым еццяажым аявеиоу       сто IGLF6  :'
+             !! (03)' '!! TOT_OUT1;
+    WRITE FILE(SYSOUT) FROM(LINE) ;
+    TOT_OUT= SPOSO;
+    LINEOUT = 'сумоко посоу еццяажемтым еццяажым аявеиоу сто IGLF6  :'
+             !! TOT_OUT;
+     WRITE FILE(SYSOUT) FROM(LINE) ;
+
+    GOTO TELOS;
+ /*----------------------------------------------------------------*/
+ TELOS:
+    CLOSE  FILE(SYSOUT);
+    CLOSE  FILE(T20KTM);
+    CLOSE  FILE(IGLFIL);
+    CLOSE  FILE(INCARD);
+    CLOSE  FILE(ERRORF);
+
+ END DK570;
+

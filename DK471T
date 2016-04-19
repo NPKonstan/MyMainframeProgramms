@@ -1,0 +1,1560 @@
+* PROCESS XOPTS(DLI);
+ DK471  : PROCEDURE OPTIONS(MAIN);
+  /***********************************************************/
+  /*          MEMBER = DK471                                 */
+  /***********************************************************/
+  /*  IMS + DB2                                              */
+  /***********************************************************/
+  /*  INTERFACE FOR  LOADING DB2 TABLE  T51SAL01             */
+  /*  диабафы DATA/BASE йатхесеым йаи еисацы тилес стом      */
+  /*  T51SAL01 пимайа пыкгсеым                               */
+  /*                                                         */
+  /* IF THE PROGRAM  IS  USED FOR TEST ONLY                  */
+  /* VARIABLE IS_TEST HAS VALUE YES                          */
+  /* IN PRODUCTION YOU HAVE TO CHANGE THIS VALUE             */
+  /*                                                         */
+  /* DATE ************************ PROGRAMMERS NAME **********/
+  /* 01/10/2003                    NPK                       */
+  /* *********************************************************/
+  /* 18/03/2004 ПЯОСХчЙГ МщЫМ ЙАХОКИЙЧМ 5114,5150            */
+  /* *********************************************************/
+  /* 07/05/2004 ПЯОСХчЙГ МщЫМ ЙАХОКИЙЧМ 5060,5122,5121,5120  */
+  /*            ЦИА ТА ПИО ПэМЫ ЙАХОКИЙА иДИЧТЕР+еПИВЕЯчСЕИР */
+  /*            ПЯОСХчЙГ ЕКЕЦВОУ лИЙЯЧМ лЕЦэКЫМ еПИВЕИЯГСЕЫМ */
+  /*                                                         */
+  /* EПИСТОКГ дИЕУХУМСГР пЕКАТЕъАР еПИВЕИЯчСЕЫМ              */
+  /*          487/134  22.04.2004                            */
+  /***********************************************************/
+  /* *********************************************************/
+  /* 28/03/2005 AККАЦч СТА ЙАХОКИЙэ     5060,5122            */
+  /* ЦИА ТА ПИО ПэМЫ ЙАХОКИЙА ДЕМ ЦИМЕТАИ ЕКЕЦВОР ЦИА ЖУСИЙЭ */
+  /* МОЛИЙЭ ПЯЭСЫПО хЕЫЯОЩМТАИ ЭКА              еПИВЕИЯГСЕЫМ */
+  /*                                                         */
+  /* Lotus notes:                                            */
+  /* аЯИХЛЭР еЦЦЯэЖОУ : B4B30491B1D6BF99C2256FD20033B917     */
+  /* АПО ТОМ аКщНИО аКЕНъОУ                           */
+  /*                                                         */
+  /* *********************************************************/
+  /* *********************************************************/
+  /* 21/09/2005 AККАЦч СТГ СУВМЭТГТА ЯОчР ТЧЯА ЛПОЯЕъ МА     */
+  /* ТЯщВЕИ ЙАИ ЙАХГЛщЯИМэ                                   */
+  /* CC_REC_TYPE                W=WEEKLY,M=MONTHLY,D=DAILY   */
+  /*                                                         */
+  /* *********************************************************/
+  /* *********************************************************/
+  /* 07/04/2008 AККАЦч ЦИА УПОСТчЯИНГ ПАЙщТЫМ                */
+  /* еэМ KSRKIND ^= '0',' ' ТЭТЕ ЕъМАИ ПАЙщТО ЙАИ АККэФЕИ О  */
+  /* ЙЫДИЙЭР ЙАХОКИЙОЩ-ПЯОИЭМТОР                             */
+  /*  апо      се                                            */
+  /* 5078----->1078                                          */
+  /* 5068----->1068                                          */
+  /* 5060----->1060                                          */
+  /* NPK 07-04-2008                                          */
+  /* *********************************************************/
+ DCL VALDAY EXTERNAL ENTRY(CHAR(44))
+                                     OPTIONS(INTER,ASM);
+ FETCH VALDAY;
+
+ /***********************************************************/
+ /* PLIXOPT *************************************************/
+ /* OVERIDES L-E DECLARATION FOR MAXIMUM ERRORS             */
+ /* IT IS NEEDED IF YOU WANT TO HANDLE VSAM ON-KEY ERRORS   */
+ /* NPK   19-05-2004 ****************************************/
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+ /***********************************************************/
+
+    /*------------------------------------------*/
+    /*  дгкысеис аявеиым                        */
+    /*------------------------------------------*/
+
+ DCL  READER     FILE RECORD INPUT ENV(
+                 FB RECSIZE(80)                          );
+
+
+ DCL PRT   FILE RECORD OUTPUT ENV(                    FB
+           RECSIZE(133)            CTLASA);
+
+ DCL  ETAIRIE FILE RECORD DIRECT INPUT
+                 KEYED
+                 ENV ( VSAM );
+   /* -------------------------------------------------------------- */
+   /*           RECORD VSAM APXEIOY DK.TRAP.EPIX                     */
+   /*                                                                */
+   /*           RECORD SIZE = 100                                    */
+   /* -------------------------------------------------------------- */
+
+ % INCLUDE  DKSPACC ;
+ % INCLUDE  KSDBMAP   ;
+ % INCLUDE  DAYATNS   ;
+ % INCLUDE  CUAVDCDS  ;
+
+ DCL 1 CC_REC ,    /*CONTROL CARD RECORD */
+        2 CC_DATEPRFR PIC '(8)9',  /*DDMMYYYY*//*DATE FROM */
+        2 FILLER1     CHAR(01),
+        2 CC_DATEPRTO PIC '(8)9',  /*DDMMYYYY*//*DATE TO   */
+        2 FILLER2     CHAR(01),
+        2 CC_REC_TYPE CHAR(01),    /*W=WEEKLY,M=MONTHLY,D=DAILY   */
+        2 FILLER3     CHAR(61);
+
+
+    DCL T_KEY CHAR(10) BASED(ADDR( DSA_ARLOG));
+    DCL 1  T_KER       BASED(ADDR( DSA_ARLOG)),
+         2 T_KER60     BIT(60)                ,
+         2 T_KER04     BIT(04)                ;
+
+    DCL  EOF          FIXED(1)       INIT(0)  ;
+
+    DCL  FLAG         FIXED(1)       INIT(0)  ;
+    DCL  IS_PACKAGE   FIXED(1)       INIT(0)  ;
+
+    DCL  DATEPRFR  CHAR(8);
+    DCL  DATEPRTO  CHAR(8);
+
+    DCL MAX_BRANCHES  DEC FIXED(5) INIT(600);
+    /*MEцистос аяихлос пяоиымтым         */
+    DCL MAX_TYPES     DEC FIXED(3) INIT( 13);/*npk 07-04-2008 add 3*/
+
+    /*идиытес,л.епивеиягсеис,епивеиягсеис*/
+    DCL MAX_PRODS     DEC FIXED(3) INIT(3);
+
+    /*хесг йатастглатос леса стом пимайа PINAX*/
+    DCL I          DEC FIXED(3) INIT(0);
+    /*MEцистос аяихлос йатастглатым      */
+    DCL MAX_NUM_BRANCH DEC FIXED(3) INIT(0);
+
+    DCL 1 PINAX(MAX_BRANCHES) ,   /*KATAстглата*/
+          3 COD_KATMA  PIC '999' ,
+          3 PROD_TYPE(MAX_TYPES) ,/*йахокийа-пяои╪мта*/
+           4 PP(MAX_PRODS) ,   /*идиытес-л.епивеиягсеис-епивеиягсеис*/
+               5 COD_PROD_FAMILY  CHAR(4),
+               5 COD_PROD CHAR(4),
+               5 NUM_SALES_CNT  DEC FIXED(13,2),
+               5 NUM_SALES_AMT  DEC FIXED(13,2),
+               5 NUM_TOTAL_CNT  DEC FIXED(13,2),
+               5 NUM_TOTAL_AMT  DEC FIXED(13,2),
+               5 CHR_PROD_FAMILY  CHAR(150) ,
+               5 CHR_PROD CHAR(150) ;
+
+   DCL COD_PF (3) CHAR (4) ;
+       COD_PF(1) = '1000';
+       COD_PF(2) = '2000';
+       COD_PF(3) = '3000';
+
+  DCL CHR_PF (3) CHAR (150);
+
+       CHR_PF (1) = 'идиытес' ;
+       CHR_PF (2) = 'епивеиягсеис' ;
+       CHR_PF (3) = 'лецакес епивеиягсеис' ;
+
+  DCL INX FIXED(1) INIT(0);
+
+  DCL BIG_CNT   FIXED(9) INIT(0);
+  DCL SMALL_CNT FIXED(9) INIT(0);
+  DCL FYSIK_CNT FIXED(9) INIT(0);
+
+
+ DCL THREE STATIC FIXED BINARY(31) INIT(3);
+ /*DCL FUNGN CHAR(4) INIT('GN  ') ;*/
+ /*DCL PCBPTRK  POINTER;               *DEPOSITS-PCB POINTER */
+ DCL KFIOROOT POINTER;
+ DCL KFIOSADD POINTER;
+ /*
+ DCL PCBIO    POINTER;
+
+ DCL 1 PCBK BASED(PCBPTRK) ,
+      2 PCBDBDNM       CHAR(8),
+        2 FA             CHAR(2),
+        2 PCBSC          CHAR(2),
+        2 PCBPROPT       CHAR(4),
+        2 FB FIXED       BIN(31),
+        2 PCBSEGNM       CHAR(8),
+        2 PCBLFBK        FIXED BIN(31) ,
+        2 PC             FIXED BIN(31) ,
+        2 PCBFBK         CHAR(32)        ;
+ */
+
+ DCL   IOAREA  CHAR(450) INIT(' ') ;  /* IO AREA KOINH      Y2000 */
+       DCL       KSRTRAP     BIT (8)    BASED(ADDR(KSRKATMA));
+
+       DCL 1  IOACHECK BASED(ADDR(IOAREA)),
+             2 FNM1          CHAR(13),
+             2 DUMMYRECORD   BIT(24) ,
+             2 SAFETYRECORD  BIT(24) ;
+ /*------------------------------------------------------------------*/
+     DCL WS_BANK_KATMA FIXED(05,0) INIT(0);
+     DCL 1  WSKATR1   BASED(ADDR(WS_BANK_KATMA)),
+          2 WSFIL1    BIT(04)             ,
+          2 WS_BIT_TRAPEZA BIT(04)        ,
+          2 WS_KATMA  FIXED(03,0)         ;
+     DCL 1 WS_KATMA5,
+           2 FILLER1 PIC '9' INIT(0),
+           2 FILLER2 PIC '9' INIT(0),
+           2 WS_KATMA_P PIC '999';
+     DCL   WS_KATMA5_R PIC '99999' BASED(ADDR(WS_KATMA5));
+ /*********************************************************************/
+     /****************************/
+     /*SOME VARIABLES FOR TESTING*/
+     /****************************/
+
+     /*IF IT IS TEST IS_TEST HAS VALUE YES*/
+     /*IN PRODUCTION YOU HAVE TO PUT NO  */
+
+     DCL  IS_TEST          CHAR(3)   INIT(' NO');
+     DCL  REC_COUNTER      FIXED(15) INIT(0);
+     DCL  MAX_REC_COUNTER  FIXED(3)  INIT(099);
+                                               /*RECORDS FOR TESTING*/
+     /***************************/
+     /*SOME VARIABLES FOR TOTALS*/
+     /***************************/
+   DCL   SYNOLO_KATHOLIKOY  PIC'ZZZZ.ZZZ.ZZZ.ZZ9V,99-' INIT(0);
+   DCL   TOTAL_REC_KATHOLIKOY PIC'ZZZ.ZZZ.ZZ9' INIT(0);
+   DCL   MY_SYNOLO_KATHOLIKOY  FIXED(15,2) INIT(0);
+
+   DCL 1 COUNTERS ,
+      2 CNT_REC_READ               PIC 'ZZZ.ZZZ.ZZ9' ,
+      2 CNT_REC_REJECT_CYPR        PIC 'ZZZ.ZZZ.ZZ9' ,
+      2 CNT_REC_PROCCED            PIC 'ZZZ.ZZZ.ZZ9' ,
+      2 CNT_REC_REJECT_T04CNV97    PIC 'ZZZ.ZZZ.ZZ9' ,
+      2 CNT_REC_REJECT_T04DOM01    PIC 'ZZZ.ZZZ.ZZ9' ,
+      2 CNT_REC_PROCCED_RIGHT      PIC 'ZZZ.ZZZ.ZZ9' ,
+      2 CNT_REC_WRITTEN            PIC 'ZZZ.ZZZ.ZZ9' ,
+      2 CNT_REC_SAFETY             PIC 'ZZZ.ZZZ.ZZ9' ,
+      2 CNT_REC_BIG_COMPANY        PIC 'ZZZ.ZZZ.ZZ9' ,
+      2 CNT_REC_AFTER              PIC 'ZZZ.ZZZ.ZZ9' ,
+      2 CNT_REC_BEFORE             PIC 'ZZZ.ZZZ.ZZ9' ;
+
+ DCL  WS_TOT_5068     PIC'ZZZZ.ZZZ.ZZZ.ZZ9V,99-' INIT(0);
+ DCL  WS_TOT_5078     PIC'ZZZZ.ZZZ.ZZZ.ZZ9V,99-' INIT(0);
+
+ DCL  WS_TOT_5116     PIC'ZZZZ.ZZZ.ZZZ.ZZ9V,99-' INIT(0);
+ DCL  WS_TOT_5117     PIC'ZZZZ.ZZZ.ZZZ.ZZ9V,99-' INIT(0);
+
+ DCL  WS_TOT_5114     PIC'ZZZZ.ZZZ.ZZZ.ZZ9V,99-' INIT(0);
+ DCL  WS_TOT_5150     PIC'ZZZZ.ZZZ.ZZZ.ZZ9V,99-' INIT(0);
+ DCL  WS_TOT_5060     PIC'ZZZZ.ZZZ.ZZZ.ZZ9V,99-' INIT(0);
+ DCL  WS_TOT_5122     PIC'ZZZZ.ZZZ.ZZZ.ZZ9V,99-' INIT(0);
+ DCL  WS_TOT_5121     PIC'ZZZZ.ZZZ.ZZZ.ZZ9V,99-' INIT(0);
+ DCL  WS_TOT_5120     PIC'ZZZZ.ZZZ.ZZZ.ZZ9V,99-' INIT(0);
+
+ DCL  WS_TOT_1060     PIC'ZZZZ.ZZZ.ZZZ.ZZ9V,99-' INIT(0);
+ DCL  WS_TOT_1068     PIC'ZZZZ.ZZZ.ZZZ.ZZ9V,99-' INIT(0);
+ DCL  WS_TOT_1078     PIC'ZZZZ.ZZZ.ZZZ.ZZ9V,99-' INIT(0);
+ DCL 1 ERLINE  ,
+       2 ERLIN1    CHAR(1)  INIT(' ')       ,
+       2 ERLIN2    CHAR(132);
+
+ DCL WNAME_60   CHAR(60) INIT(' ');
+ DCL WNAME      CHAR(35) INIT(' ');
+ DCL WDATE      PIC'(8)9' INIT(0);
+ DCL WKAPELDS   CHAR(25) INIT(' ');
+ DCL WPOSO      FIXED(15,2);
+ DCL WPOSO1     FIXED(15,2);
+ DCL WKATHO     PIC'(10)9' INIT(0);
+
+ DCL WS_ZERO    FIXED(1) INIT(0);
+ DCL WS_BOOM    FIXED(1) INIT(1);
+
+ DCL WKAPEL     PIC'99';
+ DCL WTRAPEL    PIC'9';
+ DCL WARPEL     PIC'(8)9';
+ DCL WLOGAR     PIC'(4)9';
+ DCL WCIDB      CHAR(18) INIT(' ');
+
+ DCL WKATMA     PIC'(5)9';
+ DCL WPELATH  DEC FIXED(9,0) INIT(0)  ;
+ DCL WPEL       PIC'(8)9';
+ DCL CNTRYP     FIXED(9) INIT(0);
+ DCL CNTRWR     FIXED(9) INIT(0);
+ DCL CNTRCI     FIXED(9) INIT(0);
+ DCL WYPOL      FIXED(15,2) INIT (0);
+ DCL TOT_KATH   PIC'ZZZZ.ZZZ.ZZZ.ZZ9V,99' INIT(0);
+
+
+ DCL WS_PIC9_ARLOG   PIC '(8)9'  ;
+ DCL WS_PIC9_ARKATMA PIC '(3)9'  ;
+
+ DCL 1 WS_PIC9_KATH_B PIC '(6)9' BASED(ADDR(WS_PIC9_KATH));
+
+ DCL 1 WS_PIC9_KATH                  ,
+       2  WS_PIC9_KATHOL PIC '(4)9'  ,
+       2  WS_99          PIC '99'    ;
+
+ DCL  WS_KATHOL     PIC '(4)9' INIT (0);
+
+ DCL  WS_KATH_OLD   PIC'(6)9'  INIT (931900);
+ DCL  WS_KATH_OLD1  CHAR(6) BASED(ADDR(WS_KATH_OLD));
+ DCL  WS_KATH_NEW   PIC'(6)9' INIT (0);
+ DCL  WS_KATH_NEW1  CHAR(6) BASED(ADDR(WS_KATH_NEW));
+
+ DCL  AKATMA PIC '999' ;
+ DCL  PERI   PIC '999' ;
+ DCL  HMTS_F PIC '(7)9' INIT(0);
+ DCL  HMTS_S PIC '(7)9' INIT(0);
+ DCL  LAT      CHAR(24) INIT ('ABcdEZHhIKkMNnOpPrTYuXwx');
+ DCL  GRE      CHAR(24) INIT ('абцдефгхийклмнопястужвьы');
+
+ DCL (ONFILE,ONCODE,ONKEY,PRIORITY,TIME,VERIFY) BUILTIN;
+
+ DCL (DATETIME,SUBSTR,NULL,ADDR,UNSPEC,TRANSLATE) BUILTIN;
+
+ /******************************/
+ /* INCLUDE OF DB2 TABLES.     */
+ /******************************/
+     EXEC SQL INCLUDE T51SAL01;
+     EXEC SQL INCLUDE SQLCA;
+
+  /*******************************************************************/
+  /***********    M A I N   P R O G R A M    *************************/
+  /*******************************************************************/
+
+ %PAGE;
+
+   ON KEY (ETAIRIE)
+      BEGIN;
+        IF ONCODE = 51 THEN DO ;                    /* KEY NOT FOUND */
+           FLAG = 1 ;
+         END ;
+
+      END; /* BEGIN */
+
+      ON ENDFILE(READER)
+           BEGIN ;
+           ERLIN1='1';
+           ERLIN2=' TELOS пяоцяалатос DK471               ';
+           WRITE FILE(PRT) FROM(ERLINE);
+           ERLIN1='0';
+           ERLIN2=' дем бяехгйе CONTROL-CARD   ';
+           WRITE FILE(PRT) FROM(ERLINE);
+           ERLIN2=' THS лояжгс DDMMYYYY DDMMYYYY  X';
+           WRITE FILE(PRT) FROM(ERLINE);
+
+           WS_BOOM = WS_BOOM /  WS_ZERO  ; /*JUST CRASH*/
+
+           END;
+  /*
+      ON ERROR      BEGIN;
+
+         IF   ONCODE= 8097 THEN DO;
+              PUT LIST('ERROR 8097 ');
+              PUT LIST(' I  = ',I  );
+              PUT LIST(' XX ',
+                         PINAX(I).PROD_TYPE(2).NUM_TOTAL_CNT    );
+
+              GOTO TELOS ;
+         END;
+      END;
+    */
+
+   PUT SKIP LIST('start dk471T for Test = ', DATETIME());
+   CNT_REC_READ              = 0 ;
+   CNT_REC_REJECT_CYPR       = 0 ;
+   CNT_REC_PROCCED           = 0 ;
+   CNT_REC_REJECT_T04CNV97   = 0 ;
+   CNT_REC_WRITTEN           = 0 ;
+   CNT_REC_SAFETY            = 0 ;
+   CNT_REC_BEFORE            = 0 ;
+   CNT_REC_AFTER             = 0 ;
+
+   PINAX    = '';
+   T51SAL01 = '';
+
+
+   CALL PROC_READER;
+   CALL READ_IMS_DB;
+
+   CLOSE FILE(ETAIRIE) ;
+
+  /**************************************************************
+  *  READ_IMS_DB              START                             *
+  *                   диабасла йатахесеым                     ***
+  **************************************************************/
+  READ_IMS_DB :PROC ;
+   KFIOROOT = ADDR(IOAREA) ;
+   KFIOSADD = ADDR(IOAREA) ;
+
+   READKAT:
+   /*CALL PLITDLI(THREE,FUNGN,PCBK,IOAREA) ; */
+   /*IF   PCBK.PCBSC ='GK' !
+        PCBK.PCBSC ='GA' !
+        PCBK.PCBSC ='GB' !
+        PCBK.PCBSC ='  ' THEN;*EVERYTHING IS OK,CONTINUE */
+   EXEC DLI
+        GN USING PCB(2)
+        INTO (IOAREA);
+
+
+     IF DIBSTAT   ='GK' !
+        DIBSTAT   ='GA' !
+        DIBSTAT   ='GB' !
+        DIBSTAT   ='  ' THEN;/*EVERYTHING IS OK,CONTINUE */
+   ELSE DO;
+           ERLIN1='1';
+           WRITE FILE(PRT) FROM(ERLINE);
+           ERLIN2='0   * кахос амацмысг стгм  D/B йатахесеым * ';
+           WRITE FILE(PRT) FROM(ERLINE);
+           ERLIN2='DIBSTAT =  '!!DIBSTAT;
+           WRITE FILE(PRT) FROM(ERLINE);
+           STOP;
+      END;
+      IF  DIBSTAT  ='GB'   THEN
+           CALL  TERMINATE_PROGR;
+       IF DIBSEGM   ^= 'KROOTSEG' THEN
+           GOTO READKAT ;
+
+      IF DUMMYRECORD='000000000000000000000000'B   THEN
+                     CALL TERMINATE_PROGR;
+
+      IF SAFETYRECORD='000000000000000000000000'B  THEN GOTO READKAT;
+
+      IF KSRARLOG    = 999999999  THEN CALL TERMINATE_PROGR ;
+
+      /*лгм епенеяцастгс то талиеутгяио*/
+      IF KSRARLOG    < 80000000 THEN GOTO READKAT;
+
+      WS_BANK_KATMA = KSRKATMA ;
+
+      /*лгм епенеяцасхEIс тяапефес аккес ейтос елпояийгс*/
+
+      IF  WS_BIT_TRAPEZA ^= '0000'B THEN GOTO READKAT;
+
+      /*оуте йатастглата  CYPRUS*/
+      IF (WS_KATMA > 452 & WS_KATMA < 460) THEN DO;
+           CNT_REC_REJECT_CYPR   = CNT_REC_REJECT_CYPR +1;
+           GOTO READKAT;
+      END ;
+      /*еам глеяолгмиа амоицлатос лецакутеяг апо то еыс тгс CC-CARD*/
+      /*READ AGAIN                                                 */
+      IF  DAYSAR8(CONVERT_DATE(KSRHMAN))  >
+          DAYS8R8(CC_DATEPRTO )  THEN DO;
+           CNT_REC_AFTER   = CNT_REC_AFTER       +1;
+           GOTO READKAT;
+      END ;
+
+      /*еам еимаи айуяылемос пяим TO апо тгс CC-CARD*/
+      IF (KSRAKYR='1' &
+          DAYSAR8(CONVERT_DATE(KSRHMTA))  <
+          DAYS8R8(CC_DATEPRFR )) THEN DO;
+           CNT_REC_BEFORE      = CNT_REC_BEFORE      +1;
+           GOTO READKAT;
+      END ;
+      /*ломо та йахокийа 5078 5068 5116 йаи 5117 5114 5150
+                         5060,5122,5121,5120
+                   лас емдиажеяоум           */
+      IF  KSRKATHO ^= 5078  & KSRKATHO ^= 5068 &
+          KSRKATHO ^= 5116  & KSRKATHO ^= 5117 &
+          KSRKATHO ^= 5114  & KSRKATHO ^= 5150 &
+          KSRKATHO ^= 5060  & KSRKATHO ^= 5122 &
+          KSRKATHO ^= 5121  & KSRKATHO ^= 5120 THEN GOTO READKAT;
+
+      /*ломо та жусийа пяосыпа лас емдиажеяоум
+            ста йахокийа 5078 5068 5116 5117 5114 5150  */
+      IF (KSRKATHO = 5078  ! KSRKATHO = 5068 !
+          KSRKATHO = 5116  ! KSRKATHO = 5117 !
+          KSRKATHO = 5114  ! KSRKATHO = 5150 )  THEN DO;
+
+      /*start 07-04-2008 add ПАЙщТА          */
+       IS_PACKAGE = 0;
+       IF (KSRKIND = '0') ! (KSRKIND = ' ') THEN
+          IS_PACKAGE = 0;
+       ELSE
+          IS_PACKAGE = 1;
+      /*end   07-04-2008 add ПАЙщТА          */
+            IF    (KSRFN = 'N' )  THEN
+                   GOTO READKAT;
+            ELSE
+                   FYSIK_CNT = FYSIK_CNT + 1;
+      END;
+
+      /**********************************************************/
+      /* текос тым апояиьеым,                                   */
+      /*EAN Eжтасес еыс еды,тоте г еццяажг пяепеи ма епенеяцAсхеи*/
+      /**********************************************************/
+      CNT_REC_READ  = CNT_REC_READ  + 1;
+
+      /*************************************************************/
+      /*бяес се пиа хесг тоу пимайа еимаи топохетглемо то йатастгла*/
+      /*************************************************************/
+
+      I = LOCATE_BRANCH(WS_KATMA);
+
+      CALL LOAD_LOCAL_TABLE      ;
+
+
+      GOTO READKAT; /* Read Again */
+
+  END READ_IMS_DB  ;
+
+  /**************************************************************
+  *  READ_IMS_DB              END                               *
+  **************************************************************/
+
+  /**************************************************************
+  *  PROC_READER              START                             *
+  *  1) ои глеяолгмиес пяепеи ма еимаи ецйуяес ( VALDAY)  KAI   *
+  *  2) пяепеи йаи г леяа  емаянгс                              *
+  *  NA EINAI лийяотеяг г исг ле тгм глеяолгмиа кгнгс           *
+  *  3) думатес тилес циа COD_REC_TYPE  MONON W KAI M           *
+  **************************************************************/
+    PROC_READER: PROC;
+
+
+    OPEN FILE(ETAIRIE) ;
+    OPEN FILE(READER) ;
+
+    READ  FILE(READER) INTO(CC_REC);
+
+    IF IS_TEST = 'YES' THEN   DO ;
+        ERLIN1='1';
+        ERLIN2='FROM = '!!CC_DATEPRFR!!' TO = '!!CC_DATEPRTO ;
+        WRITE FILE(PRT) FROM(ERLINE);
+    END;
+
+    DATEPRFR =  CC_DATEPRFR  ;
+    DATEPRTO =  CC_DATEPRTO  ;
+
+    IF VERIFY(DATEPRFR,'0123456789')   > 0  !
+       VERIFY(DATEPRTO,'0123456789')   > 0  THEN DO;
+        ERLIN1='1';
+        ERLIN2=' TELOS пяоцяалатос DK471               ';
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN1='0';
+        ERLIN2=' кахос стгм  CONTROL-CARD   ';
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN2= DATEPRFR!!' '!!  DATEPRTO !! ' ' !! CC_REC_TYPE ;
+        WRITE FILE(PRT) FROM (ERLINE);
+        ERLIN2='Eкецнате глеяолгмиес апо-еыс  ' ;
+        WRITE FILE(PRT) FROM (ERLINE);
+        ERLIN2='лг ояхг HM/NIA апо              '!! DATEPRFR ;
+        WRITE FILE(PRT) FROM (ERLINE);
+        ERLIN2='лг ояхг HM/NIA еыс              '!! DATEPRTO ;
+        WRITE FILE(PRT) FROM (ERLINE);
+        IF IS_TEST = 'YES' THEN   GO TO TELOS;
+        WS_BOOM = WS_BOOM /  WS_ZERO  ; /*JUST CRASH*/
+     END;
+
+
+    CUAHMERX = SUBSTR(DATEPRFR,1,4)!!SUBSTR(DATEPRFR,7,2);
+    CUAKLEIT = 'EO';
+    CALL VALDAY(CUAVDCDS) ;
+     IF CUAAPANT ^= ' ' THEN DO;
+        ERLIN1='1';
+        ERLIN2=' TELOS пяоцяалатос DK471               ';
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN1='0';
+        ERLIN2=' кахос стгм  CONTROL-CARD   ';
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN2='лг ояхг HM/NIA апо: (VALDAY) = '!! CC_DATEPRFR ;
+        WRITE FILE(PRT) FROM (ERLINE);
+        IF IS_TEST = 'YES' THEN   GO TO TELOS;
+        WS_BOOM = WS_BOOM /  WS_ZERO  ; /*JUST CRASH*/
+     END;
+
+    /*еимаи коцийг глеяолгмиа г  CC_DATEPRTO           */
+    IF IS_TEST = 'YES' THEN   DO ;
+         PUT LIST ('SUBSTR(DATEPRTO,1,4)= ',SUBSTR(DATEPRTO,1,4),
+         'SUBSTR(DATEPRTO,7,2)= ',SUBSTR(DATEPRTO,7,2) );
+    END;
+
+     CUAHMERX = SUBSTR(DATEPRTO ,1,4)!!SUBSTR(DATEPRTO ,7,2);
+     CUAKLEIT = 'EO';
+     CALL VALDAY(CUAVDCDS) ;
+     IF CUAAPANT ^= ' ' THEN DO;
+        ERLIN1='1';
+        ERLIN2=' TELOS пяоцяалатос DK471               ';
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN1='0';
+        ERLIN2=' кахос стгм  CONTROL-CARD   ';
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN2='лг ояхг HM/NIA еыс : (VALDAY) = '!! DATEPRTO ;
+        WRITE FILE(PRT) FROM (ERLINE);
+        IF IS_TEST = 'YES' THEN   GO TO TELOS;
+        WS_BOOM = WS_BOOM /  WS_ZERO  ; /*JUST CRASH*/
+     END;
+
+    /*летатяопг тым глея/миым апо тHм лояжг DDMMYYYY */
+    /*стгм лояжг YYYYMMDD циа ма лпояы ма тис суцйяимы*/
+
+    IF DAYS8R8(CC_DATEPRFR)  >  DAYS8R8(CC_DATEPRTO )  THEN DO;
+           ERLIN1='1';
+           ERLIN2=' TELOS пяоцяалатос DK471               ';
+           WRITE FILE(PRT) FROM(ERLINE);
+           ERLIN1='0';
+           ERLIN2=' кахос стгм  CONTROL-CARD   ';
+           WRITE FILE(PRT) FROM(ERLINE);
+           ERLIN2= DATEPRFR!!' '!!  DATEPRTO !! ' ' !! CC_REC_TYPE ;
+           WRITE FILE(PRT) FROM (ERLINE);
+           ERLIN2=' пяепеи г йаята ма еимаи лояжгс DDMMYYYY DDMMYYYY X';
+           WRITE FILE(PRT) FROM(ERLINE);
+
+           ERLIN2=' KAI H пяытг глеяолгмиа ма еимаи лийяотеяг H'!!
+                   ' Iсг ап тгм деутеяг  ';
+           WRITE FILE(PRT) FROM(ERLINE);
+
+        IF IS_TEST = 'YES' THEN   GO TO TELOS;
+           WS_BOOM = WS_BOOM /  WS_ZERO  ; /*JUST CRASH*/
+
+           END;
+
+        IF CC_REC_TYPE  ^=  'W' &
+           CC_REC_TYPE  ^=  'M' &
+           CC_REC_TYPE  ^=  'D' THEN DO;
+           ERLIN1='0';
+           ERLIN2=' TELOS пяоцяалатос DK471               ';
+           WRITE FILE(PRT) FROM(ERLINE);
+           ERLIN2=' кахос стгм  CONTROL-CARD   ';
+           WRITE FILE(PRT) FROM(ERLINE);
+           ERLIN2= DATEPRFR!!' '!!  DATEPRTO !! ' ' !! CC_REC_TYPE ;
+           WRITE FILE(PRT) FROM (ERLINE);
+           ERLIN2=' пяепеи г йаята ма еимаи лояжгс DDMMYYYY DDMMYYYY X';
+           WRITE FILE(PRT) FROM(ERLINE);
+
+           ERLIN2=' KAI Tо тяито педиоу еимаи'!!
+                   ' W циа ебдоладиаиа г M циа лгмиаиа D циа глеягсиа';
+           WRITE FILE(PRT) FROM(ERLINE);
+
+        IF IS_TEST = 'YES' THEN   GO TO TELOS;
+           WS_BOOM = WS_BOOM /  WS_ZERO  ; /*JUST CRASH*/
+        END;
+
+        CLOSE FILE(READER) ;
+
+    END PROC_READER        ;
+  /**************************************************************
+  *  PROC_READER              END                               *
+  **************************************************************/
+  /**************************************************************
+  *  LOAD_LOCAL_TABLE         START                             *
+  *                                                             *
+  * жоятымеи том топийо пимайа ама йатастгла амоицлатос коцаяиас*
+  *                                                             *
+  **************************************************************/
+     LOAD_LOCAL_TABLE       : PROC;
+
+       DCL IS_NEW_PR CHAR(1);
+
+       PINAX(I).COD_KATMA  =  WS_KATMA ;
+
+       IS_NEW_PR = IS_NEW_PRODUCT();
+
+       /*ломо та пио йаты йахокиа енетафомтаи циа епивеиягсеис   */
+      IF (KSRKATHO = 5121  !  KSRKATHO = 5120  ) THEN DO ;
+               IF (KSRFN = 'N' ) THEN /*ONLY епивеиягсеис */
+                  INX = RETURN_PROD(KSRARLOG);
+               ELSE DO;
+                  INX = 1;            /*жусийа пяосыпа    */
+                   FYSIK_CNT = FYSIK_CNT + 1;
+
+               END;
+      END;
+
+ /**************************************************************/
+ /*28-03-2005                                                  */
+ /*дЕМ ЕКщЦВЫ ЖУСИЙЭ ,МОЛИЙЭ ПЯЭСЫПО ХЕЫЯЕъТЕ ПАМТА ЕПИВЕИЯГСГ */
+ /**************************************************************/
+      IF (KSRKATHO = 5060  !  KSRKATHO = 5122  ) THEN DO ;
+                  INX = RETURN_PROD(KSRARLOG);
+      END;
+
+       SELECT (KSRKATHO );
+         WHEN (5068) DO ;
+         IF IS_PACKAGE= 0 THEN DO;/*NPK 07-04-2008 PACKAGES*/
+           PINAX(I).PROD_TYPE(1).PP(1).COD_PROD = '5068' ;
+           PINAX(I).PROD_TYPE(1).PP(1).CHR_PROD = 'пяомолиайос идиытым';
+           PINAX(I).PROD_TYPE(1).PP(1).COD_PROD_FAMILY = '1000';
+           PINAX(I).PROD_TYPE(1).PP(1).CHR_PROD_FAMILY =
+                                     'идиытес'  ;
+           /*еимаи мео пяоиом ?               */
+           IF  IS_NEW_PR         = '1' THEN DO;
+                  PINAX(I).PROD_TYPE(1).PP(1).NUM_SALES_CNT =
+                  PINAX(I).PROD_TYPE(1).PP(1).NUM_SALES_CNT + 1;
+                  PINAX(I).PROD_TYPE(1).PP(1).NUM_SALES_AMT =
+                  PINAX(I).PROD_TYPE(1).PP(1).NUM_SALES_AMT +
+                                          KSRDYPOL + KSREKKRE ;
+           END;
+           /*пакиа йаи меа пяоиомта еды       */
+           PINAX(I).PROD_TYPE(1).PP(1).NUM_TOTAL_CNT =
+           PINAX(I).PROD_TYPE(1).PP(1).NUM_TOTAL_CNT + 1;
+           PINAX(I).PROD_TYPE(1).PP(1).NUM_TOTAL_AMT =
+           PINAX(I).PROD_TYPE(1).PP(1).NUM_TOTAL_AMT +
+                                            KSRDYPOL + KSREKKRE ;
+         END; /*END IS PACKAGE*/
+         ELSE DO;
+          PINAX(I).PROD_TYPE(13).PP(1).COD_PROD = '1068' ;
+          PINAX(I).PROD_TYPE(13).PP(1).CHR_PROD ='пяом.пайетоу еупоягс';
+          PINAX(I).PROD_TYPE(13).PP(1).COD_PROD_FAMILY = '1000';
+          PINAX(I).PROD_TYPE(13).PP(1).CHR_PROD_FAMILY =
+                                     'идиытес'  ;
+           /*еимаи мео пяоиом ?               */
+           IF  IS_NEW_PR         = '1' THEN DO;
+                  PINAX(I).PROD_TYPE(13).PP(1).NUM_SALES_CNT =
+                  PINAX(I).PROD_TYPE(13).PP(1).NUM_SALES_CNT + 1;
+                  PINAX(I).PROD_TYPE(13).PP(1).NUM_SALES_AMT =
+                  PINAX(I).PROD_TYPE(13).PP(1).NUM_SALES_AMT +
+                                          KSRDYPOL + KSREKKRE ;
+           END;
+           /*пакиа йаи меа пяоиомта еды       */
+           PINAX(I).PROD_TYPE(13).PP(1).NUM_TOTAL_CNT =
+           PINAX(I).PROD_TYPE(13).PP(1).NUM_TOTAL_CNT + 1;
+           PINAX(I).PROD_TYPE(13).PP(1).NUM_TOTAL_AMT =
+           PINAX(I).PROD_TYPE(13).PP(1).NUM_TOTAL_AMT +
+                                            KSRDYPOL + KSREKKRE ;
+         END;
+         END;
+         /**************END   5068***************************/
+         /**************START 5078***************************/
+          WHEN (5078) DO ;
+          IF IS_PACKAGE= 0 THEN DO;/*NPK 07-04-2008 PACKAGES*/
+          PINAX(I).PROD_TYPE(2).PP(1).COD_PROD = '5078';
+          PINAX(I).PROD_TYPE(2).PP(1).CHR_PROD = 'тяевоулемос';
+          PINAX(I).PROD_TYPE(2).PP(1).COD_PROD_FAMILY = '1000';
+          PINAX(I).PROD_TYPE(2).PP(1).CHR_PROD_FAMILY =
+                                   'идиытес'  ;
+         /*еимаи мео пяоиом ?               */
+         IF  IS_NEW_PR         = '1' THEN DO;
+                PINAX(I).PROD_TYPE(2).PP(1).NUM_SALES_CNT =
+                PINAX(I).PROD_TYPE(2).PP(1).NUM_SALES_CNT + 1;
+                PINAX(I).PROD_TYPE(2).PP(1).NUM_SALES_AMT =
+                PINAX(I).PROD_TYPE(2).PP(1).NUM_SALES_AMT +
+                                        KSRDYPOL + KSREKKRE ;
+         END;
+         /*пакиа йаи меа пяоиомта еды       */
+         PINAX(I).PROD_TYPE(2).PP(1).NUM_TOTAL_CNT =
+         PINAX(I).PROD_TYPE(2).PP(1).NUM_TOTAL_CNT + 1;
+         PINAX(I).PROD_TYPE(2).PP(1).NUM_TOTAL_AMT =
+         PINAX(I).PROD_TYPE(2).PP(1).NUM_TOTAL_AMT +
+                                          KSRDYPOL + KSREKKRE ;
+         END;
+         ELSE DO;
+          PINAX(I).PROD_TYPE(12).PP(1).COD_PROD = '1078';
+          PINAX(I).PROD_TYPE(12).PP(1).CHR_PROD ='тяев.пайетоу лафийгс';
+          PINAX(I).PROD_TYPE(12).PP(1).COD_PROD_FAMILY = '1000';
+          PINAX(I).PROD_TYPE(12).PP(1).CHR_PROD_FAMILY =
+                                   'идиытес'  ;
+         /*еимаи мео пяоиом ?               */
+         IF  IS_NEW_PR         = '1' THEN DO;
+                PINAX(I).PROD_TYPE(12).PP(1).NUM_SALES_CNT =
+                PINAX(I).PROD_TYPE(12).PP(1).NUM_SALES_CNT + 1;
+                PINAX(I).PROD_TYPE(12).PP(1).NUM_SALES_AMT =
+                PINAX(I).PROD_TYPE(12).PP(1).NUM_SALES_AMT +
+                                        KSRDYPOL + KSREKKRE ;
+         END;
+         /*пакиа йаи меа пяоиомта еды       */
+         PINAX(I).PROD_TYPE(12).PP(1).NUM_TOTAL_CNT =
+         PINAX(I).PROD_TYPE(12).PP(1).NUM_TOTAL_CNT + 1;
+         PINAX(I).PROD_TYPE(12).PP(1).NUM_TOTAL_AMT =
+         PINAX(I).PROD_TYPE(12).PP(1).NUM_TOTAL_AMT +
+                                          KSRDYPOL + KSREKKRE ;
+
+         END;
+         END;
+         /**************END   5078***************************/
+          WHEN (5116) DO ;
+          PINAX(I).PROD_TYPE(3).PP(1).COD_PROD = '5116' ;
+          PINAX(I).PROD_TYPE(3).PP(1).CHR_PROD =
+             'коцаяиаслои пеяихыяиоу паяацыца   ';
+          PINAX(I).PROD_TYPE(3).PP(1).COD_PROD_FAMILY = '1000';
+          PINAX(I).PROD_TYPE(3).PP(1).CHR_PROD_FAMILY =
+                                   'идиытес'  ;
+         /*еимаи мео пяоиом ?               */
+         IF  IS_NEW_PR         = '1' THEN DO;
+                PINAX(I).PROD_TYPE(3).PP(1).NUM_SALES_CNT =
+                PINAX(I).PROD_TYPE(3).PP(1).NUM_SALES_CNT + 1;
+                PINAX(I).PROD_TYPE(3).PP(1).NUM_SALES_AMT =
+                PINAX(I).PROD_TYPE(3).PP(1).NUM_SALES_AMT +
+                                        KSRDYPOL + KSREKKRE ;
+         END;
+         /*пакиа йаи меа пяоиомта еды       */
+         PINAX(I).PROD_TYPE(3).PP(1).NUM_TOTAL_CNT =
+         PINAX(I).PROD_TYPE(3).PP(1).NUM_TOTAL_CNT + 1;
+         PINAX(I).PROD_TYPE(3).PP(1).NUM_TOTAL_AMT =
+         PINAX(I).PROD_TYPE(3).PP(1).NUM_TOTAL_AMT +
+                                          KSRDYPOL + KSREKKRE ;
+          END;
+          WHEN (5117) DO ;
+          PINAX(I).PROD_TYPE(4).PP(1).COD_PROD = '5117' ;
+          PINAX(I).PROD_TYPE(4).PP(1).CHR_PROD =
+             'деслеулемои апо ейп.айим.коипым выяым';
+          PINAX(I).PROD_TYPE(4).PP(1).COD_PROD_FAMILY = '1000';
+          PINAX(I).PROD_TYPE(4).PP(1).CHR_PROD_FAMILY =
+                                   'идиытес'  ;
+
+         /*еимаи мео пяоиом ?               */
+         IF  IS_NEW_PR         = '1' THEN DO;
+                PINAX(I).PROD_TYPE(4).PP(1).NUM_SALES_CNT =
+                PINAX(I).PROD_TYPE(4).PP(1).NUM_SALES_CNT + 1;
+                PINAX(I).PROD_TYPE(4).PP(1).NUM_SALES_AMT =
+                PINAX(I).PROD_TYPE(4).PP(1).NUM_SALES_AMT +
+                                        KSRDYPOL + KSREKKRE ;
+         END;
+         /*пакиа йаи меа пяоиомта еды       */
+         PINAX(I).PROD_TYPE(4).PP(1).NUM_TOTAL_CNT =
+         PINAX(I).PROD_TYPE(4).PP(1).NUM_TOTAL_CNT + 1;
+         PINAX(I).PROD_TYPE(4).PP(1).NUM_TOTAL_AMT =
+         PINAX(I).PROD_TYPE(4).PP(1).NUM_TOTAL_AMT +
+                                          KSRDYPOL + KSREKKRE ;
+          END;
+          WHEN (5114) DO ;
+          PINAX(I).PROD_TYPE(5).PP(1).COD_PROD = '5114' ;
+          PINAX(I).PROD_TYPE(5).PP(1).CHR_PROD =
+             'пяомолиайос лисходосиас           ';
+          PINAX(I).PROD_TYPE(5).PP(1).COD_PROD_FAMILY = '1000';
+          PINAX(I).PROD_TYPE(5).PP(1).CHR_PROD_FAMILY =
+                                   'идиытес'  ;
+         /*еимаи мео пяоиом ?               */
+         IF  IS_NEW_PR         = '1' THEN DO;
+                PINAX(I).PROD_TYPE(5).PP(1).NUM_SALES_CNT =
+                PINAX(I).PROD_TYPE(5).PP(1).NUM_SALES_CNT + 1;
+                PINAX(I).PROD_TYPE(5).PP(1).NUM_SALES_AMT =
+                PINAX(I).PROD_TYPE(5).PP(1).NUM_SALES_AMT +
+                                        KSRDYPOL + KSREKKRE ;
+         END;
+         /*пакиа йаи меа пяоиомта еды       */
+         PINAX(I).PROD_TYPE(5).PP(1).NUM_TOTAL_CNT =
+         PINAX(I).PROD_TYPE(5).PP(1).NUM_TOTAL_CNT + 1;
+         PINAX(I).PROD_TYPE(5).PP(1).NUM_TOTAL_AMT =
+         PINAX(I).PROD_TYPE(5).PP(1).NUM_TOTAL_AMT +
+                                          KSRDYPOL + KSREKKRE ;
+          END;
+          WHEN (5150) DO ;
+          PINAX(I).PROD_TYPE(6).PP(1).COD_PROD = '5150' ;
+          PINAX(I).PROD_TYPE(6).PP(1).CHR_PROD =
+             'PREMIUM  апоталиеутийос  ';
+          PINAX(I).PROD_TYPE(6).PP(1).COD_PROD_FAMILY = '1000';
+          PINAX(I).PROD_TYPE(6).PP(1).CHR_PROD_FAMILY =
+                                   'идиытес'  ;
+         /*еимаи мео пяоиом ?               */
+         IF  IS_NEW_PR         = '1' THEN DO;
+                PINAX(I).PROD_TYPE(6).PP(1).NUM_SALES_CNT =
+                PINAX(I).PROD_TYPE(6).PP(1).NUM_SALES_CNT + 1;
+                PINAX(I).PROD_TYPE(6).PP(1).NUM_SALES_AMT =
+                PINAX(I).PROD_TYPE(6).PP(1).NUM_SALES_AMT +
+                                        KSRDYPOL + KSREKKRE ;
+         END;
+         /*пакиа йаи меа пяоиомта еды       */
+         PINAX(I).PROD_TYPE(6).PP(1).NUM_TOTAL_CNT =
+         PINAX(I).PROD_TYPE(6).PP(1).NUM_TOTAL_CNT + 1;
+         PINAX(I).PROD_TYPE(6).PP(1).NUM_TOTAL_AMT =
+         PINAX(I).PROD_TYPE(6).PP(1).NUM_TOTAL_AMT +
+                                          KSRDYPOL + KSREKKRE ;
+          END;
+         /**************START 5060***************************/
+          WHEN (5060) DO ;
+          IF IS_PACKAGE= 0 THEN DO;/*NPK 07-04-2008 PACKAGES*/
+          PINAX(I).PROD_TYPE(7).PP(INX).COD_PROD = '5060' ;
+          PINAX(I).PROD_TYPE(7).PP(INX).CHR_PROD =
+             'коцаяиаслои йатахесеым оьеыс      ';
+          PINAX(I).PROD_TYPE(7).PP(INX).COD_PROD_FAMILY = COD_PF(INX);
+          PINAX(I).PROD_TYPE(7).PP(INX).CHR_PROD_FAMILY = CHR_PF(INX);
+         /*еимаи мео пяоиом ?               */
+         IF  IS_NEW_PR         = '1' THEN DO;
+                PINAX(I).PROD_TYPE(7).PP(INX).NUM_SALES_CNT =
+                PINAX(I).PROD_TYPE(7).PP(INX).NUM_SALES_CNT + 1;
+                PINAX(I).PROD_TYPE(7).PP(INX).NUM_SALES_AMT =
+                PINAX(I).PROD_TYPE(7).PP(INX).NUM_SALES_AMT +
+                                        KSRDYPOL + KSREKKRE ;
+         END;
+         /*пакиа йаи меа пяоиомта еды       */
+         PINAX(I).PROD_TYPE(7).PP(INX).NUM_TOTAL_CNT =
+         PINAX(I).PROD_TYPE(7).PP(INX).NUM_TOTAL_CNT + 1;
+         PINAX(I).PROD_TYPE(7).PP(INX).NUM_TOTAL_AMT =
+         PINAX(I).PROD_TYPE(7).PP(INX).NUM_TOTAL_AMT +
+                                          KSRDYPOL + KSREKKRE ;
+         END;
+         ELSE DO;
+          PINAX(I).PROD_TYPE(11).PP(INX).COD_PROD = '1060' ;
+          PINAX(I).PROD_TYPE(11).PP(INX).CHR_PROD =
+             'оьеыс пайетоу SB&P     ';
+          PINAX(I).PROD_TYPE(11).PP(INX).COD_PROD_FAMILY = COD_PF(INX);
+          PINAX(I).PROD_TYPE(11).PP(INX).CHR_PROD_FAMILY = CHR_PF(INX);
+         /*еимаи мео пяоиом ?               */
+         IF  IS_NEW_PR         = '1' THEN DO;
+                PINAX(I).PROD_TYPE(11).PP(INX).NUM_SALES_CNT =
+                PINAX(I).PROD_TYPE(11).PP(INX).NUM_SALES_CNT + 1;
+                PINAX(I).PROD_TYPE(11).PP(INX).NUM_SALES_AMT =
+                PINAX(I).PROD_TYPE(11).PP(INX).NUM_SALES_AMT +
+                                        KSRDYPOL + KSREKKRE ;
+         END;
+         /*пакиа йаи меа пяоиомта еды       */
+         PINAX(I).PROD_TYPE(11).PP(INX).NUM_TOTAL_CNT =
+         PINAX(I).PROD_TYPE(11).PP(INX).NUM_TOTAL_CNT + 1;
+         PINAX(I).PROD_TYPE(11).PP(INX).NUM_TOTAL_AMT =
+         PINAX(I).PROD_TYPE(11).PP(INX).NUM_TOTAL_AMT +
+                                          KSRDYPOL + KSREKKRE ;
+
+         END;
+         END;
+         /************* END   5060***************************/
+          WHEN (5122) DO ;
+          PINAX(I).PROD_TYPE(8).PP(INX).COD_PROD = '5122' ;
+          PINAX(I).PROD_TYPE(8).PP(INX).CHR_PROD =
+             'пяомолиайос епивеиягсеым          ';
+          PINAX(I).PROD_TYPE(8).PP(INX).COD_PROD_FAMILY = COD_PF(INX);
+          PINAX(I).PROD_TYPE(8).PP(INX).CHR_PROD_FAMILY = CHR_PF(INX);
+         /*еимаи мео пяоиом ?               */
+         IF  IS_NEW_PR         = '1' THEN DO;
+                PINAX(I).PROD_TYPE(8).PP(INX).NUM_SALES_CNT =
+                PINAX(I).PROD_TYPE(8).PP(INX).NUM_SALES_CNT + 1;
+                PINAX(I).PROD_TYPE(8).PP(INX).NUM_SALES_AMT =
+                PINAX(I).PROD_TYPE(8).PP(INX).NUM_SALES_AMT +
+                                        KSRDYPOL + KSREKKRE ;
+         END;
+         /*пакиа йаи меа пяоиомта еды       */
+         PINAX(I).PROD_TYPE(8).PP(INX).NUM_TOTAL_CNT =
+         PINAX(I).PROD_TYPE(8).PP(INX).NUM_TOTAL_CNT + 1;
+         PINAX(I).PROD_TYPE(8).PP(INX).NUM_TOTAL_AMT =
+         PINAX(I).PROD_TYPE(8).PP(INX).NUM_TOTAL_AMT +
+                                          KSRDYPOL + KSREKKRE ;
+         END;
+          WHEN (5121) DO ;
+          PINAX(I).PROD_TYPE(9).PP(INX).COD_PROD = '5121' ;
+          PINAX(I).PROD_TYPE(9).PP(INX).CHR_PROD =
+             'йатахетийос пеяих.ецц/йым епистокым ';
+          PINAX(I).PROD_TYPE(9).PP(INX).COD_PROD_FAMILY = COD_PF(INX);
+          PINAX(I).PROD_TYPE(9).PP(INX).CHR_PROD_FAMILY = CHR_PF(INX);
+         /*еимаи мео пяоиом ?               */
+         IF  IS_NEW_PR         = '1' THEN DO;
+                PINAX(I).PROD_TYPE(9).PP(INX).NUM_SALES_CNT =
+                PINAX(I).PROD_TYPE(9).PP(INX).NUM_SALES_CNT + 1;
+                PINAX(I).PROD_TYPE(9).PP(INX).NUM_SALES_AMT =
+                PINAX(I).PROD_TYPE(9).PP(INX).NUM_SALES_AMT +
+                                        KSRDYPOL + KSREKKRE ;
+         END;
+         /*пакиа йаи меа пяоиомта еды       */
+         PINAX(I).PROD_TYPE(9).PP(INX).NUM_TOTAL_CNT =
+         PINAX(I).PROD_TYPE(9).PP(INX).NUM_TOTAL_CNT + 1;
+         PINAX(I).PROD_TYPE(9).PP(INX).NUM_TOTAL_AMT =
+         PINAX(I).PROD_TYPE(9).PP(INX).NUM_TOTAL_AMT +
+                                          KSRDYPOL + KSREKKRE ;
+          END;
+          WHEN (5120) DO ;
+
+          PINAX(I).PROD_TYPE(10).PP(INX).COD_PROD = '5120' ;
+          PINAX(I).PROD_TYPE(10).PP(INX).CHR_PROD =
+             'йатахетийос коцая.еидийым воягцгсеым';
+          PINAX(I).PROD_TYPE(10).PP(INX).COD_PROD_FAMILY = COD_PF(INX);
+          PINAX(I).PROD_TYPE(10).PP(INX).CHR_PROD_FAMILY = CHR_PF(INX);
+         /*еимаи мео пяоиом ?               */
+         IF  IS_NEW_PR         = '1' THEN DO;
+                PINAX(I).PROD_TYPE(10).PP(INX).NUM_SALES_CNT =
+                PINAX(I).PROD_TYPE(10).PP(INX).NUM_SALES_CNT + 1;
+                PINAX(I).PROD_TYPE(10).PP(INX).NUM_SALES_AMT =
+                PINAX(I).PROD_TYPE(10).PP(INX).NUM_SALES_AMT +
+                                        KSRDYPOL + KSREKKRE ;
+         END;
+         /*пакиа йаи меа пяоиомта еды       */
+         PINAX(I).PROD_TYPE(10).PP(INX).NUM_TOTAL_CNT =
+         PINAX(I).PROD_TYPE(10).PP(INX).NUM_TOTAL_CNT + 1;
+         PINAX(I).PROD_TYPE(10).PP(INX).NUM_TOTAL_AMT =
+         PINAX(I).PROD_TYPE(10).PP(INX).NUM_TOTAL_AMT +
+                                          KSRDYPOL + KSREKKRE ;
+              END;
+              OTHERWISE
+                DO;
+                END;
+            END;
+
+
+
+     END  LOAD_LOCAL_TABLE      ;
+  /**************************************************************
+  *  LOAD_LOCAL_TABLE                END                        *
+  **************************************************************/
+  /**************************************************************
+  *  RETURN_PROD                     START                      *
+  *  епестяеье деийтг ле тгм йатгцояиа тоу пяоиомтос*
+  **************************************************************/
+     RETURN_PROD:PROC (ACC) RETURNS (FIXED(1) );
+
+       DCL ACC  FIXED DEC (9,0);
+
+       FLAG = 0 ; /* RESET FLAG */
+
+          /* целифы то йкеиди TOу VSAM */
+           DSA_ARLOG = ACC        ;
+
+           T_KER04 = '1111'B;  /*BALE F NA TOY BRISKETE*/
+           DSA_PARALHPTHS = 1 ;
+
+           READ FILE (ETAIRIE) INTO (DSA_REC) KEY (T_KEY) ;
+
+           IF FLAG = 0 THEN /* лецакг етаияиа  , упаявеи сто VSAM */
+           DO;
+
+            /* PUT SKIP LIST('лецакг етаияиа ле коцаяиасло ',ACC);*/
+              BIG_CNT = BIG_CNT +1 ;
+              RETURN(3);
+           END;
+           ELSE
+           DO;
+
+            /*PUT SKIP LIST('лийяг етаияиа ле коцаяиасло ',ACC);*/
+              SMALL_CNT = SMALL_CNT +1 ;
+              RETURN(2); /*дем упаявеи сто VSAM аяа лийяг етаияиа */
+           END;
+
+
+     END RETURN_PROD ;
+  /**************************************************************
+  *  RETURN_PROD                     END                        *
+  **************************************************************/
+  /**************************************************************
+  *  LOCATE_BRANCH                   START                      *
+  *  епестяеье тг хесг тоу йатастглатос стом топийо пимайа      *
+  **************************************************************/
+     LOCATE_BRANCH:PROC (L_KATMA ) RETURNS (DEC FIXED(3));
+        DCL L_KATMA  DEC FIXED(03,0)         ;
+        DCL POS      DEC FIXED(3) ;
+        DCL  PKATMA PIC '999' ;
+        DCL M        DEC FIXED(3) INIT(0);
+
+        PKATMA = L_KATMA; /*CONVERT*/
+
+        DO M = 1 TO MAX_BRANCHES ;
+
+           IF PINAX(M).COD_KATMA =  PKATMA THEN DO;
+              POS = M ;
+              RETURN (POS)   ;
+           END;
+
+        END;/*DO END*/
+
+        /*IF THE FLOW COMES HERE,KATMA IS NOT IN THE PINAX*/
+        /*SO ADD ONE TO THE KATMA COUNTER                 */
+        MAX_NUM_BRANCH   = MAX_NUM_BRANCH + 1;
+        POS = MAX_NUM_BRANCH ;
+
+        RETURN (POS)     ;
+     END LOCATE_BRANCH ;
+  /**************************************************************
+  *  LOCATE_BRANCH                    END                       *
+  **************************************************************/
+  /**************************************************************
+  *  CONVERT_DATE                    START                      *
+  **************************************************************/
+     CONVERT_DATE :PROC (DATE_INP) RETURNS (CHAR(10) );
+        DCL DATE_INP  FIXED (7)  ;
+        DCL DATE_OUT CHAR  (10)  ;
+
+        DCL DATE_IN   FIXED (7) INIT(0) ;
+        DCL YYMMDD   PIC '(6)9' INIT (0);
+        DCL STR_YYMMDD CHAR(6)  BASED(ADDR(YYMMDD     ));
+
+        DCL AYYMMDD   PIC '(7)9' INIT (0000000);
+        DCL STR_AYYMMDD CHAR(7)  BASED(ADDR(AYYMMDD     ));
+        /*еам г глеяолгмиа еимаи лийяотеяг апо 1000000  */
+        /*хеыяеитаи пакиа глеяолгмиа йаи евеи сам аиыма 19 */
+        DATE_IN = DATE_INP  ;
+
+        AYYMMDD = DATE_IN;
+
+        STR_AYYMMDD=AYYMMDD;
+
+        IF SUBSTR(STR_AYYMMDD,4,2) ^= '01'  &
+           SUBSTR(STR_AYYMMDD,4,2) ^= '02'  &
+           SUBSTR(STR_AYYMMDD,4,2) ^= '03'  &
+           SUBSTR(STR_AYYMMDD,4,2) ^= '04'  &
+           SUBSTR(STR_AYYMMDD,4,2) ^= '05'  &
+           SUBSTR(STR_AYYMMDD,4,2) ^= '06'  &
+           SUBSTR(STR_AYYMMDD,4,2) ^= '07'  &
+           SUBSTR(STR_AYYMMDD,4,2) ^= '08'  &
+           SUBSTR(STR_AYYMMDD,4,2) ^= '09'  &
+           SUBSTR(STR_AYYMMDD,4,2) ^= '10'  &
+           SUBSTR(STR_AYYMMDD,4,2) ^= '11'  &
+           SUBSTR(STR_AYYMMDD,4,2) ^= '12'   THEN DO;
+        ERLIN2 =
+              ' DATE ERR.IN ACC '!! KSRARLOG     !! ' IN MONTH'
+            !!' HMEROMHNIA= '!! STR_AYYMMDD ;
+        WRITE FILE(PRT) FROM(ERLINE);
+        END;
+        IF
+           (
+           SUBSTR(STR_AYYMMDD,4,2) = '01'  &
+           SUBSTR(STR_AYYMMDD,6,2) > '31'
+           ) !
+
+           (
+           SUBSTR(STR_AYYMMDD,4,2) =  '02' &
+           SUBSTR(STR_AYYMMDD,6,2) > '29'
+           ) !
+
+           (
+           SUBSTR(STR_AYYMMDD,4,2) = '03'  &
+           SUBSTR(STR_AYYMMDD,6,2) > '31'
+           ) !
+
+           (
+           SUBSTR(STR_AYYMMDD,4,2) = '04'  &
+           SUBSTR(STR_AYYMMDD,6,2) > '30'
+           ) !
+
+           (
+           SUBSTR(STR_AYYMMDD,4,2) = '05'  &
+           SUBSTR(STR_AYYMMDD,6,2) > '31'
+           ) !
+
+           (
+           SUBSTR(STR_AYYMMDD,4,2) = '06'  &
+           SUBSTR(STR_AYYMMDD,6,2) > '30'
+           ) !
+
+           (
+           SUBSTR(STR_AYYMMDD,4,2) = '07'  &
+           SUBSTR(STR_AYYMMDD,6,2) > '31'
+           ) !
+
+           (
+           SUBSTR(STR_AYYMMDD,4,2) = '08'  &
+           SUBSTR(STR_AYYMMDD,6,2) > '31'
+           ) !
+
+           (
+           SUBSTR(STR_AYYMMDD,4,2) = '09'  &
+           SUBSTR(STR_AYYMMDD,6,2) > '30'
+           ) !
+
+           (
+           SUBSTR(STR_AYYMMDD,4,2) = '10'  &
+           SUBSTR(STR_AYYMMDD,6,2) > '31'
+           ) !
+
+           (
+           SUBSTR(STR_AYYMMDD,4,2) = '11'  &
+           SUBSTR(STR_AYYMMDD,6,2) > '30'
+           ) !
+
+           (
+           SUBSTR(STR_AYYMMDD,4,2) = '12'  &
+           SUBSTR(STR_AYYMMDD,6,2) > '31'
+           ) THEN DO;
+
+
+
+        ERLIN2 =
+              ' DATE ERR.IN ACC '!! KSRARLOG      !! ' IN DAY  ' !!
+              ' HMEROMHNIA= '!! STR_AYYMMDD ;
+        WRITE FILE(PRT) FROM(ERLINE);
+        END;
+
+        IF (DATE_IN = 1000000 ! DATE_IN = 0) THEN RETURN('0001.01.01');
+        IF (DATE_IN < 0                    ) THEN RETURN('2222.22.22');
+
+        IF DATE_IN < 1000000  THEN DO ;
+
+             YYMMDD = DATE_IN ;
+             DATE_OUT =        SUBSTR(STR_YYMMDD,5,2)!!
+                        '.'  !!SUBSTR(STR_YYMMDD,3,2)!!
+                        '.19'!!SUBSTR(STR_YYMMDD,1,2)   ;
+        END ;
+        ELSE DO;
+
+             DATE_IN = DATE_IN -1000000; /*CUT FIRST DIGIT*/
+             YYMMDD = DATE_IN ;
+             DATE_OUT =        SUBSTR(STR_YYMMDD,5,2)!!
+                        '.'  !!SUBSTR(STR_YYMMDD,3,2)!!
+                        '.20'!!SUBSTR(STR_YYMMDD,1,2)   ;
+        END;
+        RETURN(DATE_OUT);
+
+     END CONVERT_DATE ;
+  /**************************************************************
+  *  CONVERT_DATE                    END                        *
+  **************************************************************/
+  /**************************************************************
+  *  IS_NEW_PRODUCT         START                               *
+  **************************************************************/
+     /*еимаи мео пяоиом                 */
+     IS_NEW_PRODUCT:PROC RETURNS(CHAR(1));
+
+      DCL IS_NEW   CHAR  (1 )  ;
+
+      IF ( DAYA6R8(KSRHMAN) < DAYS8R8(CC_DATEPRFR) ) !
+         ( DAYA6R8(KSRHMAN) > DAYS8R8(CC_DATEPRTO) ) THEN
+                   IS_NEW       = ' ';/*пыкгсг ейтос пеяиодоу*/
+     ELSE
+                   IS_NEW       = '1'; /*пыкгсг леса стгм пеяиодо*/
+
+     RETURN (IS_NEW);
+     END IS_NEW_PRODUCT;
+
+  /**************************************************************
+  *  IS_NEW_PRODUCT         END                                 *
+  **************************************************************/
+
+  /**************************************************************
+  *INSERT_T51SAL01               START                          *
+  **************************************************************/
+  INSERT_T51SAL01: PROC;
+
+        EXEC SQL
+        INSERT INTO T51SAL01
+             ( COD_KATMA       ,
+               COD_EFARM       ,
+               CHR_PROD_FAMILY ,
+               COD_PROD        ,
+               COD_REC_TYPE    ,
+               DAT_VALID_FROM  ,
+               DAT_VALID_TO    ,
+               NUM_SALES_CNT   ,
+               NUM_SALES_AMT   ,
+               NUM_TOTAL_CNT   ,
+               NUM_TOTAL_AMT   ,
+               COD_PROD_FAMILY ,
+               CHR_PROD        ,
+               COD_USERID      ,
+               TIM_TIMESTAMP)
+        VALUES
+             ( :T51SAL01.COD_KATMA       ,
+               :T51SAL01.COD_EFARM       ,
+               :T51SAL01.CHR_PROD_FAMILY ,
+               :T51SAL01.COD_PROD        ,
+               :T51SAL01.COD_REC_TYPE    ,
+               :T51SAL01.DAT_VALID_FROM  ,
+               :T51SAL01.DAT_VALID_TO    ,
+               :T51SAL01.NUM_SALES_CNT   ,
+               :T51SAL01.NUM_SALES_AMT   ,
+               :T51SAL01.NUM_TOTAL_CNT   ,
+               :T51SAL01.NUM_TOTAL_AMT   ,
+               :T51SAL01.COD_PROD_FAMILY ,
+               :T51SAL01.CHR_PROD        ,
+               :T51SAL01.COD_USERID      ,
+               CURRENT TIMESTAMP        );
+
+        IF  SQLCODE ^= 0  THEN  DO;
+        ERLIN2=
+        'SQL EROOR              '!! SQLCODE                     ;
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN2=
+        '.COD_KATMA             '!! T51SAL01.COD_KATMA          ;
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN2=
+        '.COD_EFARM             '!! T51SAL01.COD_EFARM          ;
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN2=
+        '.CHR_PROD_FAMILY       '!! T51SAL01.CHR_PROD_FAMILY    ;
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN2=
+        '.COD_PROD              '!! T51SAL01.COD_PROD           ;
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN2=
+        '.COD_REC_TYPE          '!! T51SAL01.COD_REC_TYPE       ;
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN2=
+        '.DAT_VALID_FROM        '!! T51SAL01.DAT_VALID_FROM     ;
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN2=
+        '.DAT_VALID_TO          '!! T51SAL01.DAT_VALID_TO       ;
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN2=
+        '.NUM_SALES_CNT         '!! T51SAL01.NUM_SALES_CNT      ;
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN2=
+        '.NUM_SALES_AMT         '!! T51SAL01.NUM_SALES_AMT      ;
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN2=
+        '.NUM_TOTAL_CNT         '!! T51SAL01.NUM_TOTAL_CNT      ;
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN2=
+        '.NUM_TOTAL_AMT         '!! T51SAL01.NUM_TOTAL_AMT      ;
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN2=
+        '.COD_PROD_FAMILY       '!! T51SAL01.COD_PROD_FAMILY    ;
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN2=
+        '.CHR_PROD              '!! T51SAL01.CHR_PROD           ;
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN2=
+        '.COD_USERID            '!! T51SAL01.COD_USERID         ;
+        WRITE FILE(PRT) FROM(ERLINE);
+
+
+
+
+            GOTO  TELOS    ;
+        END;
+
+  END INSERT_T51SAL01;
+  /**************************************************************
+  * INSERT_T51SAL01              END                            *
+  **************************************************************/
+  /**************************************************************
+  *  TERMINATE_PROGR             START                          *
+  *  LOAD DB2 TABLE AND TERMINATE                               *
+  **************************************************************/
+   TERMINATE_PROGR: PROC;
+
+   DCL K       FIXED (5) INIT (0);
+   DCL J       FIXED (5) INIT (0);
+   DCL L       FIXED (5) INIT (0);
+
+   T51SAL01.COD_EFARM       = '70';
+   T51SAL01.COD_REC_TYPE    = CC_REC_TYPE   ;
+   T51SAL01.DAT_VALID_FROM  = DAYR8SA(DAYS8R8(CC_DATEPRFR)) ;
+   T51SAL01.DAT_VALID_TO    = DAYR8SA(DAYS8R8(CC_DATEPRTO)) ;
+   T51SAL01.COD_USERID      = 'DK471';
+
+   DO  K = 1 TO    MAX_NUM_BRANCH ;
+    T51SAL01.COD_KATMA       = '0'!!PINAX(K).COD_KATMA;
+      DO  J = 1 TO    MAX_TYPES;
+        DO  L = 1 TO    MAX_PRODS;
+            T51SAL01.COD_PROD_FAMILY =
+            PINAX(K).PROD_TYPE(J).PP(L).COD_PROD_FAMILY ;
+
+            T51SAL01.CHR_PROD_FAMILY =
+            PINAX(K).PROD_TYPE(J).PP(L).CHR_PROD_FAMILY ;
+
+            T51SAL01.COD_PROD        =
+            PINAX(K).PROD_TYPE(J).PP(L).COD_PROD ;
+
+            T51SAL01.CHR_PROD        =
+            PINAX(K).PROD_TYPE(J).PP(L).CHR_PROD ;
+
+            T51SAL01.NUM_SALES_CNT   =
+            PINAX(K).PROD_TYPE(J).PP(L).NUM_SALES_CNT ;
+
+            T51SAL01.NUM_SALES_AMT   =
+            PINAX(K).PROD_TYPE(J).PP(L).NUM_SALES_AMT ;
+
+            T51SAL01.NUM_TOTAL_CNT   =
+            PINAX(K).PROD_TYPE(J).PP(L).NUM_TOTAL_CNT ;
+
+            T51SAL01.NUM_TOTAL_AMT   =
+            PINAX(K).PROD_TYPE(J).PP(L).NUM_TOTAL_AMT ;
+
+      /* ломом ам упаявоум тилес диажояес тоу лгдемос */
+      /* цяаье стом пимайа DB2                        */
+
+       IF T51SAL01.NUM_SALES_CNT ^=0  !
+          T51SAL01.NUM_SALES_AMT ^=0  !
+          T51SAL01.NUM_TOTAL_CNT ^=0  !
+          T51SAL01.NUM_TOTAL_AMT ^=0   THEN  do;
+
+          if J > 10 then do
+            PUT SKIP LIST('K = ', K);
+            PUT SKIP LIST('J = ', J);
+            PUT SKIP LIST('L = ', L);
+
+            PUT SKIP LIST('T51SAL01.COD_PROD  = ',
+            PINAX(K).PROD_TYPE(J).PP(L).COD_PROD );
+
+            PUT SKIP LIST('T51SAL01.CHR_PROD = ',
+            PINAX(K).PROD_TYPE(J).PP(L).CHR_PROD );
+
+            PUT SKIP LIST('T51SAL01.NUM_SALES_CNT =',
+            PINAX(K).PROD_TYPE(J).PP(L).NUM_SALES_CNT) ;
+
+            PUT SKIP LIST('T51SAL01.NUM_SALES_AMT   =',
+            PINAX(K).PROD_TYPE(J).PP(L).NUM_SALES_AMT) ;
+
+            PUT SKIP LIST('T51SAL01.NUM_TOTAL_CNT   =',
+            PINAX(K).PROD_TYPE(J).PP(L).NUM_TOTAL_CNT) ;
+
+            PUT SKIP LIST('T51SAL01.NUM_TOTAL_AMT   =',
+            PINAX(K).PROD_TYPE(J).PP(L).NUM_TOTAL_AMT) ;
+
+
+          END;
+
+          END;
+
+     IF  J  = 1  THEN  DO;
+     WS_TOT_5068  = WS_TOT_5068 +  T51SAL01.NUM_TOTAL_AMT ;
+     END;
+     IF  J  = 2  THEN DO;
+     WS_TOT_5078  = WS_TOT_5078 +  T51SAL01.NUM_TOTAL_AMT ;
+     END;
+     IF  J  = 3  THEN DO;
+     WS_TOT_5116  = WS_TOT_5116 +  T51SAL01.NUM_TOTAL_AMT ;
+     END;
+     IF  J  = 4  THEN DO;
+     WS_TOT_5117  = WS_TOT_5117 +  T51SAL01.NUM_TOTAL_AMT ;
+     END;
+
+     IF  J  = 5  THEN DO;
+     WS_TOT_5114  = WS_TOT_5114 +  T51SAL01.NUM_TOTAL_AMT ;
+     END;
+
+     IF  J  = 6  THEN DO;
+     WS_TOT_5150  = WS_TOT_5150 +  T51SAL01.NUM_TOTAL_AMT ;
+     END;
+
+     IF  J  = 7  THEN DO;
+     WS_TOT_5060  = WS_TOT_5060 +  T51SAL01.NUM_TOTAL_AMT ;
+     END;
+
+     IF  J  = 8  THEN DO;
+     WS_TOT_5122  = WS_TOT_5122 +  T51SAL01.NUM_TOTAL_AMT ;
+     END;
+
+     IF  J  = 9  THEN DO;
+     WS_TOT_5121  = WS_TOT_5121 +  T51SAL01.NUM_TOTAL_AMT ;
+     END;
+
+     IF  J  = 10 THEN DO;
+     WS_TOT_5120  = WS_TOT_5120 +  T51SAL01.NUM_TOTAL_AMT ;
+     END;
+     /*start 07-04-2008 changes npk          */
+     IF  J  = 11 THEN DO;
+     WS_TOT_1060  = WS_TOT_1060 +  T51SAL01.NUM_TOTAL_AMT ;
+     END;
+
+     IF  J  = 12 THEN DO;
+     WS_TOT_1078  = WS_TOT_1078 +  T51SAL01.NUM_TOTAL_AMT ;
+     END;
+
+     IF  J  = 13 THEN DO;
+     WS_TOT_1068  = WS_TOT_1068 +  T51SAL01.NUM_TOTAL_AMT ;
+     END;
+
+     /*end   07-04-2008 changes npk          */
+
+     /*еам еимаи тест тупысе леяийес еццяажес */
+        IF IS_TEST = 'YES' THEN  DO;
+        ERLIN2=
+        'K = ' !! K !! ' J = '!! J     ;
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN2=
+        '.COD_KATMA             '!! T51SAL01.COD_KATMA          ;
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN2=
+        '.COD_EFARM             '!! T51SAL01.COD_EFARM          ;
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN2=
+        '.CHR_PROD_FAMILY       '!! T51SAL01.CHR_PROD_FAMILY    ;
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN2=
+        '.COD_PROD              '!! T51SAL01.COD_PROD           ;
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN2=
+        '.COD_REC_TYPE          '!! T51SAL01.COD_REC_TYPE       ;
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN2=
+        '.DAT_VALID_FROM        '!! T51SAL01.DAT_VALID_FROM     ;
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN2=
+        '.DAT_VALID_TO          '!! T51SAL01.DAT_VALID_TO       ;
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN2=
+        '.NUM_SALES_CNT         '!! T51SAL01.NUM_SALES_CNT      ;
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN2=
+        '.NUM_SALES_AMT         '!! T51SAL01.NUM_SALES_AMT      ;
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN2=
+        '.NUM_TOTAL_CNT         '!! T51SAL01.NUM_TOTAL_CNT      ;
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN2=
+        '.NUM_TOTAL_AMT         '!! T51SAL01.NUM_TOTAL_AMT      ;
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN2=
+        '.COD_PROD_FAMILY       '!! T51SAL01.COD_PROD_FAMILY    ;
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN2=
+        '.CHR_PROD              '!! T51SAL01.CHR_PROD           ;
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN2=
+        '.COD_USERID            '!! T51SAL01.COD_USERID         ;
+        WRITE FILE(PRT) FROM(ERLINE);
+
+       END;
+
+
+
+        END;/* DO L END   */
+      END;  /* DO K END   */
+    END;    /* DO J   END */
+
+    GO TO TELOS;
+
+   END TERMINATE_PROGR;
+  /**************************************************************
+  *  TERMINATE_PROGR             END                            *
+  **************************************************************/
+
+ TELOS:;
+        ERLIN1='1';
+        ERLIN2=' * DK471 ** глеяолгмиа ыяа яогс : '!!DATETIME;
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN2=' йамомийо текос пяоцяалатос DK471               ';
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN1='0';
+        ERLIN2=' Tилес паяалетяым апо CC CARD <FROM> <TO> <TYPE>  ';
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN2= DATEPRFR!!' '!!  DATEPRTO !! ' ' !! CC_REC_TYPE ;
+        WRITE FILE(PRT) FROM (ERLINE);
+
+        ERLIN2=
+        'сумока 5068            '!!  WS_TOT_5068 ;
+        WRITE FILE(PRT) FROM(ERLINE);
+
+        ERLIN2=
+        'сумока 1068            '!!  WS_TOT_1068 ;
+        WRITE FILE(PRT) FROM(ERLINE);
+
+        ERLIN2=
+        'сумока 5078            '!!  WS_TOT_5078  ;
+        WRITE FILE(PRT) FROM(ERLINE);
+
+        ERLIN2=
+        'сумока 1078            '!!  WS_TOT_1078  ;
+        WRITE FILE(PRT) FROM(ERLINE);
+
+        ERLIN2=
+        'сумока 5116            '!!  WS_TOT_5116  ;
+        WRITE FILE(PRT) FROM(ERLINE);
+
+        ERLIN2=
+        'сумока 5117            '!!  WS_TOT_5117  ;
+        WRITE FILE(PRT) FROM(ERLINE);
+
+        ERLIN2=
+        'сумока 5114            '!!  WS_TOT_5114  ;
+        WRITE FILE(PRT) FROM(ERLINE);
+
+        ERLIN2=
+        'сумока 5150            '!!  WS_TOT_5150  ;
+        WRITE FILE(PRT) FROM(ERLINE);
+
+        ERLIN2=
+        'сумока 5060            '!!  WS_TOT_5060  ;
+        WRITE FILE(PRT) FROM(ERLINE);
+
+        ERLIN2=
+        'сумока 1060            '!!  WS_TOT_1060  ;
+        WRITE FILE(PRT) FROM(ERLINE);
+
+        ERLIN2=
+        'сумока 5122            '!!  WS_TOT_5122  ;
+        WRITE FILE(PRT) FROM(ERLINE);
+
+        ERLIN2=
+        'сумока 5121            '!!  WS_TOT_5121  ;
+        WRITE FILE(PRT) FROM(ERLINE);
+
+        ERLIN2=
+        'сумока 5120            '!!  WS_TOT_5120  ;
+        WRITE FILE(PRT) FROM(ERLINE);
+
+
+        ERLIN2=
+        '************ сулжымиа **********************';
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN2=
+        'сумоко диабасхемтым еццяажым = '!!CNT_REC_READ;
+        WRITE FILE(PRT) FROM(ERLINE);
+
+        ERLIN2=
+        'сумока MIйяым -лецакым етаияеиым -ж.пяосыпым';
+        WRITE FILE(PRT) FROM(ERLINE);
+
+        ERLIN2=
+        'сумока MIйяым  етаияеиым '!!SMALL_CNT;
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN2=
+        'сумока лецакым етаияеиым '!!BIG_CNT;
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN2=
+        'сумока ж.пяосыпым        '!!FYSIK_CNT;
+        WRITE FILE(PRT) FROM(ERLINE);
+
+ END DK471;
+

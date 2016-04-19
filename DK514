@@ -1,0 +1,172 @@
+*PROCESS GOSTMT;
+ DK514 : PROC OPTIONS (MAIN);
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+ DCL CZX3VDAT CHAR(6); FETCH CZXDATEP;
+ DCL CZXDATEP ENTRY OPTIONS(INTER,ASM) ;
+     /***********************************************************/
+     /*          MEMBER = DK514                                 */
+     /*                                                         */
+     /***********************************************************/
+
+ DCL   KINHSF  FILE  RECORD  INPUT  ENV(
+                 FB    RECSIZE(029)                            );
+ DCL   KINHSFN FILE  RECORD  OUTPUT ENV(
+                 FB    RECSIZE(029)                            );
+ DCL      KSMRECIN    CHAR(29)            ;
+ DCL  1   KSMREC1   BASED(ADDR(KSMRECIN)) ,
+       2  KSMKATOL  FIXED(07,0)         ,  /* MEPIdA KAhOkIKOY       */
+       2  KSMTRAP   PIC '(01)9'         ,  /* 0=EMpOP,2=pEIP,3=ATTIK */
+       2  KSMKATM   FIXED(03,0)         ,  /* KxdIKOr KATArTHMATOr   */
+       2  KSMARLOG  FIXED(09,0)         ,  /* APIhMOr kOcAPIArMOY    */
+       2  KSMHMNIA  FIXED(07,0)         ,  /* HM/NIA rYNAkkAc EEMMHH */
+       2  KSMKWDEG  PIC '(01)9'         ,  /* 1=pIrTxrH,2=XPExrH     */
+       2  KSMPOSON  FIXED(13,2)         ,  /* pOrO rYNAkkAcHr        */
+       2  KSMAXIA   FIXED(07,0)         ,  /* VALEUR rYNAkkAc EEMMHH */
+       2  KSMAFET   BIT  (08)           ;  /* 00=AuETHPIA,FF=KINHrH  */
+ DCL      KSMRECOUT   CHAR(29)            ;
+ DCL  1   KSMREC2   BASED(ADDR(KSMRECOUT)) ,
+       2  KSMKATOL  FIXED(07,0)         ,  /* MEPIdA KAhOkIKOY       */
+       2  KSMTRAP   PIC '(01)9'         ,  /* 0=EMpOP,2=pEIP,3=ATTIK */
+       2  KSMKATM   FIXED(03,0)         ,  /* KxdIKOr KATArTHMATOr   */
+       2  KSMARLOG  FIXED(09,0)         ,  /* APIhMOr kOcAPIArMOY    */
+       2  KSMHMNIA  FIXED(07,0)         ,  /* HM/NIA rYNAkkAc EEMMHH */
+       2  KSMKWDEG  PIC '(01)9'         ,  /* 1=pIrTxrH,2=XPExrH     */
+       2  KSMPOSON  FIXED(13,2)         ,  /* pOrO rYNAkkAcHr        */
+       2  KSMAXIA   FIXED(07,0)         ,  /* VALEUR rYNAkkAc EEMMHH */
+       2  KSMAFET   BIT  (08)           ;  /* 00=AuETHPIA,FF=KINHrH  */
+
+     DCL  EOF          FIXED(1)       INIT(0)  ;
+     DCL  FLAG         FIXED(1)       INIT(0)  ;
+
+     DCL  IS_TEST          CHAR(3)   INIT('YES');
+     DCL  REC_COUNTER      FIXED(15) INIT(0);
+     DCL  MAX_REC_COUNTER  FIXED(2)  INIT(99); /*MAXIMUM NUMBER OF*/
+                                               /*RECORDS FOR TESTING*/
+     /***************************/
+     /*SOME VARIABLES FOR TOTALS*/
+     /***************************/
+   DCL   SYNOLO_KATHOLIKOY  PIC'ZZZZ.ZZZ.ZZZ.ZZ9V,99-' INIT(0);
+   DCL   TOTAL_REC_KATHOLIKOY PIC'ZZZ.ZZZ.ZZ9' INIT(0);
+   DCL   MY_SYNOLO_KATHOLIKOY  FIXED(15,2) INIT(0);
+
+   DCL 1 COUNTERS ,
+      2 CNT_REC_READ               PIC 'ZZZ.ZZZ.ZZ9' ,
+      2 CNT_REC_WRITTEN            PIC 'ZZZ.ZZZ.ZZ9' ;
+
+     /***************************/
+     /*DB2 DECLARATIONS         */
+     /***************************/
+ EXEC SQL                                                               01460000
+          INCLUDE CTDKBCE;                                              01510300
+ EXEC SQL                                                               01510500
+            INCLUDE SQLCA;                                              01510600
+
+
+ DCL PRT   FILE RECORD OUTPUT ENV(                    FB
+           RECSIZE(133)            CTLASA);
+
+ DCL 1 ERLINE  ,
+       2 ERLIN1    CHAR(1)  INIT(' ')       ,
+       2 ERLIN2    CHAR(132);
+
+
+ DCL LAT      CHAR(24) INIT ('ABcdEZHhIKkMNnOpPrTYuXwx');
+ DCL GRE      CHAR(24) INIT ('абцдефгхийклмнопястужвьы');
+
+ DCL (ONFILE,ONCODE,ONKEY,PRIORITY,TIME) BUILTIN;
+ DCL (DATETIME,SUBSTR,NULL,ADDR,UNSPEC,TRANSLATE) BUILTIN;
+
+  /*******************************************************************/
+  /***********    M A I N   P R O G R A M    *************************/
+  /*******************************************************************/
+ ARXH :;
+   CNT_REC_READ              = 0 ;
+   CNT_REC_WRITTEN           = 0 ;
+
+   OPEN FILE(KINHSF);
+   OPEN FILE(KINHSFN);
+
+   ON ENDFILE(KINHSF)
+        BEGIN ;
+          CALL UPD_CTDKBCE;
+          CALL DEL_CTDKBCE;
+
+          GO TO  TELOS;
+        END;
+
+ /* * * * * * * * * * * * * * * * * * * * * * * */
+ READ_FILE:;
+
+     READ  FILE(KINHSF)  INTO(KSMRECIN);
+     CNT_REC_READ  = CNT_REC_READ  + 1;
+     IF ( KSMREC1.KSMARLOG = 80006829 ) !
+        ( KSMREC1.KSMARLOG = 83702214 ) !
+        ( KSMREC1.KSMARLOG = 84334537 )  THEN DO;
+             IF ( KSMREC1.KSMARLOG = 83702214 ) !
+                ( KSMREC1.KSMARLOG = 84334537 )  THEN DO;
+                KSMREC2 = KSMREC1;
+                KSMREC2.KSMPOSON = KSMREC2.KSMPOSON + 0.01;
+                WRITE FILE(KINHSFN ) FROM(KSMRECOUT);
+                CNT_REC_WRITTEN = CNT_REC_WRITTEN + 1;
+             END;
+       GO TO READ_FILE;
+     END;
+     ELSE DO ;
+         KSMREC2 = KSMREC1;
+         WRITE FILE(KINHSFN ) FROM(KSMRECOUT);
+         CNT_REC_WRITTEN = CNT_REC_WRITTEN + 1;
+         GO TO READ_FILE;
+     END;
+
+ UPD_CTDKBCE        : PROC;
+
+        EXEC SQL
+            UPDATE CTDKBCE
+            SET AMT_POSON   = AMT_POSON  + 0.01
+            WHERE
+                 COD_PERIOD = 0   AND
+                 KEY_ARLOG IN  (83702214,84334537);
+            IF SQLCODE ^= 0 THEN DO;
+   ERLIN2 = 'кахос сто UPDATE DB2 ERROR  :'!!CHAR(SQLCODE);
+   WRITE FILE(PRT) FROM(ERLINE);
+            END;
+ END UPD_CTDKBCE;
+
+ DEL_CTDKBCE        : PROC;
+
+        EXEC SQL
+            DELETE  FROM CTDKBCE
+            WHERE
+                 KEY_ARLOG = 80006829;
+            IF SQLCODE ^= 0 THEN DO;
+   ERLIN2 = 'кахос сто DELETE DB2 ERROR  :'!!CHAR(SQLCODE);
+   WRITE FILE(PRT) FROM(ERLINE);
+            END;
+
+ END DEL_CTDKBCE;
+
+  TELOS:
+
+  /***********************************************/
+  /**   PRINT TOTALS     *************************/
+  /***********************************************/
+   ERLIN1    = '1';  /*SKIP LINE*/
+
+   ERLIN2 = '   ейтупысг сумокым тоу пяоцяаллатос *DK514*   ';
+   WRITE FILE(PRT) FROM(ERLINE);
+
+   ERLIN1    = ' ';
+   ERLIN2 = ' глеяолгмиа KAI ыяа яогс :  ' !!DATETIME ;
+   WRITE FILE(PRT) FROM(ERLINE);
+   ERLIN2 = 'сумоко еццяажым поу упаявоум сто тал20                :'!!
+   CNT_REC_READ                  ;
+   WRITE FILE(PRT) FROM(ERLINE);
+   ERLIN2 = 'сумоко еццяажым поу цяажтгйам сто аявеио ALM          :'!!
+   CNT_REC_WRITTEN               ;
+   WRITE FILE(PRT) FROM(ERLINE);
+
+
+     CLOSE FILE(KINHSF);
+     CLOSE FILE(KINHSFN);
+ END DK514;
+

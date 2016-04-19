@@ -1,0 +1,339 @@
+ BE102:   PROCEDURE OPTIONS(MAIN);
+ /********************************************************************/
+ /* –—œ√—¡ÃÃ¡ PLI BATCH+DB2                                          */
+ /********************************************************************/
+ /*           PROGRAM NAME: BE102      LOAD MODULE: BE102            */
+ /********************************************************************/
+ /* –Ò¸„Ò·ÏÏ· ≈ÈÛ·„˘„ﬁÚ ≈ÂÛÙÒ·Ï›Ì˘Ì ÂÈÙ·G˛Ì ÛÙÔÌ ÈÌ·Í· ‘42¡◊120   */
+ /********************************************************************/
+ /********************************************************************/
+ /* Input : BE.P.XS.CDB012F0                                         */
+ /* Output:                                                          */
+ /********************************************************************/
+ /********************************************************************/
+ /* 22-11-2007 NPK                                                   */
+ /********************************************************************/
+ /* 03-12-2009 NPK  –ÒÔÛËﬁÍÁ Â‰ﬂÔı COD_APPLIC = AE for FOS          */
+ /********************************************************************/
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+
+ DCL CZX3VDAT CHAR(6); FETCH CZXDATEP;
+ DCL CZXDATEP ENTRY OPTIONS(INTER,ASM) ;
+ DCL   NULL      BUILTIN;
+ DATE: PROC IRREDUCIBLE RETURNS(CHAR(6)) ;
+         CALL CZXDATEP          ( CZX3VDAT) ;
+         RETURN (CZX3VDAT) ;
+         END DATE ;
+ /********************************************************************/
+ /*     File               BE.P.XS.CDB012F0                          */
+ /********************************************************************/
+ DCL INFILE    FILE  SEQUENTIAL INPUT ENV(FB RECSIZE(90));
+ DCL PRT      FILE RECORD OUTPUT   ENV(FB RECSIZE(133) CTLASA);
+
+ /***** –ÂÒÈ„Ò·ˆﬁ  T˘Ì  INPUT  RECORDS *******************************/
+ DCL 1  INREC            CHAR(90)      INIT(' ');
+
+ /***** HEADER RECORD ¡„ÔÒ‹ÛÙÒÈ·Ú ‘Ò‹ÂÊ·Ú ≈Ã–œ—… « */
+ DCL 1  RECINP1 BASED(ADDR(INREC)),
+      2  RECINP1_EGG      CHAR(1)        INIT('1'),
+      2  RECINP1_TRAP     CHAR(3)        INIT(' '),
+      2  RECINP1_DATE_AG  CHAR(8)        INIT(' '),
+      2  RECINP1_DATE_S   CHAR(8)        INIT(' '),
+      2  RECINP1_FILLER   CHAR(70)       INIT(' ');
+
+ /***** HEADER RECORD –ÎÁÒ˛ÙÒÈ·Ú ‘Ò‹ÂÊ·Ú            */
+ DCL 1  RECINP3 BASED(ADDR(INREC)),
+      2  RECINP3_EGG      CHAR(1)        INIT('3'),
+      2  RECINP3_TRAP     CHAR(3)        INIT(' '),
+      2  RECINP3_NOM      CHAR(3)        INIT(' '),
+      2  RECINP3_FILLER   CHAR(83)       INIT(' ');
+
+ /*****  Detail   Record                          */
+ DCL 1  RECINP5 BASED(ADDR(INREC)),
+      2  RECINP5_EGG      CHAR(1)        INIT('5'),
+      2  RECINP5_RIBAN    CHAR(27)       INIT(' '),
+      2  RECINP5_RSPCHAR  CHAR(04)       INIT(' '),
+      2  RECINP5_AREPIT   CHAR(9)        INIT(' '),
+      2  RECINP5_POSO     PIC'(9)9V99'   INIT(0),
+      2  RECINP5_HMSYN    CHAR(8)        INIT(' '),
+      2  RECINP5_HMEKD    CHAR(8)        INIT(' '),
+      2  RECINP5_KATMA_A  CHAR(4)        INIT(' '),
+      2  RECINP5_DIAS     CHAR(7)        INIT(' '),
+      2  RECINP5_KOD      CHAR(1)        INIT(' '),
+      2  RECINP5_APORRICH CHAR(2)        INIT(' '),
+      2  RECINP5_TAYTOT   CHAR(8)        INIT(' ');
+
+ DCL 1  RIBANX  BASED(ADDR(RECINP5_RIBAN)),
+      2  RIBANCNTR        CHAR(02) ,
+      2  RIBANCD          PIC'(02)9' ,
+      2  RIBANBANK        PIC'(03)9' ,
+      2  RIBANKTM         PIC'(04)9' ,
+      2  RARLOGFR         PIC'(03)9' ,
+      2  RARLOG           PIC'(13)9' ;
+
+ /********************************************************************/
+
+ DCL     LINE                CHAR (133);
+ DCL 1   LNX                 BASED(ADDR(LINE)),
+      2  CTLCHR              CHAR(1)      INIT('1'),
+      2  GRAMH               CHAR(132)    INIT(' ');
+
+ DCL 1   ERLINE              ,
+      2  ERLIN1       CHAR(1)      INIT('1'),
+      2  ERLIN2       CHAR(132)    INIT(' ');
+
+ DCL TODAY       CHAR(6) INIT('');
+ DCL BUY_DATE    CHAR(8) INIT('');
+ DCL PAY_BANK    PIC '999' INIT(0);
+ DCL REC_FLAG    CHAR(1)  ;
+ DCL INFILE_EOF  FIXED (1) INIT(0);
+ DCL REC_IN      FIXED(15) INIT(1);
+ DCL REC_OUT     FIXED(15) INIT(0);
+ DCL MY_TOTAL    PIC'ZZZ.ZZZ.ZZZ.ZZ9,V99'   INIT(0);
+
+ EXEC SQL INCLUDE T42AX120;                                             01510500
+ EXEC SQL INCLUDE SQLCA;                                                01510500
+
+  ON ERROR BEGIN;
+     ON ERROR SYSTEM;
+     PUT SKIP LIST('ESKASE TO BE102');
+  END;
+
+  ON ENDFILE(INFILE)
+    BEGIN ;
+           INFILE_EOF  = 1;
+
+    END;
+
+  /*******************************************************************/
+  /***********    M A I N   P R O G R A M    *************************/
+  /*******************************************************************/
+     OPEN FILE(INFILE);
+     OPEN FILE(PRT) ;
+
+ /*«ÏÂÒÔÏÁÌﬂ· —ÔﬁÚ ¡¸ ÙÁÌ DATE JCL          */
+     TODAY = DATE();
+
+     READ  FILE(INFILE) INTO(INREC);
+     IF  RECINP1_EGG   ^= '1'    THEN
+         CALL ERROR('ƒ≈Õ ¬—≈»« ≈ HEADER RECORD ”‘œ ¡—◊≈…œ');
+
+     IF  RECINP1_TRAP  ^= '012' THEN
+         CALL ERROR('« ¡√œ—¡”‘—…¡ ‘—¡–≈∆¡ ƒ≈Õ ≈…Õ¡… ≈Ã–œ—… « '
+                         !!RECINP1_TRAP);
+
+     DO WHILE ( INFILE_EOF = 0 ) ;
+
+        REC_FLAG = SUBSTR(INREC,1,1);
+        SELECT(REC_FLAG);
+          WHEN('1')      BUY_DATE  = RECINP1_DATE_AG;/*HEADER REC*/
+          WHEN('3')      PAY_BANK  = RECINP3_TRAP ; /*BANK REC*/
+          WHEN('5') /*DETAIL REC*/
+               DO;
+                DCL FLG CHAR(1);
+                FLG = SUBSTR(RECINP5_TAYTOT,4,1);
+                /*OXI EPITAGES SIGLO - ’–≈√√’≈”*/
+                IF((FLG='0') ! (FLG='1') ! (FLG='2') ! (FLG='3')) &
+                  (RECINP5_APORRICH ^='01'& RECINP5_APORRICH ^='21')
+                  THEN DO;
+                       REC_OUT = REC_OUT + 1;
+                       CALL LOAD_TABLE;
+                  END;
+               END;
+          WHEN('7','9') ; /*DO NOTHING*/
+          OTHERWISE CALL ERROR('À¡»œ” ‘’–œ” RECORD '!!REC_FLAG);
+       END;
+       READ  FILE(INFILE) INTO(INREC);
+       REC_IN = REC_IN  + 1;
+     END;/*DO WHILE END*/
+  /**************************************************************
+  *  LOAD_TABLE             START                             *
+  **************************************************************/
+     LOAD_TABLE : PROC ;
+        T42AX120 = '';
+
+        COD_EMPRESA  = '0012';
+        COD_CENTRO   =  RECINP5_KATMA_A;
+        COD_GLACC    =  '3820000020';
+        COD_PERSONA  =  0;
+        COD_MONEDA   = 'EUR';
+        FEC_GLACC  = SUBSTR(BUY_DATE,1,2)!!'.'!!
+                     SUBSTR(BUY_DATE,3,2)!!'.'!!
+                     SUBSTR(BUY_DATE,5,4);
+        FEC_OPERACION = SUBSTR(TODAY,5,2)!!'.'!!
+                        SUBSTR(TODAY,3,2)!!'.'!!'20'!!
+                        SUBSTR(TODAY,1,2);
+        AMT_DEBIT     = RECINP5_POSO;
+        AMT_CREDIT    = 0;
+        CHR_INFO1_KEY = RECINP5_AREPIT;
+        IND_SYZ_ACC   = 'Y';
+        IND_IS_SYZ    = 'N';
+        IND_SYGKENT   = 'N';
+        IND_ACTIVE    = 'A';
+        COD_OPERACION = 'BE102';
+        COD_USU_MOV   = 'BE102';
+        COD_USU_UPD   = '';
+        COD_USU_SYZ   ='';
+        NUM_NODO      = 999;
+
+        CHR_INFO2  = 'AE';
+        COD_APPLIC = 'AE';/*npk 03-12-2009 for FOS*/
+        CHR_INFO3  = 'T—¡–/A—.Àœ√¡—: '   !!PAY_BANK!!'/'!!
+                      RECINP5_RIBAN;
+        CHR_INFO4  = ' Ÿƒ… œ” ¡–œ——…ÿ«” : '!!RECINP5_APORRICH;
+
+    EXEC SQL INSERT INTO T42AX120
+                    ( COD_EMPRESA,
+                      COD_CENTRO,
+                      COD_GLACC,
+                      COD_PERSONA,
+                      COD_MONEDA,
+                      FEC_GLACC,
+                      FEC_OPERACION,
+                      AMT_DEBIT,
+                      AMT_CREDIT,
+                      CHR_INFO1_KEY,
+                      IND_SYZ_ACC,
+                      IND_IS_SYZ,
+                      IND_SYGKENT,
+                      IND_ACTIVE,
+                      COD_OPERACION,
+                      COD_USU_MOV,
+                      COD_USU_UPD,
+                      COD_USU_SYZ,
+                      NUM_NODO,
+                      TIM_TIMESTAMP,
+                      COD_APPLIC,
+                      CHR_INFO2,
+                      CHR_INFO3,
+                      CHR_INFO4)
+              VALUES(
+                     :T42AX120.COD_EMPRESA,
+                     :T42AX120.COD_CENTRO,
+                     :T42AX120.COD_GLACC,
+                     :T42AX120.COD_PERSONA,
+                     :T42AX120.COD_MONEDA,
+                     :T42AX120.FEC_GLACC,
+                     :T42AX120.FEC_OPERACION,
+                     :T42AX120.AMT_DEBIT,
+                     :T42AX120.AMT_CREDIT,
+                     :T42AX120.CHR_INFO1_KEY,
+                     :T42AX120.IND_SYZ_ACC,
+                     :T42AX120.IND_IS_SYZ,
+                     :T42AX120.IND_SYGKENT,
+                     :T42AX120.IND_ACTIVE,
+                     :T42AX120.COD_OPERACION,
+                     :T42AX120.COD_USU_MOV,
+                     :T42AX120.COD_USU_UPD,
+                     :T42AX120.COD_USU_SYZ,
+                     :T42AX120.NUM_NODO,
+                      CURRENT TIMESTAMP,
+                     :T42AX120.COD_APPLIC,
+                     :T42AX120.CHR_INFO2,
+                     :T42AX120.CHR_INFO3,
+                     :T42AX120.CHR_INFO4) ;
+                 IF SQLCODE ^= 0 THEN DO;
+                    PUT SKIP LIST('¡–œ‘’◊…¡ : SQLCODE = '
+                                                      , char(SQLCODE));
+                    CALL ERROR('¡–œ‘’◊…¡ : SQLCODE = '!!char(SQLCODE));
+                 END;
+                 ELSE DO;
+                     MY_TOTAL = MY_TOTAL + T42AX120.AMT_DEBIT;
+                 END;
+     END LOAD_TABLE;
+  /**************************************************************
+  *  LOAD_TABLE             END                               *
+  **************************************************************/
+  /**************************************************************
+  *  PRINT_TOTALS             START                             *
+  **************************************************************/
+     PRINT_TOTALS           : PROC;
+
+      DCL    LIM   FIXED(3) INIT(20);
+      DCL    IND   FIXED(3) INIT(0);
+
+      ERLIN1 = '1'       ;
+
+      ERLIN2 = '****************************************';
+      WRITE FILE(PRT) FROM(ERLINE);
+      ERLIN1 = ' '       ;
+      ERLIN2 = '”’ÕœÀ¡ –—œ√—¡ÃÃ¡‘œ” BE102';
+      WRITE FILE(PRT) FROM(ERLINE);
+      ERLIN2 = 'ƒ…¡¬¡”»« ¡Õ '!!CHAR(REC_IN)     ;
+      WRITE FILE(PRT) FROM(ERLINE);
+
+      ERLIN2 = '√—¡÷‘« ¡Õ     ”‘œÕ –…Õ¡ ¡ '!!CHAR(REC_OUT)     ;
+      WRITE FILE(PRT) FROM(ERLINE);
+
+      ERLIN2 = '”’ÕœÀ… œ –œ”œ ”‘œÕ –…Õ¡ ¡ '!!MY_TOTAL;
+      WRITE FILE(PRT) FROM(ERLINE);
+
+     END PRINT_TOTALS           ;
+  /**************************************************************
+  *  PRINT_TOTALS               END                             *
+  *                                                             *
+  **************************************************************/
+ /**************************************************************
+ *  ERROR                           START                      *
+ **************************************************************/
+ ERROR        :PROC (MSG  ) ;
+    DCL MSG      CHAR  (132)  ;
+    DCL WS_BOOM   FIXED(1) INIT(1);
+    DCL WS_ZERO   FIXED(1) INIT(0);
+
+       ERLIN1='1';
+       ERLIN2='***************************************************';
+       WRITE FILE(PRT) FROM(ERLINE);
+       ERLIN1='0';
+
+       ERLIN2=' * BE102  «Ã≈—¡ —œ«”         = '!!DATE ();
+       WRITE FILE(PRT) FROM(ERLINE);
+
+       ERLIN2='–—œ¬À«Ã¡ ”‘œ –—œ√—¡ÃÃ¡ BE102 ‘œ –—œ√—¡ÃÃ¡ »¡ ” ¡”≈…';
+       WRITE FILE(PRT) FROM(ERLINE);
+
+       ERLIN2=MSG;
+       WRITE FILE(PRT) FROM(ERLINE);
+
+       ERLIN2='***************************************************';
+       WRITE FILE(PRT) FROM(ERLINE);
+
+       WS_BOOM = WS_BOOM /  WS_ZERO  ; /*JUST CRASH*/
+
+   END ERROR        ;
+  /**************************************************************
+  *  ERROR                           END                        *
+  **************************************************************/
+  TELOS:
+      CALL PRINT_TOTALS ;
+      CLOSE FILE(INFILE);
+
+ END BE102;
+ /* PLI DECLARATION FOR TABLE          T42AX120
+ DCL 1 T42AX120,
+      5 KEY_AUTOID  DEC FIXED(15,0),
+      5 COD_EMPRESA  CHAR(4),
+      5 COD_CENTRO  CHAR(4),
+      5 COD_GLACC  CHAR(10),
+      5 COD_PERSONA  DEC FIXED(9,0),
+      5 COD_MONEDA  CHAR(3),
+      5 FEC_GLACC  CHAR(10),
+      5 FEC_OPERACION  CHAR(10),
+      5 AMT_DEBIT  DEC FIXED(15,2),
+      5 AMT_CREDIT  DEC FIXED(15,2),
+      5 CHR_INFO1_KEY  CHAR(50),
+      5 IND_SYZ_ACC  CHAR(1),
+      5 IND_IS_SYZ  CHAR(1),
+      5 IND_SYGKENT  CHAR(1),
+      5 IND_ACTIVE  CHAR(1),
+      5 COD_OPERACION  CHAR(12),
+      5 COD_USU_MOV  CHAR(8),
+      5 COD_USU_UPD  CHAR(8),
+      5 COD_USU_SYZ  CHAR(8),
+      5 NUM_NODO DEC FIXED(3,0),
+      5 TIM_TIMESTAMP  CHAR(26),
+      5 CHR_INFO2  CHAR(50) VAR,
+      5 CHR_INFO3  CHAR(50) VAR,
+      5 CHR_INFO4  CHAR(50) VAR,
+      5 CHR_TXT_MORE  CHAR(100) VAR; */
+

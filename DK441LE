@@ -1,0 +1,620 @@
+ /* PROCESS INCLUDE,GS,AG,A,M,MAP,MI(':'),NEST,S,NIS,OPT(2),X,OF;     */
+   /*---------------  DK441LE-------------------------*/                BK300090
+   /*                    EURO                         */                BK300090
+   /* KATA TAXYDROMIKO KVDIKA                         */                BK300090
+   /* AkkAcH rEkIdAr ANA KATArTHMA                    */
+   /* EKTYpxrH KATArTArHr cIA EMpOPIKH XPHMATIrTHPIAKH*/                BK300100
+   /* ApO APXEIO ME ZIP DRIVE                         */
+   /* X.T.  08/10/98                                  */
+   /* LAST UPDATE   08.10.98                          */
+   /* RECSIZE = 212    BLKSIZE = 0000                 */
+   /*-------------------------------------------------*/                BK300120
+                                                                        BK300130
+ ARXH: PROCEDURE OPTIONS(MAIN);                                         BK300140
+                                                                        BK300230
+ DCL  PRINT FILE RECORD SEQUENTIAL OUTPUT ENV(F RECSIZE(133) CTLASA);
+ DCL  PRINTF FILE RECORD SEQUENTIAL OUTPUT ENV(F RECSIZE(133) CTLASA);
+ DCL  OUT98  FILE RECORD SEQUENTIAL OUTPUT ENV(F RECSIZE(98));
+
+                                                                        BK300260
+ DCL INTAM1 FILE RECORD INPUT ENV( FB RECSIZE(212) );
+ DCL INTAM2 FILE RECORD INPUT ENV( FB RECSIZE(212) );
+
+ DCL (SUBSTR,ADDR,TRANSLATE,STRING,VERIFY,MOD,MULTIPLY) BUILTIN;
+ DCL 1  RECINP1_ALL,
+      2  RECINP1_212       CHAR(212)    INIT(' ');
+ DCL 1  RECINP2_ALL,
+      2  RECINP2_212       CHAR(212)    INIT(' ');
+                                                                        BK300840
+ DCL 1  RECINP1,
+      2  RECINP1_TYPOS     CHAR(2)      INIT(' '),
+      2  RECINP1_XAA       CHAR(6)      INIT(' '),
+      2  RECINP1_PEL       CHAR(8)      INIT(' '),
+      2  RECINP1_ONMT      CHAR(30)     INIT(' '),
+      2  RECINP1_ONOMA     CHAR(20)     INIT(' '),
+      2  RECINP1_ADDR      CHAR(30)     INIT(' '),
+      2  RECINP1_TK        CHAR(6)      INIT(' '),
+      2  RECINP1_POLIS     CHAR(20)     INIT(' '),
+      2  RECINP1_KATOIKOS  CHAR(1)      INIT(' '),
+   /* 2  RECINP1_YPOLOIPO  PIC '--------------9'   INIT(0), */
+      2  RECINP1_YPOLOIPO  PIC '(12)-V,99'   INIT(0),
+      2  RECINP1_APOTIMHSH PIC '(12)-V,99'   INIT(0),
+      2  RECINP1_REPOS     PIC '(12)-V,99'   INIT(0),
+      2  RECINP1_SYNOLO    PIC '(12)-V,99'   INIT(0),
+      2  RECINP1_SHMERINH  CHAR(8)      INIT(' '),
+      2  RECINP1_APO       CHAR(8)      INIT(' '),
+      2  RECINP1_EOS       CHAR(8)      INIT(' '),
+      2  RECINP1_PROFIT    CHAR(4)      INIT(' '),
+      2  RECINP1_FILLER    CHAR(1)      INIT(' ');
+                                                                        BK300170
+ DCL 1  RECINP2,
+      2  RECINP2_TYPOS     CHAR(2)      INIT(' '),
+      2  RECINP2_PEL       CHAR(8)      INIT(' '),
+      2  RECINP2_TITLOS    CHAR(10)     INIT(' '),
+      2  RECINP2_PERIGR    CHAR(30)     INIT(' '),
+      2  RECINP2_KOYPONI   PIC '(3)9'   INIT(0),
+      2  RECINP2_POSOTHS   PIC '--------9'   INIT(0),
+      2  RECINP2_TREXOYSA  PIC '(6)9V.99'   INIT(0),
+      2  RECINP2_FILLER    CHAR(141)    INIT(' ');
+   /***  BAR CODE  ***/
+ DCL  BARIN             CHAR(20); /* BAR CODE INPUT STRING */
+   /***  BAR CODE  ***/
+
+    DCL  ENA  CHAR(24)
+         INIT('ABcdEZHhIKkMNnOpPrTYuXwx');
+    DCL  DYO  CHAR(24)
+         INIT('ÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÓÔÕÖ×ØÙ');
+ DCL  C4                CHAR(4);
+ DCL  PICT4             PIC'(4)9' BASED(ADDR(C4));
+ DCL  RECNO             FIXED(15,0) INIT (0);
+ DCL  WRECNO            PIC'(8)9'  INIT (0);
+
+ DCL  KEEP_PEL          CHAR(8) INIT(' ');
+ DCL  SINGLEPAGE        PIC '9' INIT(0);
+
+ DCL  1 LINE,                                                           BK300270
+      2  CTLCHR         CHAR(2)     INIT('  '),                         BK300280
+      2  GRAMMH         CHAR(131)   INIT (' ');                         BK300290
+
+ DCL  1 LINER           CHAR(133) BASED(ADDR(LINE));                    BK300270
+
+ DCL  1 LINE1,                                                          BK300270
+      2  CTLCHR1         CHAR(1)     INIT(' '),                         BK300280
+      2  GRAMMH1         CHAR(132)   INIT (' ');                        BK300290
+
+ DCL  LINE98             CHAR(98);                                      BK300270
+ DCL  1 LINE98R          BASED(ADDR(LINE98)),                           BK300270
+      2  L98TAX          CHAR(6),                                       BK300280
+      2  L98ONM          CHAR(4),                                       BK300280
+      2  L98AA           FIXED(15,0),                                   BK300280
+      2  L98DAT          CHAR(80);                                      BK300290
+
+ DCL  1 LINE99,                                                         BK300270
+      2  CTLCHR991      CHAR(2)      INIT('10'),                        BK300280
+      2  PROFIT_OUT     CHAR(04)     INIT(' '),
+      2  GSEL_OUT       PIC'ZZZZZZ9' INIT(0),
+      2  FLR994         CHAR(67)     INIT(' ');
+ DCL  1 LINE_99         CHAR(80) BASED(ADDR(LINE99));                   BK300270
+ DCL  1 LINE02,                                                         BK300270
+      2  CTLCHR021      CHAR(2)      INIT(' 0'),                        BK300280
+      2  ONMT_ONOMA_OUT CHAR(37)     INIT(' '),
+      2  XAA_OUT        CHAR(6)      INIT(' '),
+      2  FLR024         CHAR(35)     INIT(' ');
+ DCL  1 LINE_02         CHAR(80) BASED(ADDR(LINE02));                   BK300270
+ DCL  1 LINE03,                                                         BK300270
+      2  CTLCHR031      CHAR(2)      INIT(' 0'),                        BK300280
+      2  ADDR_OUT       CHAR(29)     INIT(' '),
+      2  SEL_OUT        PIC'ZZ9'     INIT(0),
+      2  FLR034         CHAR(46)     INIT(' ');
+ DCL  1 LINE_03         CHAR(80) BASED(ADDR(LINE03));                   BK300270
+ DCL  1 LINE04,                                                         BK300270
+      2  CTLCHR041      CHAR(2)      INIT(' 0'),                        BK300280
+      2  TK_OUT         CHAR(6)      INIT(' '),
+      2  POLIS_OUT      CHAR(20)     INIT(' '),
+      2  DD_OUT         PIC '99'     INIT(0),
+      2  FLR044         CHAR(1)      INIT('/'),
+      2  MM_OUT         PIC '99'     INIT(0),
+      2  FLR045         CHAR(1)      INIT('/'),
+      2  YY_OUT         PIC '9999'   INIT(0),
+      2  FLR046         CHAR(42)     INIT(' ');
+ DCL  1 LINE_04         CHAR(80) BASED(ADDR(LINE04));                   BK300270
+ DCL  1 LINE07,                                                         BK300270
+      2  CTLCHR071      CHAR(2)      INIT('20'),                        BK300280
+   /* 2  YPOLOIPO_OUT   PIC'ZZZ.ZZZ.ZZZ.ZZ9-' INIT(0),*/
+      2  YPOLOIPO_OUT   PIC'ZZZ.ZZZ.ZZ9V,99-' INIT(0),
+      2  FLR076         CHAR(64)     INIT(' ');
+ DCL  1 LINE_07         CHAR(80) BASED(ADDR(LINE07));                   BK300270
+ DCL  1 LINE08,                                                         BK300270
+      2  CTLCHR081      CHAR(2)    INIT(' 0'),                          BK300280
+      2  APOTIMHSH_OUT  PIC'ZZZ.ZZZ.ZZ9V,99-' INIT(0),
+      2  FLR086         CHAR(64)   INIT(' ');
+ DCL  1 LINE_08         CHAR(80) BASED(ADDR(LINE08));                   BK300270
+ DCL  1 LINE09,                                                         BK300270
+      2  CTLCHR091      CHAR(2)    INIT(' 0'),                          BK300280
+      2  REPOS_OUT      PIC'ZZZ.ZZZ.ZZ9V,99-' INIT(0),
+      2  FLR096         CHAR(64)   INIT(' ');
+ DCL  1 LINE_09         CHAR(80) BASED(ADDR(LINE09));                   BK300270
+ DCL  1 LINE10,                                                         BK300270
+      2  CTLCHR101      CHAR(2)    INIT(' 0'),                          BK300280
+      2  SYNOLO_OUT     PIC'ZZZ.ZZZ.ZZ9V,99-' INIT(0),
+      2  FLR109         CHAR(64)   INIT(' ');
+ DCL  1 LINE_10         CHAR(80) BASED(ADDR(LINE10));                   BK300270
+ DCL  1 LINE11,                                                         BK300270
+      2  CTLCHR111      CHAR(2)    INIT(' 0'),                          BK300280
+      2  DD10_OUT       CHAR(2)    INIT(' '),
+      2  FLR104         CHAR(1)    INIT('/'),
+      2  MM10_OUT       CHAR(2)    INIT(' '),
+      2  FLR105         CHAR(1)    INIT('/'),
+      2  YY10_OUT       CHAR(4)    INIT(' '),
+      2  DD11_OUT       CHAR(2)    INIT(' '),
+      2  FLR114         CHAR(1)    INIT('/'),
+      2  MM11_OUT       CHAR(2)    INIT(' '),
+      2  FLR115         CHAR(1)    INIT('/'),
+      2  YY11_OUT       CHAR(4)    INIT(' '),
+      2  FLR119         CHAR(58)   INIT(' ');
+ DCL  1 LINE_11         CHAR(80) BASED(ADDR(LINE11));                   BK300270
+ DCL  1 LINE14,                                                         BK300270
+      2  CTLCHR141      CHAR(2)    INIT('30'),                          BK300280
+      2  PERIGR_OUT     CHAR(30)   INIT(' '),
+      2  POSOTHS_OUT    PIC '----.---.---.--9' INIT(0),
+      2  TREXOYSA_OUT   PIC 'ZZZ9V,99' INIT(0),
+      2  AJIA_OUT       PIC'ZZZZ.ZZZ.ZZ9V,99-' INIT(0),
+      2  FLR145         CHAR(14)   INIT(' ');
+ DCL  1 LINE_14         CHAR(80) BASED(ADDR(LINE14));                   BK300270
+ DCL  1 LINE15,                                                         BK300270
+      2  CTLCHR151      CHAR(2)    INIT(' 1'),                          BK300280
+      2  FLR151         CHAR(11)    INIT('rYNOkO     '),
+      2  FLR152         CHAR(19)   INIT(' IrOTIMO rE dPX.   '),
+      2  SYNODRX_OUT    PIC'ZZZ.ZZZ.ZZZ.ZZ9-' INIT(0),
+      2  FLR153         CHAR(7)    INIT('  EYPx '),
+      2  SYNO_OUT       PIC'ZZZZ.ZZZ.ZZ9V,99-' INIT(0),
+      2  FLR155         CHAR(14)   INIT(' ');
+ DCL  1 LINE_15         CHAR(80) BASED(ADDR(LINE15));                   BK300270
+
+ DCL GAA           FIXED(09)  INIT(0); /* APIhMOr RECORDS pOY IKANOpI*/ BK300800
+ DCL GEN01         FIXED(09)  INIT(0); /* APIhMOr RECORDS ApO INPUT*/   BK300800
+ DCL GEN02         FIXED(09)  INIT(0); /* APIhMOr RECORDS ApO INPUT*/   BK300800
+ DCL OUT01         FIXED(09)  INIT(0); /* APIhMOr RECORDS ApO INPUT*/   BK300800
+ DCL OUT02         FIXED(09)  INIT(0); /* APIhMOr RECORDS ApO INPUT*/   BK300800
+ DCL OUT99         FIXED(09)  INIT(0); /* APIhMOr RECORDS ApO INPUT*/   BK300800
+ DCL ERR01         FIXED(09)  INIT(0); /* APIhMOr RECORDS ApO INPUT*/   BK300800
+ DCL WPOSO         FIXED(15,2) INIT(0);                                 BK300800
+ DCL WPOSO1        FIXED(15,2) INIT(0);                                 BK300800
+ DCL WPOSO1DRX     FIXED(15)   INIT(0);                                 BK300800
+ DCL WREC1         FIXED(09)   INIT(0);                                 BK300800
+ DCL GPAGENO       FIXED(09)  INIT(0);                                  BK300800
+ DCL PAGENO        FIXED(09)  INIT(0);                                  BK300800
+ DCL PAGENO2       FIXED(09)  INIT(0);                                  BK300800
+ DCL PAGENO3       FIXED(09)  INIT(0);                                  BK300800
+ DCL PAGENO4       FIXED(09)  INIT(0);                                  BK300800
+ DCL PAGENO5       FIXED(09)  INIT(0);                                  BK300800
+ DCL PAGENO6       FIXED(09)  INIT(0);                                  BK300800
+ DCL LINENO        FIXED(05)  INIT(0);                                  BK300800
+ DCL LIMIT_LINENO  PIC'99'    INIT(53); /*57*/                          BK300800
+ DCL NOREAD        PIC'9'     INIT(0);                                  BK300800
+ DCL II            PIC'99'    INIT(0);                                  BK300800
+ DCL JJ            PIC'99'    INIT(0);                                  BK300800
+
+ %PAGE;                                                                 BK300850
+                                                                        BK300860
+  ON ENDFILE(INTAM1) GOTO TELOS;                                        BK301030
+  ON ENDFILE(INTAM2) GOTO TELOS;                                        BK301030
+  OPEN FILE(INTAM1);
+  OPEN FILE(INTAM2);
+  OPEN FILE(PRINT);
+  OPEN FILE(PRINTF);
+  OPEN FILE(OUT98);
+  PAGENO = 0;
+  NOREAD = 0;
+
+ RD01:                                                                  BK301050
+    READ FILE(INTAM1) INTO  (RECINP1);                                  BK301060
+    GEN01 = GEN01 + 1;
+    KEEP_PEL = RECINP1_PEL;
+    PAGENO = 0;
+    WPOSO1 = 0;
+    WREC1  = 0;
+    WPOSO1DRX = 0;
+    SINGLEPAGE = 0;
+    CALL HEAD;
+    OUT01 = OUT01 + 1;
+    CTLCHR141 = '30';                                                   BK300280
+    CTLCHR151 = ' 1';
+    CALL METOXES;
+    IF WPOSO1 = 0 & WREC1 = 0 THEN CTLCHR151 = '31';
+    SYNO_OUT      = WPOSO1;
+    WPOSO1DRX = MULTIPLY(WPOSO1,340.75,15,0);
+    SYNODRX_OUT = WPOSO1DRX;
+    IF WPOSO1 ^= RECINP1_APOTIMHSH THEN DO;
+       GRAMMH1 = 'kAhOr rTON pEkATH '!!RECINP1_PEL!!' '!!'ApOTIMHrH '!!
+                RECINP1_APOTIMHSH!!' '!!'ApO YpOkOcIrMO'!!WPOSO1;
+       WRITE FILE (PRINTF) FROM (LINE1);                                BK301680
+       ERR01 = ERR01 + 1;
+    END;
+    LINENO = LINENO + 1; /* 1 GRAMMES GIA SYNOLA */
+    IF LINENO > LIMIT_LINENO THEN DO;
+       RECNO = RECNO + 1;
+       L98TAX = RECINP1_TK;
+       L98ONM = SUBSTR(RECINP1_ONMT,1,4);
+       L98AA  = RECNO;
+       IF PAGENO = 1 THEN
+          L98DAT = '80FP';
+       IF PAGENO > 1 THEN
+          L98DAT = '80MP';
+       WRITE FILE (OUT98) FROM (LINE98);                                BK301680
+       LINENO = LINENO + 1;
+
+       CTLCHR = '90';
+       GRAMMH = (131)'0';
+       WRECNO = RECNO;
+       BARIN = '0000'!!(16)'0';
+       GRAMMH = BARIN;
+       RECNO = RECNO + 1;
+       L98TAX = RECINP1_TK;
+       L98ONM = SUBSTR(RECINP1_ONMT,1,4);
+       L98AA  = RECNO;
+       L98DAT = SUBSTR(LINER,1,79);
+       WRITE FILE (OUT98) FROM (LINE98);                                BK301680
+       LINE = '';
+       CALL HEAD1;
+       LINENO = LINENO + 1; /* 1 GRAMMES GIA SYNOLA */
+    END;
+    LINENO = LINENO - 1;
+                             /* SYNOLA */
+    IF LINENO = 0 THEN CTLCHR151 = '31';
+    RECNO = RECNO + 1;
+    L98TAX = RECINP1_TK;
+    L98ONM = SUBSTR(RECINP1_ONMT,1,4);
+    L98AA  = RECNO;
+    FLR151 = TRANSLATE(FLR151,DYO,ENA);
+    FLR152 = TRANSLATE(FLR152,DYO,ENA);
+    FLR153 = TRANSLATE(FLR153,DYO,ENA);
+    L98DAT = SUBSTR(LINE_15,1,80);
+    WRITE FILE (OUT98) FROM (LINE98R);                                  BK301680
+    LINENO = LINENO + 1;
+
+    RECNO = RECNO + 1;
+    L98TAX = RECINP1_TK;
+    L98ONM = SUBSTR(RECINP1_ONMT,1,4);
+    L98AA  = RECNO;
+    L98DAT = '';
+    IF SINGLEPAGE = 0 THEN
+       L98DAT = '80SP';
+    ELSE
+       L98DAT = '80EP';
+    WRITE FILE (OUT98) FROM (LINE98R);                                  BK301680
+
+
+    /*   T E L O S  STATEMENT */
+
+    IF MOD(GEN01,1000) = 0 THEN DO;
+       GRAMMH1 = 'CHECK INPUT RECORDS ANA 1000 : '!!GEN01;
+       WRITE FILE (PRINTF) FROM (LINE1);                                BK301680
+    END;
+    IF MOD(RECNO,10000) = 0 THEN DO;
+       GRAMMH1 = 'CHECK APIhMOr cPAMMxN ANA 10000 : '!!RECNO;
+       WRITE FILE (PRINTF) FROM (LINE1);                                BK301680
+    END;
+    IF PAGENO > 2 THEN DO;
+       GRAMMH1 = 'PAGENO '!!PAGENO!!' '!!RECINP1_PEL!!' '!!RECINP1_ONMT;
+       WRITE FILE (PRINTF) FROM (LINE1);                                BK301680
+    END;
+    IF PAGENO = 2 THEN DO;
+       PAGENO2 = PAGENO2 + 1;
+    END;
+    IF PAGENO = 3 THEN DO;
+       PAGENO3 = PAGENO3 + 1;
+    END;
+    IF PAGENO = 4 THEN DO;
+       PAGENO4 = PAGENO4 + 1;
+    END;
+    IF PAGENO = 5 THEN DO;
+       PAGENO5 = PAGENO5 + 1;
+    END;
+    IF PAGENO = 6 THEN DO;
+       PAGENO6 = PAGENO6 + 1;
+    END;
+    CTLCHR = '90';
+    GRAMMH = (131)'0';
+    WRECNO = RECNO;
+    BARIN = '0001'!!(16)'0';
+    GRAMMH = BARIN;
+    RECNO = RECNO + 1;
+    L98TAX = RECINP1_TK;
+    L98ONM = SUBSTR(RECINP1_ONMT,1,4);
+    L98AA  = RECNO;
+    L98DAT = SUBSTR(LINER,1,79);
+    WRITE FILE (OUT98) FROM (LINE98);                                   BK301680
+    LINE = '';
+
+    GO TO RD01;
+
+
+ METOXES: PROC;
+ RD02:
+    IF NOREAD = 0 THEN DO;
+       READ FILE(INTAM2) INTO  (RECINP2);                               BK301060
+       GEN02 = GEN02 + 1;
+    END;
+ /* NOREAD = 0;*/
+ /* IF RECINP2_PEL ^= RECINP1_PEL THEN DO;
+       NOREAD = 1;
+       GO TO RD02END;
+    END; */
+    IF RECINP2_PEL < RECINP1_PEL THEN DO;
+       NOREAD = 0;
+       GO TO RD02;
+    END;
+    IF RECINP2_PEL > RECINP1_PEL THEN DO;
+       NOREAD = 1;
+       GO TO RD02END;
+    END;
+
+    IF RECINP2_PEL = RECINP1_PEL THEN DO;
+       NOREAD = 0;
+       IF LINENO > LIMIT_LINENO THEN DO;
+          RECNO = RECNO + 1;
+          L98TAX = RECINP1_TK;
+          L98ONM = SUBSTR(RECINP1_ONMT,1,4);
+          L98AA  = RECNO;
+          IF PAGENO = 1 THEN
+             L98DAT = '80FP';
+          IF PAGENO > 1 THEN
+             L98DAT = '80MP';
+          WRITE FILE (OUT98) FROM (LINE98);                             BK301680
+
+          CTLCHR = '90';
+          GRAMMH = (131)'0';
+          WRECNO = RECNO;
+          BARIN = '0000'!!(16)'0';
+          GRAMMH = BARIN;
+          RECNO = RECNO + 1;
+          L98TAX = RECINP1_TK;
+          L98ONM = SUBSTR(RECINP1_ONMT,1,4);
+          L98AA  = RECNO;
+          L98DAT = SUBSTR(LINER,1,79);
+          WRITE FILE (OUT98) FROM (LINE98);                             BK301680
+          LINENO = LINENO + 1;
+          LINE = '';
+
+          CALL HEAD1;
+          CTLCHR141 = '30';                                             BK300280
+       END;
+
+       PERIGR_OUT    = RECINP2_PERIGR;
+       POSOTHS_OUT   = RECINP2_POSOTHS;
+       TREXOYSA_OUT  = RECINP2_TREXOYSA;
+       WPOSO = RECINP2_POSOTHS * RECINP2_TREXOYSA;
+       WPOSO1 = WPOSO1 + WPOSO;
+       WREC1  = WREC1  + 1;
+       AJIA_OUT      = WPOSO;
+
+       RECNO = RECNO + 1;
+       L98TAX = RECINP1_TK;
+       L98ONM = SUBSTR(RECINP1_ONMT,1,4);
+       L98AA  = RECNO;
+       L98DAT = SUBSTR(LINE_14,1,80);
+       WRITE FILE (OUT98) FROM (LINE98);                                BK301680
+       LINENO = LINENO + 1;
+       CTLCHR141 = ' 0';                                                BK300280
+       OUT02 = OUT02 + 1;
+    END;
+
+    GO TO RD02;
+ RD02END:
+ END;
+ HEAD: PROC;
+    PAGENO = PAGENO + 1;
+    GPAGENO = GPAGENO + 1;
+    II = 0;
+    JJ = 0;
+    DO II = 30 TO 1 BY -1;
+       IF SUBSTR(RECINP1_ONMT,II,1) = ' ' THEN DO;
+          JJ = JJ + 1;
+       END;
+    END;
+    JJ = 31 - JJ;
+    IF JJ > 30 THEN JJ = 30;
+    PROFIT_OUT     = RECINP1_PROFIT;
+    ONMT_ONOMA_OUT = SUBSTR(RECINP1_ONMT,1,JJ) !! ' '!! RECINP1_ONOMA;
+    ADDR_OUT       = RECINP1_ADDR;
+    XAA_OUT        = RECINP1_XAA;
+    TK_OUT         = RECINP1_TK;
+    POLIS_OUT      = RECINP1_POLIS;
+    YPOLOIPO_OUT   = RECINP1_YPOLOIPO;
+    APOTIMHSH_OUT  = RECINP1_APOTIMHSH;
+    REPOS_OUT      = RECINP1_REPOS;
+    SYNOLO_OUT     = RECINP1_SYNOLO;
+    SEL_OUT        = PAGENO;
+    GSEL_OUT       = GPAGENO;
+    YY_OUT         = SUBSTR(RECINP1_SHMERINH,1,4);
+    YY10_OUT       = SUBSTR(RECINP1_SHMERINH,1,4);
+    YY11_OUT       = SUBSTR(RECINP1_SHMERINH,1,4);
+    MM_OUT         = SUBSTR(RECINP1_SHMERINH,5,2);
+    MM10_OUT       = SUBSTR(RECINP1_SHMERINH,5,2);
+    MM11_OUT       = SUBSTR(RECINP1_SHMERINH,5,2);
+    DD_OUT         = SUBSTR(RECINP1_SHMERINH,7,2);
+    DD10_OUT       = SUBSTR(RECINP1_SHMERINH,7,2);
+    DD11_OUT       = SUBSTR(RECINP1_SHMERINH,7,2);
+
+
+ /* ALLAGH SELIDAS                    */                                BK301680
+    RECNO = RECNO + 1;
+    L98TAX = RECINP1_TK;
+    L98ONM = SUBSTR(RECINP1_ONMT,1,4);
+    L98AA  = RECNO;
+    L98DAT = SUBSTR(LINE_99,1,80);
+    WRITE FILE (OUT98) FROM (LINE98);                                   BK301680
+
+
+    RECNO = RECNO + 1;
+    L98TAX = RECINP1_TK;
+    L98ONM = SUBSTR(RECINP1_ONMT,1,4);
+    L98AA  = RECNO;
+    L98DAT = SUBSTR(LINE_02,1,80);
+    WRITE FILE (OUT98) FROM (LINE98);                                   BK301680
+
+    RECNO = RECNO + 1;
+    L98TAX = RECINP1_TK;
+    L98ONM = SUBSTR(RECINP1_ONMT,1,4);
+    L98AA  = RECNO;
+    L98DAT = SUBSTR(LINE_03,1,80);
+    WRITE FILE (OUT98) FROM (LINE98);                                   BK301680
+
+    RECNO = RECNO + 1;
+    L98TAX = RECINP1_TK;
+    L98ONM = SUBSTR(RECINP1_ONMT,1,4);
+    L98AA  = RECNO;
+    L98DAT = SUBSTR(LINE_04,1,80);
+    WRITE FILE (OUT98) FROM (LINE98);                                   BK301680
+
+    RECNO = RECNO + 1;
+    L98TAX = RECINP1_TK;
+    L98ONM = SUBSTR(RECINP1_ONMT,1,4);
+    L98AA  = RECNO;
+    L98DAT = SUBSTR(LINE_07,1,80);
+    WRITE FILE (OUT98) FROM (LINE98);                                   BK301680
+
+    RECNO = RECNO + 1;
+    L98TAX = RECINP1_TK;
+    L98ONM = SUBSTR(RECINP1_ONMT,1,4);
+    L98AA  = RECNO;
+    L98DAT = SUBSTR(LINE_08,1,80);
+    WRITE FILE (OUT98) FROM (LINE98);                                   BK301680
+
+    RECNO = RECNO + 1;
+    L98TAX = RECINP1_TK;
+    L98ONM = SUBSTR(RECINP1_ONMT,1,4);
+    L98AA  = RECNO;
+    L98DAT = SUBSTR(LINE_09,1,80);
+    WRITE FILE (OUT98) FROM (LINE98);                                   BK301680
+
+    RECNO = RECNO + 1;
+    L98TAX = RECINP1_TK;
+    L98ONM = SUBSTR(RECINP1_ONMT,1,4);
+    L98AA  = RECNO;
+    L98DAT = SUBSTR(LINE_10,1,80);
+    WRITE FILE (OUT98) FROM (LINE98);                                   BK301680
+
+    RECNO = RECNO + 1;
+    L98TAX = RECINP1_TK;
+    L98ONM = SUBSTR(RECINP1_ONMT,1,4);
+    L98AA  = RECNO;
+    CTLCHR111 = ' 0';
+    L98DAT = SUBSTR(LINE_11,1,80);
+    WRITE FILE (OUT98) FROM (LINE98);                                   BK301680
+
+    LIMIT_LINENO = 24;
+    LINENO = 0;
+ END HEAD;
+
+ HEAD1: PROC;
+    PAGENO = PAGENO + 1;
+    GPAGENO = GPAGENO + 1;
+    SEL_OUT = PAGENO;
+    GSEL_OUT = GPAGENO;
+    SINGLEPAGE = 1;
+
+ /* ALLAGH SELIDAS                    */                                BK301680
+
+    RECNO = RECNO + 1;
+    L98TAX = RECINP1_TK;
+    L98ONM = SUBSTR(RECINP1_ONMT,1,4);
+    L98AA  = RECNO;
+    L98DAT = SUBSTR(LINE_99,1,80);
+    WRITE FILE (OUT98) FROM (LINE98);                                   BK301680
+
+    RECNO = RECNO + 1;
+    L98TAX = RECINP1_TK;
+    L98ONM = SUBSTR(RECINP1_ONMT,1,4);
+    L98AA  = RECNO;
+    L98DAT = SUBSTR(LINE_02,1,80);
+    WRITE FILE (OUT98) FROM (LINE98);                                   BK301680
+
+    RECNO = RECNO + 1;
+    L98TAX = RECINP1_TK;
+    L98ONM = SUBSTR(RECINP1_ONMT,1,4);
+    L98AA  = RECNO;
+    L98DAT = SUBSTR(LINE_03,1,80);
+    WRITE FILE (OUT98) FROM (LINE98);                                   BK301680
+
+    RECNO = RECNO + 1;
+    L98TAX = RECINP1_TK;
+    L98ONM = SUBSTR(RECINP1_ONMT,1,4);
+    L98AA  = RECNO;
+    L98DAT = SUBSTR(LINE_04,1,80);
+    WRITE FILE (OUT98) FROM (LINE98);                                   BK301680
+
+
+    RECNO = RECNO + 1;
+    L98TAX = RECINP1_TK;
+    L98ONM = SUBSTR(RECINP1_ONMT,1,4);
+    L98AA  = RECNO;
+    CTLCHR111 = '20';                                                   BK300280
+    L98DAT = SUBSTR(LINE_11,1,80);
+    WRITE FILE (OUT98) FROM (LINE98);                                   BK301680
+
+    LIMIT_LINENO = 35;
+    LINENO = 0;
+ END HEAD1;
+
+ TELOS:                                                                 BK301650
+  CTLCHR1 = '1';
+  GRAMMH1 = (10) ' ' !! 'rYNOpTIKH pAPOYrIArH THr hErHr ' !!
+                        'TPApEZA EpENdYrExN KATA TAX.Kxd.* DK441LE*' ;
+  WRITE FILE (PRINTF) FROM (LINE1);                                     BK301680
+  CTLCHR1 = ' ';
+  GRAMMH1 = (10) ' ' !! '===============================' !!
+                        '========================       ' ;
+  WRITE FILE (PRINTF) FROM (LINE1);                                     BK301680
+
+  CTLCHR1 = '0';
+  GRAMMH1 = (10) ' ' !! 'pEkATEr pOY dIABArhHKAN ApO INPUT(01)  : ' !!
+           GEN01 ;
+  WRITE FILE (PRINTF) FROM (LINE1);                                     BK301680
+  GRAMMH1 = (10) ' ' !! 'rEkIdEr EKTYpxrHr                      : ' !!
+           GPAGENO ;
+  WRITE FILE (PRINTF) FROM (LINE1);                                     BK301680
+  GRAMMH1 = (10) ' ' !! 'pPOIONTA pOY dIABArhHKAN ApO INPUT(02) : ' !!
+           GEN02 ;
+  WRITE FILE (PRINTF) FROM (LINE1);                                     BK301680
+  GRAMMH1 = (10) ' ' !! 'pEkATEr pOY cPAuTHKAN STATEMENTS (01)  : ' !!
+           GEN01 ;
+  WRITE FILE (PRINTF) FROM (LINE1);                                     BK301680
+  GRAMMH1 = (10) ' ' !! 'pPOIONTA pOY cPAuTHKAN STATEMENTS (02) : ' !!
+           GEN02 ;
+  WRITE FILE (PRINTF) FROM (LINE1);                                     BK301680
+  GRAMMH1 = (10) ' ' !! 'MHdENIKOI pEkATEr pOY AcNOHhHKAN       : ' !!
+           OUT99 ;
+  WRITE FILE (PRINTF) FROM (LINE1);                                     BK301680
+  GRAMMH1 = (10) ' ' !! 'ME dYO rEkIdEr    : ' !! PAGENO2;
+  WRITE FILE (PRINTF) FROM (LINE1);                                     BK301680
+  GRAMMH1 = (10) ' ' !! 'ME TPEIr rEkIdEr  : ' !! PAGENO3;
+  WRITE FILE (PRINTF) FROM (LINE1);                                     BK301680
+  GRAMMH1 = (10) ' ' !! 'ME TErrEPEIr rEkId: ' !! PAGENO4;
+  WRITE FILE (PRINTF) FROM (LINE1);                                     BK301680
+  GRAMMH1 = (10) ' ' !! 'ME pENTE rEkIdEr  : ' !! PAGENO5;
+  WRITE FILE (PRINTF) FROM (LINE1);                                     BK301680
+  GRAMMH1 = (10) ' ' !! 'ME EnH rEkIdEr    : ' !! PAGENO6;
+  WRITE FILE (PRINTF) FROM (LINE1);                                     BK301680
+  GRAMMH1 = (10) ' ' !! 'cPAuTHKAN RECORDS : ' !! RECNO;
+  WRITE FILE (PRINTF) FROM (LINE1);                                     BK301680
+
+  GRAMMH1 = (10) ' ' !! 'pPOrOXH pPOrOXH pPOrOXH pPOrOXH        ';
+  WRITE FILE (PRINTF) FROM (LINE1);                                     BK301680
+  GRAMMH1 = (10) ' ' !! 'AN BPEhOYN kAhH NA MHN TYpxhOYN .... : ';
+  WRITE FILE (PRINTF) FROM (LINE1);                                     BK301680
+  GRAMMH1 = (10) ' ' !! 'BPEhHKAN kAhH ApOTIMHrHr-rYNOkO      : ' !!
+            ERR01 ;
+  WRITE FILE (PRINTF) FROM (LINE1);                                     BK301680
+
+  GRAMMH1 = (30) ' ' !! 'TEkOr pPOcPAMMATOr DK441LE';
+  WRITE FILE (PRINTF) FROM (LINE1);                                     BK301680
+  GRAMMH1 = '';
+  CLOSE FILE(INTAM1);
+  CLOSE FILE(INTAM2);
+  CLOSE FILE(PRINT);
+  CLOSE FILE(PRINTF);
+  CLOSE FILE(OUT98);
+  END;                                                                  BK301800
+

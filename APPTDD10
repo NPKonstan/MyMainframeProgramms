@@ -1,0 +1,1143 @@
+* PROCESS XOPTS(CICS,SP),LIMITS (FIXEDDEC(15,31));
+ DD10: PROC(COM_PTR) OPTIONS(MAIN,REENTRANT) ;
+ /********************************************************************/
+ /*                                                                  */
+ /*   ONLINE PLI + DB2      MEMBER = APPTDD10                        */
+ /*                                                                  */
+ /*   ΕΝΤΟΛΗ ΑΝΑΘΕΣΗΣ ΕΝΤΟΛΗΣ ΓΙΑ INTERNET                           */
+ /*                                                                  */
+ /********************************************************************/
+ /* Τα λάθη επιστρέφονται στα πιο κάτω πεδία :                       */
+ /* CA_ANSWER_CODE  PIC '(3)9'                                       */
+ /* CA_ANSWER_DESC  CHAR(100)                                        */
+ /********************************************************************/
+ /* NPK 02-03-2010                                                   */
+ /********************************************************************/
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+ DCL COCDCBG  ENTRY (PIC'(9)9') RETURNS (PIC'(9)9');
+ DCL DDR002   ENTRY (CHAR(35)) RETURNS (FIXED(1));
+ DCL DDR003   ENTRY (CHAR(35)) RETURNS (FIXED(1));
+ % INCLUDE  EFHWEBDS ;           /* WEB COMMAREA                     */
+     DCL 1 DAT_IO          BASED(ADDR(COM_AREA_DATA)),
+       2  DD_COD_PERSONA    PIC '(09)9', /*APIΘMOΣ ΠΕΛΑΤΗ ΟΦΕΙΛΕΤH*/
+       2  DEC_ARLOG         PIC '(08)9', /*                       */
+       2  CHR_C_S_I_I_517   CHAR(0035) , /*                       */
+       2  CHR_MANDAT_ID     CHAR(0035) , /*                       */
+       2  CHR_DB_NAME       CHAR(0070) , /*                       */
+       2  CHR_DB_ADDR_LINE1 CHAR(0070) , /*                       */
+       2  CHR_DB_ID         CHAR(0037) , /*                       */
+       2  SO_OWNER          PIC '(01)9', /*                       */
+       2  CHR_ULT_DB_NAME   CHAR(0070) , /*                       */
+       2  CHR_ULT_DB_ID     CHAR(0037) , /*                       */
+       2  SO_ULT_DB_ADDRESS  CHAR(0070) ,/*                       */
+       2  SO_ULT_DB_MID_NAME CHAR(0010) ,/*                       */
+       2  SO_ULT_DB_PROFES   CHAR(0010) ,/*                       */
+       2  AMT_LIMIT          PIC '(08)9';/*                       */
+   /*
+   DAT_IO  = '';
+   DAT_IO.DD_COD_PERSONA    = 123456789;
+   DAT_IO.DEC_ARLOG         = 36836580;
+   DAT_IO.AMT_LIMIT =123;
+   DAT_IO.CHR_C_S_I_I_517   = 'GR71ZZZ00704';
+   DAT_IO.CHR_MANDAT_ID     = '99070413';
+   DAT_IO.CHR_DB_NAME       = 'DB_NAME';
+   DAT_IO.CHR_DB_ADDR_LINE1 = 'DB_ADDR_LINE1';
+   DAT_IO.CHR_DB_ID =         'DB_ID';
+   DAT_IO.CHR_ULT_DB_NAME =   '_NAME';
+   DAT_IO.CHR_ULT_DB_ID =     '_DB_ID  ';
+   DAT_IO.SO_ULT_DB_ADDRESS = 'DB_ADDRESS ';
+   DAT_IO.SO_ULT_DB_MID_NAME= '_MID_NAME';
+   DAT_IO.SO_ULT_DB_PROFES =  '_PROFES';
+   */
+ DCL  WS_COD_BRANCH  CHAR(4);
+ DCL  WS_IBAN        CHAR(27);
+ DCL  PIC9   PIC'(9)9' ;
+ DCL  CHAR9  CHAR(09) INIT('000000000');
+ DCL  CHAR20 CHAR(20) INIT('00000000000000000000');
+
+
+ /********************************************************************/
+      /****************************************************************
+          INCLUDED TABLES
+       ***************************************************************/
+           EXEC SQL INCLUDE SQLCA      ;
+           EXEC SQL INCLUDE T04CNV97   ;
+           EXEC SQL INCLUDE CTDDMD10   ;
+           EXEC SQL INCLUDE CTDDMD15   ;
+           EXEC SQL INCLUDE CTDDOR86   ;
+      /**************************************************************/
+           CALL VALIDATE_DATA          ;
+           WS_IBAN = CREATE_IBAN(GET_BRANCH(),DAT_IO.DEC_ARLOG);
+           CALL GET_CR_NAME            ;
+           CALL LOAD_DATA              ;
+           CALL INSERT_ENTOLI          ;
+           CALL LOAD_ISTORIKO          ;
+           CALL INSERT_ISTORIKO        ;
+           EXEC CICS RETURN;
+      /********************************************************
+      ** VALIDATE_DATA                                       **
+      *********************************************************/
+       VALIDATE_DATA :PROC ;
+  /*
+  PUT SKIP LIST('START APPTDD10 NPK   ' );
+  PUT SKIP LIST('DD_COD_PERSONA     = ',DAT_IO.DD_COD_PERSONA       );
+  PUT SKIP LIST('DEC_ARLOG          = ',DAT_IO.DEC_ARLOG            );
+  PUT SKIP LIST('CHR_C_S_I_I_517    = ',DAT_IO.CHR_C_S_I_I_517      );
+  PUT SKIP LIST('CHR_MANDAT_ID      = ',DAT_IO.CHR_MANDAT_ID        );
+  PUT SKIP LIST('CHR_DB_NAME        = ',DAT_IO.CHR_DB_NAME          );
+  PUT SKIP LIST('CHR_DB_ADDR_LINE1  = ',DAT_IO.CHR_DB_ADDR_LINE1    );
+  PUT SKIP LIST('CHR_DB_ID          = ',DAT_IO.CHR_DB_ID            );
+  PUT SKIP LIST('SO_OWNER           = ',DAT_IO.SO_OWNER             );
+  PUT SKIP LIST('CHR_ULT_DB_NAME    = ',DAT_IO.CHR_ULT_DB_NAME      );
+  PUT SKIP LIST('CHR_ULT_DB_ID      = ',DAT_IO.CHR_ULT_DB_ID        );
+  PUT SKIP LIST('SO_ULT_DB_ADDRESS  = ',DAT_IO.SO_ULT_DB_ADDRESS    );
+  PUT SKIP LIST('SO_ULT_DB_MID_NAME = ',DAT_IO.SO_ULT_DB_MID_NAME   );
+  PUT SKIP LIST('SO_ULT_DB_PROFES   = ',DAT_IO.SO_ULT_DB_PROFES     );
+  PUT SKIP LIST('AMT_LIMIT          = ',DAT_IO.AMT_LIMIT            );
+  */
+       CA_ANSWER_CODE = 0;
+       CA_ANSWER_DESC = '';
+
+       PIC9 = DAT_IO.DEC_ARLOG ;
+       IF PIC9 ^= COCDCBG(PIC9) THEN DO;
+          CA_ANSWER_CODE = 1;
+          CA_ANSWER_DESC = 'Ο αριθμός λογαριασμού '
+          !!DAT_IO.DEC_ARLOG!!' είναι λάθος ' ;
+        /*PUT SKIP LIST('ERROR NPK = ',CA_ANSWER_DESC);*/
+          EXEC CICS RETURN;
+       END;
+       IF DAT_IO.DD_COD_PERSONA = 0 THEN DO;
+      /* PUT SKIP LIST('CA_ANSWER_CODE = 2');*/
+          CA_ANSWER_CODE = 2;
+          CA_ANSWER_DESC = 'Ο αριθμός πελάτη '
+          !!DAT_IO.DD_COD_PERSONA!!' είναι μηδέν' ;
+
+        /*PUT SKIP LIST('ERROR NPK = ',CA_ANSWER_DESC);*/
+          EXEC CICS RETURN;
+       END;
+       IF SUBSTR(DAT_IO.CHR_C_S_I_I_517,1,2) ^= 'GR' THEN DO;
+          CA_ANSWER_CODE = 3;
+          CA_ANSWER_DESC = 'Ο κωδικός οργανισμού '
+          !!DAT_IO.CHR_C_S_I_I_517     !!' είναι λάθος ' ;
+       /* PUT SKIP LIST('ERROR NPK = ',CA_ANSWER_DESC);*/
+          EXEC CICS RETURN;
+       END;
+
+
+       IF SUBSTR(DAT_IO.CHR_DB_NAME,1,15) = '               '
+       THEN DO;
+          CA_ANSWER_CODE = 4;
+          CA_ANSWER_DESC = 'Ονομα Οφειλέτη '
+          !!DAT_IO.CHR_DB_NAME !!' κενό' ;
+      /*  PUT SKIP LIST('ERROR NPK = ',CA_ANSWER_DESC);*/
+          EXEC CICS RETURN;
+       END;
+
+       IF DAT_IO.CHR_C_S_I_I_517 = 'GR88ZZZ00301' THEN
+        DAT_IO.CHR_MANDAT_ID=RIGHT(TRIM(DAT_IO.CHR_MANDAT_ID),9 ,'0');
+       ELSE
+        DAT_IO.CHR_MANDAT_ID=RIGHT(TRIM(DAT_IO.CHR_MANDAT_ID),20,'0');
+
+       IF DAT_IO.CHR_C_S_I_I_517 ^= 'GR88ZZZ00301' THEN DO;
+          IF  SUBSTR(DAT_IO.CHR_C_S_I_I_517,10,3) ^=
+              SUBSTR(DAT_IO.CHR_MANDAT_ID,16 ,3) THEN DO;
+               CA_ANSWER_CODE = 10;
+               CA_ANSWER_DESC =
+               'Ο κωδικός ανάθεσης '
+               !!TRIM(DAT_IO.CHR_MANDAT_ID)!!
+               ' ΔΕΝ ΑΝΉΚΕΙ ΣΤΟΝ ΟΡΓΑΝΙΣΜΌ ΜΕ ΚΩΔΙΚΌ '
+               !!TRIM(DAT_IO.CHR_C_S_I_I_517)        ;
+        /*PUT SKIP LIST('ERROR NPK = ',CA_ANSWER_DESC);*/
+               EXEC CICS RETURN;
+          END;
+       END;
+       IF DAT_IO.CHR_C_S_I_I_517 = 'GR88ZZZ00301' THEN DO;
+          IF DDR003(DAT_IO.CHR_MANDAT_ID) = 1 THEN DO;
+            CA_ANSWER_CODE = 5;
+            CA_ANSWER_DESC = 'Λάθος κωδικός ανάθεσης '
+            !!DAT_IO.CHR_MANDAT_ID    ;
+        /*PUT SKIP LIST('ERROR NPK = ',CA_ANSWER_DESC);*/
+            EXEC CICS RETURN;
+          END;
+       END;
+       ELSE DO;
+          IF DDR002(DAT_IO.CHR_MANDAT_ID) = 1 THEN DO;
+            CA_ANSWER_CODE = 5;
+            CA_ANSWER_DESC = 'Λάθος κωδικός ανάθεσης '
+            !!DAT_IO.CHR_MANDAT_ID                ;
+         /*PUT SKIP LIST('ERROR NPK = ',CA_ANSWER_DESC);*/
+
+            EXEC CICS RETURN;
+          END;
+       END;
+       IF (DAT_IO.DD_COD_PERSONA  ) = 0
+       THEN DO;
+          CA_ANSWER_CODE = 6;
+          CA_ANSWER_DESC = 'Το κωδικός οφειλέτη '
+          !!DAT_IO.DD_COD_PERSONA!!' είναι μηδέν' ;
+         /* PUT SKIP LIST('ERROR NPK = ',CA_ANSWER_DESC); */
+          EXEC CICS RETURN;
+       END;
+        /* TO BE DONE
+        DAT_IO.CHR_DB_ADDR_LINE1
+        DAT_IO.CHR_DB_ID
+        DAT_IO.CHR_ULT_DB_NAME
+        DAT_IO.CHR_ULT_DB_ID
+        DAT_IO.SO_ULT_DB_ADDRESS
+        DAT_IO.SO_ULT_DB_MID_NAME
+        DAT_IO.SO_ULT_DB_PROFES
+        */
+
+    END VALIDATE_DATA;
+      /****************************************************************
+      ** GET_CR_NAME                                                **
+      *********************************************************/
+       GET_CR_NAME :PROC ;
+        CTDDOR86 = '' ;
+        CTDDOR86.CHR_C_S_I_I_517 = DAT_IO.CHR_C_S_I_I_517 ;
+
+           EXEC SQL
+             SELECT  CHR_CR_NAME
+             INTO :CTDDOR86.CHR_CR_NAME
+             FROM CTDDOR86
+             WHERE
+                   FLG_CANCEL <> '1' AND
+                   CHR_C_S_I_I_517  =:CTDDOR86.CHR_C_S_I_I_517;
+       PUT SKIP LIST('NPK APPTDD10 SQLCODE = ',SQLCODE);
+
+       END GET_CR_NAME ;
+      /****************************************************************
+      ** LOAD_DATA                                                  **
+      *********************************************************/
+       LOAD_DATA :PROC ;
+        CTDDMD10 = '' ;
+        /*
+        CTDDMD10.CHR_CODE_BRANCH    = DAT_IO.DDBRANCH ;
+        CTDDMD10.CHR_CR_ADDR_LINE1  = DAT_IO.CHR_CR_ADDR_LINE1 ;
+        CTDDMD10.CHR_CR_ADDR_LINE2  = DAT_IO.CHR_CR_ADDR_LINE2 ;*/
+        CTDDMD10.CHR_CR_NAME        = CTDDOR86.CHR_CR_NAME ;
+        CTDDMD10.CHR_DB_ADDR_LINE2  = DAT_IO.SO_ULT_DB_ADDRESS ;
+        CTDDMD10.CHR_C_S_I_I_517    = DAT_IO.CHR_C_S_I_I_517   ;
+        CTDDMD10.CHR_DB_ADDR_LINE1  = DAT_IO.CHR_DB_ADDR_LINE1 ;
+        CTDDMD10.CHR_DB_ACC_IBAN    = WS_IBAN;
+        CTDDMD10.DEC_ARLOG          = DAT_IO.DEC_ARLOG ;
+
+        CTDDMD10.CHR_DB_ID          = DAT_IO.CHR_DB_ID   ;
+        CTDDMD10.CHR_DB_NAME        = DAT_IO.CHR_DB_NAME ;
+        CTDDMD10.CHR_MANDAT_ID      = DAT_IO.CHR_MANDAT_ID ;
+        CTDDMD10.CHR_ULT_DB_NAME =
+        SUBSTR(DAT_IO.CHR_ULT_DB_NAME,1,48)!!' '!!
+                  DAT_IO.SO_ULT_DB_MID_NAME!!' '!!
+                  DAT_IO.SO_ULT_DB_PROFES;
+        CTDDMD10.CHR_ULT_DB_ID      = DAT_IO.CHR_ULT_DB_ID;
+        CTDDMD10.CHR_USER           = 'DD10';
+        CTDDMD10.DEC_CIDB_CUST      =   DAT_IO.DD_COD_PERSONA ;
+        CTDDMD10.AMT_LIMIT          = DAT_IO.AMT_LIMIT     ;
+      /**********************************************************
+       * LOAD HARD_CODED DATA
+       **********************************************************/
+        CTDDMD10.DAT_LAST_DEBIT     = '01.01.0001' ;
+        CTDDMD10.DAT_LAST_CREDIT    = '01.01.0001' ;
+        CTDDMD10.CHR_LOCAL_INSTR    = 'CORE' ;
+        CTDDMD10.CHR_LOCAL_INSTR    = 'CORE' ;
+        CTDDMD10.CHR_CR_ADDR_CNTRY  = 'GR' ;
+        CTDDMD10.CHR_DB_AG_BR_ID    = '0555' ;
+        CTDDMD10.CHR_SEQ_TYPE       = 'FRST' ;
+        CTDDMD10.CHR_SERV_LEVEL     = 'SEPA' ;
+        CTDDMD10.CHR_DB_ADDR_CNTRY  = 'GR' ;
+        CTDDMD10.CHR_C_S_I_I_T_518  = 'SEPA' ;
+        CTDDMD10.DEC_FILL           = 0 ;
+        CTDDMD10.CHR_DB_AG          = 'EMPOGRAA   ' ;
+        CTDDMD10.CHR_SEND_INST      = 'EMPOGRAA   ' ;
+        CTDDMD10.CHR_RECV_INST      = 'DIASGRA1   ' ;
+        CTDDMD10.CHR_SERV_ID        = 'DDD ' ;
+        CTDDMD10.CHR_TEST_CODE      = 'P' ;
+        CTDDMD10.CHR_FILE_TYPE      = 'FDD' ;
+        CTDDMD10.DEC_GROUP_TYPE     = 40  ;
+        CTDDMD10.CHR_INSTRN_AG      = 'EMPOGRAA   ' ;
+        CTDDMD10.DEC_MSG_TYPE       = 40   ;
+        CTDDMD10.CHR_AMEND_IND      = 'F'   ;
+        CTDDMD10.DEC_RECORD_TYPE    =  0   ;
+      /* STATUS ΑΡΧΙΚΉΣ ΕΙΣΑΓΩΓΉΣ ΑΝ’ΘΕΣΗΣ */
+        CTDDMD10.FLG_STATUS_PROCESS = '0';
+        CTDDMD10.FLG_DIRECTION      = 'I';
+
+    END LOAD_DATA;
+      /****************************************************************
+       ** INSERT_ENTOLI;                                             **
+       ***************************************************************/
+    INSERT_ENTOLI :PROC;
+           EXEC SQL INSERT INTO CTDDMD10
+            (
+               CHR_FILE_ID_TODIAS ,
+               DEC_FILL            ,
+               CHR_SEND_INST       ,
+               CHR_RECV_INST       ,
+               CHR_SERV_ID         ,
+               CHR_TEST_CODE       ,
+               CHR_FILE_TYPE       ,
+               CHR_FILE_ID         ,
+               DEC_GROUP_TYPE      ,
+               DEC_CREAT_DAT_TIME  ,
+               DEC_INTRB_SETL_DAT  ,
+               CHR_SETTL_METHOD    ,
+               CHR_CLEAR_SYSTEM    ,
+               CHR_INSTRN_AG       ,
+               CHR_INSTRT_AG       ,
+               DEC_MSG_TYPE        ,
+               DEC_RECORD_TYPE     ,
+               CHR_INSTR_ID        ,
+               CHR_TR_ID           ,
+               CHR_SERV_LEVEL      ,
+               CHR_LOCAL_INSTR     ,
+               CHR_SEQ_TYPE        ,
+               CHR_MANDAT_ID       ,
+               DEC_DAT_OF_SIGN     ,
+               CHR_AMEND_IND       ,
+               CHR_O_M_I_511       ,
+               CHR_O_C_S_I_N_512   ,
+               CHR_O_C_S_I_I_513   ,
+               CHR_O_C_S_I_I_514   ,
+               CHR_O_D_A_IBAN_515  ,
+               CHR_O_D_A_PROP_516  ,
+               CHR_C_S_I_I_517     ,
+               CHR_C_S_I_I_T_518   ,
+               CHR_CR_NAME         ,
+               CHR_CR_ADDR_LINE1   ,
+               CHR_CR_ADDR_LINE2   ,
+               CHR_CR_ADDR_CNTRY   ,
+               CHR_ULT_CR_NAME     ,
+               CHR_ULT_CR_ID       ,
+               CHR_DB_NAME         ,
+               CHR_DB_ADDR_LINE1   ,
+               CHR_DB_ADDR_LINE2   ,
+               CHR_DB_ADDR_CNTRY   ,
+               CHR_DB_ID           ,
+               CHR_DB_ACC_IBAN     ,
+               CHR_DB_AG           ,
+               CHR_DB_AG_BR_ID     ,
+               CHR_ULT_DB_NAME     ,
+               CHR_ULT_DB_ID       ,
+               DEC_CIDB_CUST       ,
+               CHR_USER           ,
+               FLG_DIRECTION       ,
+               FLG_STATUS_PROCESS  ,
+               FLG_CANCEL          ,
+               CHR_ERROR_DIAS      ,
+               CHR_ERROR_CBOG      ,
+               CHR_CODE_BRANCH    ,
+               AMT_LIMIT          ,
+               DEC_ARLOG          ,
+               DAT_LAST_DEBIT     ,
+               DAT_LAST_CREDIT    ,
+               DAT_DATETIME_INIT   ,
+               DAT_DATETIME_PROC
+            )
+            VALUES
+           (
+            :CTDDMD10.CHR_FILE_ID_TODIAS ,
+            :CTDDMD10.DEC_FILL            ,
+            :CTDDMD10.CHR_SEND_INST       ,
+            :CTDDMD10.CHR_RECV_INST       ,
+            :CTDDMD10.CHR_SERV_ID         ,
+            :CTDDMD10.CHR_TEST_CODE       ,
+            :CTDDMD10.CHR_FILE_TYPE       ,
+            :CTDDMD10.CHR_FILE_ID         ,
+            :CTDDMD10.DEC_GROUP_TYPE      ,
+             SUBSTR(CHAR(CURRENT DATE),7,4)!!
+             SUBSTR(CHAR(CURRENT DATE),4,2)!!
+             SUBSTR(CHAR(CURRENT DATE),1,2)!!
+             SUBSTR(CHAR(CURRENT TIME),1,2)!!
+             SUBSTR(CHAR(CURRENT TIME),4,2)!!
+             SUBSTR(CHAR(CURRENT TIME),7,2),
+            :CTDDMD10.DEC_INTRB_SETL_DAT   ,
+            :CTDDMD10.CHR_SETTL_METHOD    ,
+            :CTDDMD10.CHR_CLEAR_SYSTEM    ,
+            :CTDDMD10.CHR_INSTRN_AG       ,
+            :CTDDMD10.CHR_INSTRT_AG       ,
+            :CTDDMD10.DEC_MSG_TYPE        ,
+            :CTDDMD10.DEC_RECORD_TYPE     ,
+            :CTDDMD10.CHR_INSTR_ID        ,
+            :CTDDMD10.CHR_TR_ID           ,
+            :CTDDMD10.CHR_SERV_LEVEL      ,
+            :CTDDMD10.CHR_LOCAL_INSTR     ,
+            :CTDDMD10.CHR_SEQ_TYPE        ,
+            :CTDDMD10.CHR_MANDAT_ID       ,
+             DEC(
+             SUBSTR(CHAR(CURRENT DATE),7,4)!!
+             SUBSTR(CHAR(CURRENT DATE),4,2)!!
+             SUBSTR(CHAR(CURRENT DATE),1,2),8),
+            :CTDDMD10.CHR_AMEND_IND       ,
+            :CTDDMD10.CHR_O_M_I_511       ,
+            :CTDDMD10.CHR_O_C_S_I_N_512   ,
+            :CTDDMD10.CHR_O_C_S_I_I_513   ,
+            :CTDDMD10.CHR_O_C_S_I_I_514   ,
+            :CTDDMD10.CHR_O_D_A_IBAN_515  ,
+            :CTDDMD10.CHR_O_D_A_PROP_516  ,
+            :CTDDMD10.CHR_C_S_I_I_517     ,
+            :CTDDMD10.CHR_C_S_I_I_T_518   ,
+            :CTDDMD10.CHR_CR_NAME         ,
+            :CTDDMD10.CHR_CR_ADDR_LINE1   ,
+            :CTDDMD10.CHR_CR_ADDR_LINE2   ,
+            :CTDDMD10.CHR_CR_ADDR_CNTRY   ,
+            :CTDDMD10.CHR_ULT_CR_NAME     ,
+            :CTDDMD10.CHR_ULT_CR_ID       ,
+            :CTDDMD10.CHR_DB_NAME         ,
+            :CTDDMD10.CHR_DB_ADDR_LINE1   ,
+            :CTDDMD10.CHR_DB_ADDR_LINE2   ,
+            :CTDDMD10.CHR_DB_ADDR_CNTRY   ,
+            :CTDDMD10.CHR_DB_ID           ,
+            :CTDDMD10.CHR_DB_ACC_IBAN     ,
+            :CTDDMD10.CHR_DB_AG           ,
+            :CTDDMD10.CHR_DB_AG_BR_ID     ,
+            :CTDDMD10.CHR_ULT_DB_NAME     ,
+            :CTDDMD10.CHR_ULT_DB_ID       ,
+            :CTDDMD10.DEC_CIDB_CUST       ,
+            :CTDDMD10.CHR_USER           ,
+            :CTDDMD10.FLG_DIRECTION       ,
+            :CTDDMD10.FLG_STATUS_PROCESS  ,
+            :CTDDMD10.FLG_CANCEL          ,
+            :CTDDMD10.CHR_ERROR_DIAS      ,
+            :CTDDMD10.CHR_ERROR_CBOG      ,
+            :CTDDMD10.CHR_CODE_BRANCH    ,
+            :CTDDMD10.AMT_LIMIT          ,
+            :CTDDMD10.DEC_ARLOG          ,
+            :CTDDMD10.DAT_LAST_DEBIT     ,
+            :CTDDMD10.DAT_LAST_CREDIT    ,
+            CURRENT TIMESTAMP,
+            CURRENT TIMESTAMP
+            ) ;
+
+           IF SQLCODE ^= 0 THEN DO;
+               CA_ANSWER_CODE = 7;
+               CA_ANSWER_DESC =
+               'Λαθος κατα την εισαγωγή ανάθεσης SQLCODE = '
+               !!SQLCODE   ;
+         /* PUT SKIP LIST('ERROR NPK = ',CA_ANSWER_DESC);*/
+               EXEC CICS SYNCPOINT ROLLBACK;
+               EXEC CICS RETURN;
+           END;
+      END INSERT_ENTOLI ;
+      /*************************************************************/
+       LOAD_ISTORIKO        : PROC;
+      /*****************************************************************
+      ** LOAD_ISTORIKO                                              **
+      ****************************************************************/
+           EXEC SQL SELECT
+              DEC_FILL                        ,
+              CHR_SEND_INST                   ,
+              CHR_RECV_INST                   ,
+              CHR_SERV_ID                     ,
+              CHR_TEST_CODE                   ,
+              CHR_FILE_TYPE                   ,
+              CHR_FILE_ID                     ,
+              DEC_GROUP_TYPE                  ,
+              DEC_CREAT_DAT_TIME              ,
+              DEC_INTRB_SETL_DAT              ,
+              CHR_SETTL_METHOD                ,
+              CHR_CLEAR_SYSTEM                ,
+              CHR_INSTRN_AG                   ,
+              CHR_INSTRT_AG                   ,
+              DEC_RECORD_TYPE                 ,
+              DEC_MSG_TYPE                    ,
+              CHR_INSTR_ID                    ,
+              CHR_TR_ID                       ,
+              CHR_SERV_LEVEL                  ,
+              CHR_LOCAL_INSTR                 ,
+              CHR_SEQ_TYPE                    ,
+              CHR_MANDAT_ID                   ,
+              DEC_DAT_OF_SIGN                 ,
+              CHR_AMEND_IND                   ,
+              CHR_O_M_I_511                   ,
+              CHR_O_C_S_I_N_512               ,
+              CHR_O_C_S_I_I_513               ,
+              CHR_O_C_S_I_I_514               ,
+              CHR_O_D_A_IBAN_515              ,
+              CHR_O_D_A_PROP_516              ,
+              CHR_C_S_I_I_517                 ,
+              CHR_C_S_I_I_T_518               ,
+              CHR_CR_NAME                     ,
+              CHR_CR_ADDR_LINE1               ,
+              CHR_CR_ADDR_LINE2               ,
+              CHR_CR_ADDR_CNTRY               ,
+              CHR_ULT_CR_NAME                 ,
+              CHR_ULT_CR_ID                   ,
+              CHR_DB_NAME                     ,
+              CHR_DB_ADDR_LINE1               ,
+              CHR_DB_ADDR_LINE2               ,
+              CHR_DB_ADDR_CNTRY               ,
+              CHR_DB_ID                       ,
+              CHR_DB_ACC_IBAN                 ,
+              CHR_DB_AG                       ,
+              CHR_DB_AG_BR_ID                 ,
+              CHR_ULT_DB_NAME                 ,
+              CHR_ULT_DB_ID                   ,
+              DEC_CIDB_CUST                   ,
+              CHR_USER                        ,
+              FLG_DIRECTION                   ,
+              FLG_STATUS_PROCESS              ,
+              FLG_CANCEL                      ,
+              CHR_ERROR_DIAS                  ,
+              CHR_ERROR_CBOG                  ,
+              CHR_FILE_ID_TODIAS              ,
+              DAT_DATETIME_INIT               ,
+              DAT_DATETIME_PROC               ,
+              DEC_AA                          ,
+              DEC_AA_RM20                     ,
+              AMT_LIMIT                       ,
+              CHR_TERMID_REFUSAL              ,
+              CHR_TERMID_REFUND               ,
+              CHR_TERMID_AUTHOR               ,
+              CHR_INFORM                      ,
+              DEC_DAT_REFUSAL                 ,
+              DEC_DAT_REFUND                  ,
+              DEC_DAT_AUTHOR                  ,
+              DEC_TIME_REFUSAL                ,
+              DEC_TIME_REFUND                 ,
+              DEC_TIME_AUTHOR                 ,
+              FLG_STATUS_REFUSAL              ,
+              FLG_STATUS_REFUND               ,
+              FLG_STATUS_AUTHOR               ,
+              CHR_VALID                       ,
+              DEC_NUM_REFUSAL                 ,
+              CHR_OK_REFUSAL                  ,
+              CHR_CODE_BRANCH,
+              DEC_ARLOG      ,
+              DAT_LAST_DEBIT ,
+              DAT_LAST_CREDIT ,
+              CHR_OK_AUTHOR
+             INTO
+             :CTDDMD15.DEC_FILL               ,
+             :CTDDMD15.CHR_SEND_INST          ,
+             :CTDDMD15.CHR_RECV_INST          ,
+             :CTDDMD15.CHR_SERV_ID            ,
+             :CTDDMD15.CHR_TEST_CODE          ,
+             :CTDDMD15.CHR_FILE_TYPE          ,
+             :CTDDMD15.CHR_FILE_ID            ,
+             :CTDDMD15.DEC_GROUP_TYPE         ,
+             :CTDDMD15.DEC_CREAT_DAT_TIME     ,
+             :CTDDMD15.DEC_INTRB_SETL_DAT     ,
+             :CTDDMD15.CHR_SETTL_METHOD       ,
+             :CTDDMD15.CHR_CLEAR_SYSTEM       ,
+             :CTDDMD15.CHR_INSTRN_AG          ,
+             :CTDDMD15.CHR_INSTRT_AG          ,
+             :CTDDMD15.DEC_RECORD_TYPE        ,
+             :CTDDMD15.DEC_MSG_TYPE           ,
+             :CTDDMD15.CHR_INSTR_ID           ,
+             :CTDDMD15.CHR_TR_ID              ,
+             :CTDDMD15.CHR_SERV_LEVEL         ,
+             :CTDDMD15.CHR_LOCAL_INSTR        ,
+             :CTDDMD15.CHR_SEQ_TYPE           ,
+             :CTDDMD15.CHR_MANDAT_ID          ,
+             :CTDDMD15.DEC_DAT_OF_SIGN        ,
+             :CTDDMD15.CHR_AMEND_IND          ,
+             :CTDDMD15.CHR_O_M_I_511          ,
+             :CTDDMD15.CHR_O_C_S_I_N_512      ,
+             :CTDDMD15.CHR_O_C_S_I_I_513      ,
+             :CTDDMD15.CHR_O_C_S_I_I_514      ,
+             :CTDDMD15.CHR_O_D_A_IBAN_515     ,
+             :CTDDMD15.CHR_O_D_A_PROP_516     ,
+             :CTDDMD15.CHR_C_S_I_I_517        ,
+             :CTDDMD15.CHR_C_S_I_I_T_518      ,
+             :CTDDMD15.CHR_CR_NAME            ,
+             :CTDDMD15.CHR_CR_ADDR_LINE1      ,
+             :CTDDMD15.CHR_CR_ADDR_LINE2      ,
+             :CTDDMD15.CHR_CR_ADDR_CNTRY      ,
+             :CTDDMD15.CHR_ULT_CR_NAME        ,
+             :CTDDMD15.CHR_ULT_CR_ID          ,
+             :CTDDMD15.CHR_DB_NAME            ,
+             :CTDDMD15.CHR_DB_ADDR_LINE1      ,
+             :CTDDMD15.CHR_DB_ADDR_LINE2      ,
+             :CTDDMD15.CHR_DB_ADDR_CNTRY      ,
+             :CTDDMD15.CHR_DB_ID              ,
+             :CTDDMD15.CHR_DB_ACC_IBAN        ,
+             :CTDDMD15.CHR_DB_AG              ,
+             :CTDDMD15.CHR_DB_AG_BR_ID        ,
+             :CTDDMD15.CHR_ULT_DB_NAME        ,
+             :CTDDMD15.CHR_ULT_DB_ID          ,
+             :CTDDMD15.DEC_CIDB_CUST          ,
+             :CTDDMD15.CHR_USER               ,
+             :CTDDMD15.FLG_DIRECTION          ,
+             :CTDDMD15.FLG_STATUS_PROCESS     ,
+             :CTDDMD15.FLG_CANCEL             ,
+             :CTDDMD15.CHR_ERROR_DIAS         ,
+             :CTDDMD15.CHR_ERROR_CBOG         ,
+             :CTDDMD15.CHR_FILE_ID_TODIAS     ,
+             :CTDDMD15.DAT_DATETIME_INIT      ,
+             :CTDDMD15.DAT_DATETIME_PROC      ,
+             :CTDDMD15.DEC_AA                 ,
+             :CTDDMD15.DEC_AA_RM20            ,
+             :CTDDMD15.AMT_LIMIT              ,
+             :CTDDMD15.CHR_TERMID_REFUSAL     ,
+             :CTDDMD15.CHR_TERMID_REFUND      ,
+             :CTDDMD15.CHR_TERMID_AUTHOR      ,
+             :CTDDMD15.CHR_INFORM             ,
+             :CTDDMD15.DEC_DAT_REFUSAL        ,
+             :CTDDMD15.DEC_DAT_REFUND         ,
+             :CTDDMD15.DEC_DAT_AUTHOR         ,
+             :CTDDMD15.DEC_TIME_REFUSAL       ,
+             :CTDDMD15.DEC_TIME_REFUND        ,
+             :CTDDMD15.DEC_TIME_AUTHOR        ,
+             :CTDDMD15.FLG_STATUS_REFUSAL     ,
+             :CTDDMD15.FLG_STATUS_REFUND      ,
+             :CTDDMD15.FLG_STATUS_AUTHOR      ,
+             :CTDDMD15.CHR_VALID              ,
+             :CTDDMD15.DEC_NUM_REFUSAL        ,
+             :CTDDMD15.CHR_OK_REFUSAL         ,
+             :CTDDMD15.CHR_CODE_BRANCH,
+             :CTDDMD15.DEC_ARLOG      ,
+             :CTDDMD15.DAT_LAST_DEBIT ,
+             :CTDDMD15.DAT_LAST_CREDIT,
+             :CTDDMD15.CHR_OK_AUTHOR
+             FROM    CTDDMD10
+             WHERE
+  /*          FLG_STATUS_PROCESS  = '0'                       AND */
+              CHR_MANDAT_ID       = :CTDDMD10.CHR_MANDAT_ID   AND
+              CHR_C_S_I_I_517     = :CTDDMD10.CHR_C_S_I_I_517 AND
+              DEC_ARLOG           = :CTDDMD10.DEC_ARLOG   ;
+
+           IF SQLCODE ^= 0 THEN DO;
+               CA_ANSWER_CODE = 8;
+               CA_ANSWER_DESC =
+               'Λαθος κατα την αναζήτηση Ιστορικού SQLCODE = '
+               !!SQLCODE   ;
+
+        /* PUT SKIP LIST('ERROR NPK = ',CA_ANSWER_DESC);*/
+               EXEC CICS SYNCPOINT ROLLBACK;
+               EXEC CICS RETURN;
+
+           END;
+       END LOAD_ISTORIKO ;
+      /*--------------------------------------------------------------*/
+       INSERT_ISTORIKO :PROC ;
+      /*****************************************************************
+      ** INSERT_ISTORIKO                                          **
+      ****************************************************************/
+           EXEC SQL INSERT INTO CTDDMD15
+           (
+             DEC_FILL               ,
+             CHR_SEND_INST          ,
+             CHR_RECV_INST          ,
+             CHR_SERV_ID            ,
+             CHR_TEST_CODE          ,
+             CHR_FILE_TYPE          ,
+             CHR_FILE_ID            ,
+             DEC_GROUP_TYPE         ,
+             DEC_CREAT_DAT_TIME     ,
+             DEC_INTRB_SETL_DAT     ,
+             CHR_SETTL_METHOD       ,
+             CHR_CLEAR_SYSTEM       ,
+             CHR_INSTRN_AG          ,
+             CHR_INSTRT_AG          ,
+             DEC_RECORD_TYPE        ,
+             DEC_MSG_TYPE           ,
+             CHR_INSTR_ID           ,
+             CHR_TR_ID              ,
+             CHR_SERV_LEVEL         ,
+             CHR_LOCAL_INSTR        ,
+             CHR_SEQ_TYPE           ,
+             CHR_MANDAT_ID          ,
+             DEC_DAT_OF_SIGN        ,
+             CHR_AMEND_IND          ,
+             CHR_O_M_I_511          ,
+             CHR_O_C_S_I_N_512      ,
+             CHR_O_C_S_I_I_513      ,
+             CHR_O_C_S_I_I_514      ,
+             CHR_O_D_A_IBAN_515     ,
+             CHR_O_D_A_PROP_516     ,
+             CHR_C_S_I_I_517        ,
+             CHR_C_S_I_I_T_518      ,
+             CHR_CR_NAME            ,
+             CHR_CR_ADDR_LINE1      ,
+             CHR_CR_ADDR_LINE2      ,
+             CHR_CR_ADDR_CNTRY      ,
+             CHR_ULT_CR_NAME        ,
+             CHR_ULT_CR_ID          ,
+             CHR_DB_NAME            ,
+             CHR_DB_ADDR_LINE1      ,
+             CHR_DB_ADDR_LINE2      ,
+             CHR_DB_ADDR_CNTRY      ,
+             CHR_DB_ID              ,
+             CHR_DB_ACC_IBAN        ,
+             CHR_DB_AG              ,
+             CHR_DB_AG_BR_ID        ,
+             CHR_ULT_DB_NAME        ,
+             CHR_ULT_DB_ID          ,
+             DEC_CIDB_CUST          ,
+             CHR_USER               ,
+             FLG_DIRECTION          ,
+             FLG_STATUS_PROCESS     ,
+             FLG_CANCEL             ,
+             CHR_ERROR_DIAS         ,
+             CHR_ERROR_CBOG         ,
+             CHR_FILE_ID_TODIAS     ,
+             DAT_DATETIME_INIT      ,
+             DAT_DATETIME_PROC      ,
+             DEC_AA                 ,
+             DEC_AA_RM20            ,
+             AMT_LIMIT              ,
+             CHR_TERMID_REFUSAL     ,
+             CHR_TERMID_REFUND      ,
+             CHR_TERMID_AUTHOR      ,
+             CHR_INFORM             ,
+             DEC_DAT_REFUSAL        ,
+             DEC_DAT_REFUND         ,
+             DEC_DAT_AUTHOR         ,
+             DEC_TIME_REFUSAL       ,
+             DEC_TIME_REFUND        ,
+             DEC_TIME_AUTHOR        ,
+             FLG_STATUS_REFUSAL     ,
+             FLG_STATUS_REFUND      ,
+             FLG_STATUS_AUTHOR      ,
+             CHR_VALID              ,
+             DEC_NUM_REFUSAL        ,
+             CHR_OK_REFUSAL         ,
+             CHR_CODE_BRANCH        ,
+             DAT_LAST_DEBIT         ,
+             DAT_LAST_CREDIT        ,
+             CHR_OK_AUTHOR
+            )
+             VALUES
+             (
+             :CTDDMD15.DEC_FILL               ,
+             :CTDDMD15.CHR_SEND_INST          ,
+             :CTDDMD15.CHR_RECV_INST          ,
+             :CTDDMD15.CHR_SERV_ID            ,
+             :CTDDMD15.CHR_TEST_CODE          ,
+             :CTDDMD15.CHR_FILE_TYPE          ,
+             :CTDDMD15.CHR_FILE_ID            ,
+             :CTDDMD15.DEC_GROUP_TYPE         ,
+             :CTDDMD15.DEC_CREAT_DAT_TIME     ,
+             :CTDDMD15.DEC_INTRB_SETL_DAT     ,
+             :CTDDMD15.CHR_SETTL_METHOD       ,
+             :CTDDMD15.CHR_CLEAR_SYSTEM       ,
+             :CTDDMD15.CHR_INSTRN_AG          ,
+             :CTDDMD15.CHR_INSTRT_AG          ,
+             :CTDDMD15.DEC_RECORD_TYPE        ,
+             :CTDDMD15.DEC_MSG_TYPE           ,
+             :CTDDMD15.CHR_INSTR_ID           ,
+             :CTDDMD15.CHR_TR_ID              ,
+             :CTDDMD15.CHR_SERV_LEVEL         ,
+             :CTDDMD15.CHR_LOCAL_INSTR        ,
+             :CTDDMD15.CHR_SEQ_TYPE           ,
+             :CTDDMD15.CHR_MANDAT_ID          ,
+             :CTDDMD15.DEC_DAT_OF_SIGN        ,
+             :CTDDMD15.CHR_AMEND_IND          ,
+             :CTDDMD15.CHR_O_M_I_511          ,
+             :CTDDMD15.CHR_O_C_S_I_N_512      ,
+             :CTDDMD15.CHR_O_C_S_I_I_513      ,
+             :CTDDMD15.CHR_O_C_S_I_I_514      ,
+             :CTDDMD15.CHR_O_D_A_IBAN_515     ,
+             :CTDDMD15.CHR_O_D_A_PROP_516     ,
+             :CTDDMD15.CHR_C_S_I_I_517        ,
+             :CTDDMD15.CHR_C_S_I_I_T_518      ,
+             :CTDDMD15.CHR_CR_NAME            ,
+             :CTDDMD15.CHR_CR_ADDR_LINE1      ,
+             :CTDDMD15.CHR_CR_ADDR_LINE2      ,
+             :CTDDMD15.CHR_CR_ADDR_CNTRY      ,
+             :CTDDMD15.CHR_ULT_CR_NAME        ,
+             :CTDDMD15.CHR_ULT_CR_ID          ,
+             :CTDDMD15.CHR_DB_NAME            ,
+             :CTDDMD15.CHR_DB_ADDR_LINE1      ,
+             :CTDDMD15.CHR_DB_ADDR_LINE2      ,
+             :CTDDMD15.CHR_DB_ADDR_CNTRY      ,
+             :CTDDMD15.CHR_DB_ID              ,
+             :CTDDMD15.CHR_DB_ACC_IBAN        ,
+             :CTDDMD15.CHR_DB_AG              ,
+             :CTDDMD15.CHR_DB_AG_BR_ID        ,
+             :CTDDMD15.CHR_ULT_DB_NAME        ,
+             :CTDDMD15.CHR_ULT_DB_ID          ,
+             :CTDDMD15.DEC_CIDB_CUST          ,
+             :CTDDMD15.CHR_USER               ,
+             :CTDDMD15.FLG_DIRECTION          ,
+             :CTDDMD15.FLG_STATUS_PROCESS     ,
+             :CTDDMD15.FLG_CANCEL             ,
+             :CTDDMD15.CHR_ERROR_DIAS         ,
+             :CTDDMD15.CHR_ERROR_CBOG         ,
+             :CTDDMD15.CHR_FILE_ID_TODIAS     ,
+             :CTDDMD15.DAT_DATETIME_INIT      ,
+             CURRENT TIMESTAMP                ,
+             :CTDDMD15.DEC_AA                 ,
+             :CTDDMD15.DEC_AA_RM20            ,
+             :CTDDMD15.AMT_LIMIT              ,
+             :CTDDMD15.CHR_TERMID_REFUSAL     ,
+             :CTDDMD15.CHR_TERMID_REFUND      ,
+             :CTDDMD15.CHR_TERMID_AUTHOR      ,
+             :CTDDMD15.CHR_INFORM             ,
+             :CTDDMD15.DEC_DAT_REFUSAL        ,
+             :CTDDMD15.DEC_DAT_REFUND         ,
+             :CTDDMD15.DEC_DAT_AUTHOR         ,
+             :CTDDMD15.DEC_TIME_REFUSAL       ,
+             :CTDDMD15.DEC_TIME_REFUND        ,
+             :CTDDMD15.DEC_TIME_AUTHOR        ,
+             :CTDDMD15.FLG_STATUS_REFUSAL     ,
+             :CTDDMD15.FLG_STATUS_REFUND      ,
+             :CTDDMD15.FLG_STATUS_AUTHOR      ,
+             :CTDDMD15.CHR_VALID              ,
+             :CTDDMD15.DEC_NUM_REFUSAL        ,
+             :CTDDMD15.CHR_OK_REFUSAL         ,
+             :CTDDMD15.CHR_CODE_BRANCH,
+             :CTDDMD15.DAT_LAST_DEBIT ,
+             :CTDDMD15.DAT_LAST_CREDIT,
+             :CTDDMD15.CHR_OK_AUTHOR
+             ) ;
+           IF SQLCODE ^= 0 THEN DO;
+
+               CA_ANSWER_CODE = 9;
+               CA_ANSWER_DESC =
+               'Λαθος κατα την εισαγωγή  Ιστορικού SQLCODE = '
+               !!SQLCODE   ;
+
+        /* PUT SKIP LIST('ERROR NPK = ',CA_ANSWER_DESC);*/
+               EXEC CICS SYNCPOINT ROLLBACK;
+               EXEC CICS RETURN;
+
+           END;
+       END INSERT_ISTORIKO ;
+ /*------------------------------------------------------------------*/
+     CREATE_IBAN  : PROC (WS_BRANCH,WS_LOGAR) RETURNS (CHAR(27));
+       DCL WS_BRANCH  CHAR(04) ;
+       DCL WS_LOGAR   CHAR(08) ;
+     DCL MY_IBAN    CHAR(27) ;
+     DCL 1 MYIBAN BASED(ADDR(MY_IBAN)) ,
+          2 IBANCC    CHAR(2), /* IBAN -COUNTRY CODE */
+          2 IBANCD    PIC'99', /* IBAN -CHECK DIGITS */
+          2 IBANBANK  PIC'999',
+          2 IBANBRAN  PIC'9999',
+          2 IBANACCNO CHAR(16) ;
+     DCL   TEMPIBAN VAR CHAR(32);
+     DCL (YP,CD) PIC'99';
+     CD = 0;
+     TEMPIBAN = '0012'!!
+                 WS_BRANCH!!
+                 RIGHT(TRIM(WS_LOGAR),16 ,'0')!!
+                 '162700';
+
+       DO WHILE (LENGTH(TEMPIBAN ) > 9);
+         YP = MOD(SUBSTR(TEMPIBAN ,1,9),97);
+         TEMPIBAN = YP!!SUBSTR(TEMPIBAN ,10);
+       END;
+       YP = MOD(TEMPIBAN  ,97);
+       IF CD = 00 THEN CD = 98 - YP;
+       IBANCC    = 'GR';
+       IBANCD    = CD;
+       IBANBANK  = '0012';
+       IBANBRAN  = WS_BRANCH;
+       IBANACCNO = RIGHT(TRIM(WS_LOGAR),16 ,'0');
+       /*PUT SKIP LIST('MYIBAN = ',MYIBAN);*/
+       RETURN (MY_IBAN);
+     END  CREATE_IBAN                ;
+ /*------------------------------------------------------------------*/
+      /****************************************************************
+      ** GET_BRANCH                                                 **
+      ****************************************************************/
+       GET_BRANCH :PROC RETURNS (CHAR(04));
+           DCL BRANCH CHAR(4);
+           T04CNV97 = '';
+           IF DAT_IO.DEC_ARLOG >= 80000000 THEN DO;
+               T04CNV97.COD_EFARM = '70' ;
+               T04CNV97.NUM_AR_LOGAR = '';
+               SUBSTR(T04CNV97.NUM_AR_LOGAR,1,8 ) = DAT_IO.DEC_ARLOG ;
+               SUBSTR(T04CNV97.NUM_AR_LOGAR,17,2) = '01';
+           END;
+           ELSE DO ;
+               T04CNV97.COD_EFARM   = '90' ;
+               T04CNV97.NUM_AR_LOGAR = '';
+               SUBSTR(T04CNV97.NUM_AR_LOGAR,1,1 ) =  '0'     ;
+               SUBSTR(T04CNV97.NUM_AR_LOGAR,2,8 ) = DAT_IO.DEC_ARLOG ;
+               SUBSTR(T04CNV97.NUM_AR_LOGAR,17,2) =  '01';
+           END ;
+          T04CNV97.IND_OPEN_CLOSE = 0;
+          T04CNV97.COD_EMPRESA    = '0012' ;
+          EXEC SQL
+             SELECT COD_KATMA
+             INTO   :T04CNV97.COD_KATMA
+             FROM    T04CNV97
+             WHERE  COD_EMPRESA  = :T04CNV97.COD_EMPRESA
+               AND  COD_EFARM    = :T04CNV97.COD_EFARM
+               AND  NUM_AR_LOGAR = :T04CNV97.NUM_AR_LOGAR ;
+           IF SQLCODE ^= 0 THEN DO;
+                      BRANCH = 0;
+           END;
+           ELSE DO;
+                       BRANCH =  T04CNV97.COD_KATMA;
+           END;
+           RETURN(BRANCH);
+      END GET_BRANCH;
+ END   DD10;
+ /*
+        DEC_FILL               ,
+        CHR_SEND_INST          ,
+        CHR_RECV_INST          ,
+        CHR_SERV_ID            ,
+        CHR_TEST_CODE          ,
+        CHR_FILE_TYPE          ,
+        CHR_FILE_ID            ,
+        DEC_GROUP_TYPE         ,
+        DEC_CREAT_DAT_TIME     ,
+        DEC_INTRB_SETL_DAT     ,
+        CHR_SETTL_METHOD       ,
+        CHR_CLEAR_SYSTEM       ,
+        CHR_INSTRN_AG          ,
+        CHR_INSTRT_AG          ,
+        DEC_RECORD_TYPE        ,
+        DEC_MSG_TYPE           ,
+        CHR_INSTR_ID           ,
+        CHR_TR_ID              ,
+        CHR_SERV_LEVEL         ,
+        CHR_LOCAL_INSTR        ,
+        CHR_SEQ_TYPE           ,
+        CHR_MANDAT_ID          ,
+        DEC_DAT_OF_SIGN        ,
+        CHR_AMEND_IND          ,
+        CHR_O_M_I_511          ,
+        CHR_O_C_S_I_N_512      ,
+        CHR_O_C_S_I_I_513      ,
+        CHR_O_C_S_I_I_514      ,
+        CHR_O_D_A_IBAN_515     ,
+        CHR_O_D_A_PROP_516     ,
+        CHR_C_S_I_I_517        ,
+        CHR_C_S_I_I_T_518      ,
+        CHR_CR_NAME            ,
+        CHR_CR_ADDR_LINE1      ,
+        CHR_CR_ADDR_LINE2      ,
+        CHR_CR_ADDR_CNTRY      ,
+        CHR_ULT_CR_NAME        ,
+        CHR_ULT_CR_ID          ,
+        CHR_DB_NAME            ,
+        CHR_DB_ADDR_LINE1      ,
+        CHR_DB_ADDR_LINE2      ,
+        CHR_DB_ADDR_CNTRY      ,
+        CHR_DB_ID              ,
+        CHR_DB_ACC_IBAN        ,
+        CHR_DB_AG              ,
+        CHR_DB_AG_BR_ID        ,
+        CHR_ULT_DB_NAME        ,
+        CHR_ULT_DB_ID          ,
+        DEC_CIDB_CUST          ,
+        CHR_USER               ,
+        FLG_DIRECTION          ,
+        FLG_STATUS_PROCESS     ,
+        FLG_CANCEL             ,
+        CHR_ERROR_DIAS         ,
+        CHR_ERROR_CBOG         ,
+        CHR_FILE_ID_TODIAS     ,
+        DAT_DATETIME_INIT      ,
+        DAT_DATETIME_PROC      ,
+        DEC_AA                 ,
+        DEC_AA_RM20            ,
+        AMT_LIMIT              ,
+        CHR_TERMID_REFUSAL     ,
+        CHR_TERMID_REFUND      ,
+        CHR_TERMID_AUTHOR      ,
+        CHR_INFORM             ,
+        DEC_DAT_REFUSAL        ,
+        DEC_DAT_REFUND         ,
+        DEC_DAT_AUTHOR         ,
+        DEC_TIME_REFUSAL       ,
+        DEC_TIME_REFUND        ,
+        DEC_TIME_AUTHOR        ,
+        FLG_STATUS_REFUSAL     ,
+        FLG_STATUS_REFUND      ,
+        FLG_STATUS_AUTHOR      ,
+        CHR_VALID              ,
+        DEC_NUM_REFUSAL        ,
+        CHR_OK_REFUSAL         ,
+        CHR_OK_AUTHOR          ,
+        CHR_CODE_BRANCH        ,
+        DEC_ARLOG              ,
+        DAT_LAST_DEBIT         ,
+        DAT_LAST_CREDIT        ,
+        CHR_INTERNET           ,
+        CHR_ERROR_FDR          ,
+        CHR_ERROR_CMF          ,
+        CHR_GENER_FPR          ,
+        CHR_GENER_FDR          ,
+        CHR_GENER_FDO          ,
+        CHR_GENER_FDI          ,
+        CHR_APROVAL
+
+        :CTDDMD10.DEC_FILL               ,
+        :CTDDMD10.CHR_SEND_INST          ,
+        :CTDDMD10.CHR_RECV_INST          ,
+        :CTDDMD10.CHR_SERV_ID            ,
+        :CTDDMD10.CHR_TEST_CODE          ,
+        :CTDDMD10.CHR_FILE_TYPE          ,
+        :CTDDMD10.CHR_FILE_ID            ,
+        :CTDDMD10.DEC_GROUP_TYPE         ,
+        :CTDDMD10.DEC_CREAT_DAT_TIME     ,
+        :CTDDMD10.DEC_INTRB_SETL_DAT     ,
+        :CTDDMD10.CHR_SETTL_METHOD       ,
+        :CTDDMD10.CHR_CLEAR_SYSTEM       ,
+        :CTDDMD10.CHR_INSTRN_AG          ,
+        :CTDDMD10.CHR_INSTRT_AG          ,
+        :CTDDMD10.DEC_RECORD_TYPE        ,
+        :CTDDMD10.DEC_MSG_TYPE           ,
+        :CTDDMD10.CHR_INSTR_ID           ,
+        :CTDDMD10.CHR_TR_ID              ,
+        :CTDDMD10.CHR_SERV_LEVEL         ,
+        :CTDDMD10.CHR_LOCAL_INSTR        ,
+        :CTDDMD10.CHR_SEQ_TYPE           ,
+        :CTDDMD10.CHR_MANDAT_ID          ,
+        :CTDDMD10.DEC_DAT_OF_SIGN        ,
+        :CTDDMD10.CHR_AMEND_IND          ,
+        :CTDDMD10.CHR_O_M_I_511          ,
+        :CTDDMD10.CHR_O_C_S_I_N_512      ,
+        :CTDDMD10.CHR_O_C_S_I_I_513      ,
+        :CTDDMD10.CHR_O_C_S_I_I_514      ,
+        :CTDDMD10.CHR_O_D_A_IBAN_515     ,
+        :CTDDMD10.CHR_O_D_A_PROP_516     ,
+        :CTDDMD10.CHR_C_S_I_I_517        ,
+        :CTDDMD10.CHR_C_S_I_I_T_518      ,
+        :CTDDMD10.CHR_CR_NAME            ,
+        :CTDDMD10.CHR_CR_ADDR_LINE1      ,
+        :CTDDMD10.CHR_CR_ADDR_LINE2      ,
+        :CTDDMD10.CHR_CR_ADDR_CNTRY      ,
+        :CTDDMD10.CHR_ULT_CR_NAME        ,
+        :CTDDMD10.CHR_ULT_CR_ID          ,
+        :CTDDMD10.CHR_DB_NAME            ,
+        :CTDDMD10.CHR_DB_ADDR_LINE1      ,
+        :CTDDMD10.CHR_DB_ADDR_LINE2      ,
+        :CTDDMD10.CHR_DB_ADDR_CNTRY      ,
+        :CTDDMD10.CHR_DB_ID              ,
+        :CTDDMD10.CHR_DB_ACC_IBAN        ,
+        :CTDDMD10.CHR_DB_AG              ,
+        :CTDDMD10.CHR_DB_AG_BR_ID        ,
+        :CTDDMD10.CHR_ULT_DB_NAME        ,
+        :CTDDMD10.CHR_ULT_DB_ID          ,
+        :CTDDMD10.DEC_CIDB_CUST          ,
+        :CTDDMD10.CHR_USER               ,
+        :CTDDMD10.FLG_DIRECTION          ,
+        :CTDDMD10.FLG_STATUS_PROCESS     ,
+        :CTDDMD10.FLG_CANCEL             ,
+        :CTDDMD10.CHR_ERROR_DIAS         ,
+        :CTDDMD10.CHR_ERROR_CBOG         ,
+        :CTDDMD10.CHR_FILE_ID_TODIAS     ,
+        :CTDDMD10.DAT_DATETIME_INIT      ,
+        :CTDDMD10.DAT_DATETIME_PROC      ,
+        :CTDDMD10.DEC_AA                 ,
+        :CTDDMD10.DEC_AA_RM20            ,
+        :CTDDMD10.AMT_LIMIT              ,
+        :CTDDMD10.CHR_TERMID_REFUSAL     ,
+        :CTDDMD10.CHR_TERMID_REFUND      ,
+        :CTDDMD10.CHR_TERMID_AUTHOR      ,
+        :CTDDMD10.CHR_INFORM             ,
+        :CTDDMD10.DEC_DAT_REFUSAL        ,
+        :CTDDMD10.DEC_DAT_REFUND         ,
+        :CTDDMD10.DEC_DAT_AUTHOR         ,
+        :CTDDMD10.DEC_TIME_REFUSAL       ,
+        :CTDDMD10.DEC_TIME_REFUND        ,
+        :CTDDMD10.DEC_TIME_AUTHOR        ,
+        :CTDDMD10.FLG_STATUS_REFUSAL     ,
+        :CTDDMD10.FLG_STATUS_REFUND      ,
+        :CTDDMD10.FLG_STATUS_AUTHOR      ,
+        :CTDDMD10.CHR_VALID              ,
+        :CTDDMD10.DEC_NUM_REFUSAL        ,
+        :CTDDMD10.CHR_OK_REFUSAL         ,
+        :CTDDMD10.CHR_OK_AUTHOR          ,
+        :CTDDMD10.CHR_CODE_BRANCH        ,
+        :CTDDMD10.DEC_ARLOG              ,
+        :CTDDMD10.DAT_LAST_DEBIT         ,
+        :CTDDMD10.DAT_LAST_CREDIT        ,
+        :CTDDMD10.CHR_INTERNET           ,
+        :CTDDMD10.CHR_ERROR_FDR          ,
+        :CTDDMD10.CHR_ERROR_CMF          ,
+        :CTDDMD10.CHR_GENER_FPR          ,
+        :CTDDMD10.CHR_GENER_FDR          ,
+        :CTDDMD10.CHR_GENER_FDO          ,
+        :CTDDMD10.CHR_GENER_FDI          ,
+        :CTDDMD10.CHR_APROVAL
+
+      5 DEC_FILL DEC FIXED(3,0),
+      5 CHR_SEND_INST  CHAR(11),
+      5 CHR_RECV_INST  CHAR(11),
+      5 CHR_SERV_ID  CHAR(4),
+      5 CHR_TEST_CODE  CHAR(1),
+      5 CHR_FILE_TYPE  CHAR(3),
+      5 CHR_FILE_ID  CHAR(8),
+      5 DEC_GROUP_TYPE  DEC FIXED(3,0),
+      5 DEC_CREAT_DAT_TIME  CHAR(14),
+      5 DEC_INTRB_SETL_DAT  CHAR(8),
+      5 CHR_SETTL_METHOD  CHAR(4),
+      5 CHR_CLEAR_SYSTEM  CHAR(35),
+      5 CHR_INSTRN_AG  CHAR(11),
+      5 CHR_INSTRT_AG  CHAR(11),
+      5 DEC_RECORD_TYPE  DEC FIXED(1,0),
+      5 DEC_MSG_TYPE  DEC FIXED(3,0),
+      5 CHR_INSTR_ID  CHAR(35),
+      5 CHR_TR_ID  CHAR(35),
+      5 CHR_SERV_LEVEL  CHAR(4),
+      5 CHR_LOCAL_INSTR  CHAR(35),
+      5 CHR_SEQ_TYPE  CHAR(4),
+      5 CHR_MANDAT_ID  CHAR(35),
+      5 DEC_DAT_OF_SIGN  DEC FIXED(8,0),
+      5 CHR_AMEND_IND  CHAR(1),
+      5 CHR_O_M_I_511  CHAR(35),
+      5 CHR_O_C_S_I_N_512  CHAR(70),
+      5 CHR_O_C_S_I_I_513  CHAR(35),
+      5 CHR_O_C_S_I_I_514  CHAR(4),
+      5 CHR_O_D_A_IBAN_515  CHAR(34),
+      5 CHR_O_D_A_PROP_516  CHAR(5),
+      5 CHR_C_S_I_I_517  CHAR(35),
+      5 CHR_C_S_I_I_T_518  CHAR(4),
+      5 CHR_CR_NAME  CHAR(70),
+      5 CHR_CR_ADDR_LINE1  CHAR(70),
+      5 CHR_CR_ADDR_LINE2  CHAR(70),
+      5 CHR_CR_ADDR_CNTRY  CHAR(2),
+      5 CHR_ULT_CR_NAME  CHAR(70),
+      5 CHR_ULT_CR_ID  CHAR(37),
+      5 CHR_DB_NAME  CHAR(70),
+      5 CHR_DB_ADDR_LINE1  CHAR(70),
+      5 CHR_DB_ADDR_LINE2  CHAR(70),
+      5 CHR_DB_ADDR_CNTRY  CHAR(2),
+      5 CHR_DB_ID  CHAR(37),
+      5 CHR_DB_ACC_IBAN  CHAR(34),
+      5 CHR_DB_AG  CHAR(11),
+      5 CHR_DB_AG_BR_ID  CHAR(35),
+      5 CHR_ULT_DB_NAME  CHAR(70),
+      5 CHR_ULT_DB_ID  CHAR(37),
+      5 DEC_CIDB_CUST  DEC FIXED(9,0),
+      5 CHR_USER CHAR(8),
+      5 FLG_DIRECTION  CHAR(1),
+      5 FLG_STATUS_PROCESS  CHAR(1),
+      5 FLG_CANCEL  CHAR(1),
+      5 CHR_ERROR_DIAS  CHAR(4),
+      5 CHR_ERROR_CBOG  CHAR(4),
+      5 CHR_FILE_ID_TODIAS  CHAR(8),
+      5 DAT_DATETIME_INIT  CHAR(26),
+      5 DAT_DATETIME_PROC  CHAR(26),
+      5 DEC_AA   DEC FIXED(17,0),
+      5 DEC_AA_RM20  DEC FIXED(17,0),
+      5 AMT_LIMIT  DEC FIXED(17,0),
+      5 CHR_TERMID_REFUSAL  CHAR(7),
+      5 CHR_TERMID_REFUND  CHAR(7),
+      5 CHR_TERMID_AUTHOR  CHAR(7),
+      5 CHR_INFORM  CHAR(50),
+      5 DEC_DAT_REFUSAL  CHAR(8),
+      5 DEC_DAT_REFUND  CHAR(8),
+      5 DEC_DAT_AUTHOR  CHAR(8),
+      5 DEC_TIME_REFUSAL  CHAR(6),
+      5 DEC_TIME_REFUND  CHAR(6),
+      5 DEC_TIME_AUTHOR  CHAR(6),
+      5 FLG_STATUS_REFUSAL  CHAR(1),
+      5 FLG_STATUS_REFUND  CHAR(1),
+      5 FLG_STATUS_AUTHOR  CHAR(1),
+      5 CHR_VALID  CHAR(1),
+      5 DEC_NUM_REFUSAL  DEC FIXED(2,0),
+      5 CHR_OK_REFUSAL  CHAR(1),
+      5 CHR_OK_AUTHOR  CHAR(1),
+      5 CHR_CODE_BRANCH  CHAR(4),
+      5 DEC_ARLOG  DEC FIXED(9,0),
+      5 DAT_LAST_DEBIT  CHAR(10),
+      5 DAT_LAST_CREDIT  CHAR(10),
+      5 CHR_INTERNET  CHAR(4),
+      5 CHR_ERROR_FDR  CHAR(4),
+      5 CHR_ERROR_CMF  CHAR(4),
+      5 CHR_GENER_FPR  CHAR(4),
+      5 CHR_GENER_FDR  CHAR(4),
+      5 CHR_GENER_FDO  CHAR(4),
+      5 CHR_GENER_FDI  CHAR(4),
+      5 CHR_APROVAL  CHAR(4);
+   */
+
+

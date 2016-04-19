@@ -1,0 +1,715 @@
+*PROCESS LIMITS (FIXEDDEC(15,31));
+ DDPFCS: PROCEDURE OPTIONS(MAIN);
+ /********************************************************************/
+ /* ΠΡΟΓΡΑΜΜΑ PLI                                                    */
+ /********************************************************************/
+ /*ΠΡΟΓΡΑΜΜΑ                                                         */
+ /********************************************************************/
+ /********************************************************************/
+ /* Input :                                                          */
+ /*      Aρχείο                                                     */
+ /*  Output:                                                         */
+ /*                                                                  */
+ /* ΤΟ ΠΡΟΓΡΑΜΜΑ  ΤΥΠΩΝΕΙ ΤΟ FCS ΑΡΧΕΙΟ ΓΙΑ ΤΟ CMOD                  */
+ /********************************************************************/
+ /********************************************************************/
+ /*           PROGRAM NAME: DDPFCS     LOAD MODULE: DDPFCS           */
+ /********************************************************************/
+ /* 29-09-2009 NPK                                                   */
+ /********************************************************************/
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+ % INCLUDE  RECDDD03;
+ %INCLUDE COBRANDS ;
+
+ DCL     PRT FILE     SEQUENTIAL OUTPUT ENV(FB RECSIZE(133) CTLASA);
+ DCL     LINE                CHAR (133);
+ DCL 1   LNX                 BASED(ADDR(LINE)),
+      2  L1                  CHAR(1)      INIT('1'),
+      2  L2                  CHAR(132)    INIT(' ');
+
+ DCL  L                      CHAR(132)    INIT(' ');
+
+ DCL 1   ERLINE              ,
+      2  ERLIN1       CHAR(1)      INIT('1'),
+      2  ERLIN2       CHAR(132)    INIT(' ');
+
+ DCL    P2            PIC 'ZZZZ9';
+
+ DCL  PAGENO        PIC  '99999'  INIT(0);
+ DCL  ZPAGENO       PIC  'Z.ZZ9'  INIT(0);
+
+ DCL     WS_MSG              CHAR (132);
+
+ /********************************************************************/
+ /*ΟΝΟΜΑ ΚΑΙ ΠΕΡΙΓΡΑΦΉ INPUT                  */
+ /********************************************************************/
+ /*                                                                */
+ DCL  FCS     FILE  SEQUENTIAL INPUT  ENV(FB RECSIZE(309));
+ DCL READER  FILE RECORD INPUT ENV (  FB RECSIZE(80) ) ;
+ DCL 1 CC_REC ,    /*CONTROL CARD RECORD */
+        2 FILLER1     CHAR(01), /*C                     */
+        2 CC_KATMA    PIC'999',  /*KATASTHMA           */
+        2 FILLER2     CHAR(76);
+
+ DCL L23(08) CHAR(29)               INIT(
+    'Τύπος Εγγραφής               '  ,
+    'Κωδικός Τράπεζας             '  ,
+    'Τύπος Αρχείου                '  ,
+    'Ταυτότητα Αρχείου            '  ,
+    'Ημερομηνία Διακανονισμού     '  ,
+    'Κύκλος Διακανονισμού         '  ,
+    'Ένδειξη χρέωσης/πίστωσης     '  ,
+    'Τελική Θέση                  '
+                                    );
+
+
+ DCL L24(12) CHAR(29)               INIT(
+    'Τύπος Εγγραφής               '  ,
+    'Κωδικός Συστήματος           '  ,
+    'CSM εκκαθάρισης              '  ,
+    'Σύστημα Διακανονισμού        '  ,
+    'Κωδικός Αναφοράς Διακανον.   '  ,
+    'Συσχετιζόμενος Λογαριασμός   '  ,
+    'Λογαριασμός Διακανονισμού    '  ,
+    'Λογαριασμός Εκκαθάρισης      '  ,
+    'Ένδειξη χρέωσης/πίστωσης     '  ,
+    'Εκκαθαριζόμενο ποσό          '  ,
+    'Remittance Information       '  ,
+    'Status                       '
+                                    );
+
+
+ DCL L25(05) CHAR(29)               INIT(
+    'Τύπος Εγγραφής               '  ,
+    'CSM διακίνησης εγγραφών      '  ,
+    'Εμπλεκόμενη τράπεζα          '  ,
+    'Ένδειξη χρέωσης/πίστωσης     '  ,
+    'Εκκαθαριζόμενο ποσό          '
+                                    );
+ DCL L26(10) CHAR(29)               INIT(
+    'Τύπος Εγγραφής               '  ,
+    'Ρόλος                        '  ,
+    'Πλήθος συναλλαγών            '  ,
+    'Ένδειξη χρέωσης/πίστωσης     '  ,
+    'Εκκαθαριζόμενο ποσό          '  ,
+    'Ένδειξη χρέωσης/πίστωσης     '  ,
+    'Compensation amount          '  ,
+    'Ένδειξη χρέωσης/πίστωσης     '  ,
+    'Ποσό Διατραπεζικών Εξόδων    '  ,
+    'Προϊόν                       '
+                                    );
+
+ DCL L27(11) CHAR(29)               INIT(
+    'Τύπος Εγγραφής               '  ,
+    'Έναρξη περιόδου τιμολόγησης  '  ,
+    'Λήξη περιόδου τιμολόγησης    '  ,
+    'Πλήθος συναλλαγών            '  ,
+    'Ένδειξη χρέωσης/πίστωσης     '  ,
+    'Ποσό Αμοιβής                 '  ,
+    'Ένδειξη χρέωσης/πίστωσης     '  ,
+    'Ποσό Φ.Π.Α                   '  ,
+    'Ένδειξη χρέωσης/πίστωσης     '  ,
+    'Κρατήσεις                    '  ,
+    'Αιτιολογία                   '
+                                    );
+
+
+ DCL L28(09) CHAR(29)               INIT(
+    'Τύπος Εγγραφής               '  ,
+    'Κωδικός Εγγραφής             '  ,
+    'Έναρξη Περιόδου Τιμολόγησης  '  ,
+    'Λήξη Περιόδου Τιμολόγησης    '  ,
+    'Πλήθος Συναλλαγών 1          '  ,
+    'Πλήθος Συναλλαγών 2          '  ,
+    'Ένδειξη χρέωσης/πίστωσης     '  ,
+    'Ποσό                         '  ,
+    'Περιγραφή                    '
+                                    );
+
+
+ DCL L29(04) CHAR(29)               INIT(
+    'Τύπος Εγγραφής               '  ,
+    'Ένδειξη χρέωσης/πίστωσης     '  ,
+    'Ποσό Αμοιβής                 '  ,
+    'Αιτιολογία                   '
+                                    );
+
+
+ DCL L210(02) CHAR(29)              INIT(
+    'Τύπος Εγγραφής               '  ,
+    'Πλήθος detail records        '
+                                    );
+
+
+ DCL L211(02) CHAR(29)              INIT(
+    'Τύπος Εγγραφής               '  ,
+    'Πλήθος subgroups             '
+                                    );
+
+
+ DCL L212(02) CHAR(29)               INIT(
+    'Τύπος Εγγραφής               '  ,
+    'Πλήθος groups                '
+                                    );
+
+ DCL 1 S23  ,
+  2 Record_Type                PIC'9',
+  2 Fill                       PIC'999',
+  2 Cod_Bank                   CHAR(11),
+  2 File_type                  CHAR(03),
+  2 File_Ident                 PIC'(08)9',
+  2 Settl_Date                 PIC'(08)9',
+  2 Settl_Cycle                PIC'(08)9',
+  2 Deb_or_Cre1                 CHAR(01),
+  2 Final_pos                  PIC'(17)9';
+
+ DCL 1 S24                     ,/*Group Header*/
+  2 Record_Type                 PIC'9',
+  2 Fill                        PIC'999',
+  2 System_Code                 CHAR(03),
+  2 Csm_ekkatharisis            CHAR(11),
+  2 Sistima_diakanonismou       CHAR(11),
+  2 Cod_anaforas_Diakanonismou  CHAR(16),
+  2 Sisxetizomenos_logariasmos  CHAR(35),
+  2 Logariasmos_Diakanonismou   CHAR(35),
+  2 Logariasmos_ekkatharisis    CHAR(35),
+  2 Deb_or_Cre1                 CHAR(01),
+  2 Poso_ekkatharizomeno        PIC'(17)9',
+  2 Remittance_Inf              CHAR(140),
+  2 Status                      CHAR(01);
+
+ DCL 1 S25                     ,/*Subgroup Header                  */
+  2 Record_Type                 PIC'9',
+  2 Fill                        PIC'999',
+  2 Csm                         CHAR(11),
+  2 Emplekomeni_Trapeza         CHAR(11),
+  2 Deb_or_cre1                  CHAR(01),
+  2 Poso_ekkatharizomeno        PIC'(17)9';
+
+ DCL 1 S26                     ,/* Detail Record - Συναλλαγές       */
+  2 Record_Type                 PIC'9',
+  2 Record_Subtype              PIC'999',
+  2 DB_OR_CB                    CHAR(02),
+  2 TOTAL_TRANS                 PIC'(08)9',
+  2 Deb_or_cre1                  CHAR(01),
+  2 Poso_ekkatharizomeno        PIC'(17)9',
+  2 Deb_or_cre2                  CHAR(01),
+  2 Compensation_amount         PIC'(17)9',
+  2 Deb_or_cre3                  CHAR(01),
+  2 EXPENCES                    PIC'(17)9',
+  2 COD_PROD                    CHAR(08);
+
+ DCL 1 S27                     ,/*Detail Περιοδικ Διατραπεζ αμοιβες*/
+  2 Record_Type                 PIC'9',
+  2 Record_Subtype              PIC'999',
+  2 Start_period_Tim            PIC'(08)9',
+  2 End_period_tim              PIC'(08)9',
+  2 TOTAL_TRANS                 PIC'(08)9',
+  2 Deb_or_cre1                  CHAR(01),
+  2 Poso_amivis                 PIC'(17)9',
+  2 Deb_or_cre2                  CHAR(01),
+  2 Poso_fpa                    PIC'(17)9',
+  2 Deb_or_cre3                  CHAR(01),
+  2 poso_kratisis               PIC'(17)9',
+  2 Etiologia                   CHAR(140);
+
+ DCL 1 S28                     ,/*Detail Περιοδικ αμοιβες ΔΙΑΣ */
+  2 Record_Type                 PIC'9',
+  2 Record_Subtype              PIC'999',
+  2 kodikos_eggrafis            CHAR(32),
+  2 Start_period_Tim            PIC'(08)9',
+  2 End_period_tim              PIC'(08)9',
+  2 TOTAL_TRANS_1               PIC'(08)9',
+  2 TOTAL_TRANS_2               PIC'(08)9',
+  2 Deb_or_cre1                  CHAR(01),
+  2 Poso_ekatharizomeno         PIC'(17)9',
+  2 Description                 CHAR(35);
+
+ DCL 1 S29                     ,/*Detail Κίνηση Λογαρισμού ΔΙΑΣ    */
+  2 Record_Type                 PIC'9',
+  2 Record_Subtype              PIC'999',
+  2 Deb_or_cre1                  CHAR(01),
+  2 Poso_amivis                 PIC'(17)9',
+  2 Etiologia                   CHAR(140);
+
+ DCL 1 S210                    ,/*Subgroup Trailer                 */
+  2 Record_Type                 PIC'9',
+  2 Fill                        PIC'999',
+  2 Total_detail_rec            PIC'(08)9';
+
+ DCL 1 S211                    ,/*   Group Trailer                 */
+  2 Record_Type                 PIC'9',
+  2 Fill                        PIC'999',
+  2 Total_detail_Subgroups      PIC'(08)9';
+
+ DCL 1 S212                    ,/*   File  Trailer                 */
+  2 Record_Type                 PIC'9',
+  2 Fill                        PIC'999',
+  2 Total_detail_Groups         PIC'(08)9';
+
+
+ DCL FCS_EOF    FIXED (1) INIT(0);
+
+ DCL  LINES             FIXED (5)  INIT (0);
+ DCL  COUNT_NEW         FIXED (15) INIT (0000);
+ DCL  COUNT             FIXED (15) INIT (0000);
+ DCL  MYSTEP            FIXED (3)  INIT (050);
+
+ DCL 1   REC_COUNTERS,
+      2  REC_APO             FIXED (15)  INIT(0),
+      2  REC_CNT             FIXED (15)  INIT(0),
+      2  REC_ROOT            FIXED (15)  INIT(0),
+      2  REC_TOT             FIXED (15)  INIT(0),
+      2  REC_ERROR           FIXED (15)  INIT(0),
+      2  REC_CONTROL         FIXED (15)  INIT(0),
+      2  TOT_NORMAL_REC      FIXED (15)  INIT(0),
+      2  CNT_Insert_DB2         FIXED (07)  INIT(0),
+      2  CNT_Records_Read       FIXED (07)  INIT(0),
+      2  CNT_File_Header        FIXED (07)  INIT(0),
+      2  CNT_GROUP_Header       FIXED (07)  INIT(0),
+      2  CNT_Detail_Record      FIXED (07)  INIT(0),
+      2  SAVE_Detail_Record     FIXED (07)  INIT(0),
+      2  CNT_Detail_Record_Sup  FIXED (07)  INIT(0),
+      2  SAVE_Detail_Record_Sup FIXED (07)  INIT(0),
+      2  CNT_Group_Trailer      FIXED (07)  INIT(0),
+      2  CNT_FILE_Trailer       FIXED (07)  INIT(0);
+ DCL     CNT                    PIC   'Z.ZZZ.ZZZ' INIT(0);
+ DCL     MYPROC CHAR(40);
+ DCL     MYMSG CHAR(132);
+ DCL     MYLINE   PIC  '99999';
+ DCL     RC       BIT(1) INIT('1'B);
+
+ DCL   MY_DEC            PIC 'ZZZ.ZZZ.ZZZ.ZZZ.ZZ9,99';
+ DCL   MY_D              PIC 'ZZZ.ZZZ.ZZ9';
+ DCL   MY_DATE           PIC '9999.99.99' INIT(0);
+ DCL   WS_LAST_DATE      CHAR(10) INIT('');
+ DCL   MY_DATETIME       PIC '9999.99.99B99B99';
+       MY_DATETIME =     SUBSTR(DATETIME(),1,12) ;
+ /****************************************/
+ /*                                      */
+ /****************************************/
+  DCL TYPE_CURR4 CHAR(4);
+
+ DCL  SUBSTR       BUILTIN;
+ DCL  DATE         BUILTIN;
+ DCL  TRANSLATE    BUILTIN;
+ DCL  ADDR         BUILTIN;
+ DCL  ABS          BUILTIN;
+ DCL  DIVIDE       BUILTIN;
+ DCL  ROUND        BUILTIN;
+ DCL  DATETIME     BUILTIN;
+ DCL  FILEDDWORD   BUILTIN;
+ DCL  VERIFY       BUILTIN;
+ DCL  VALIDDATE    BUILTIN;
+                                                                        01510400
+      ON ENDFILE(FCS)
+      BEGIN ;
+            FCS_EOF    = 1;
+            GO TO TELOS;
+      END;
+      ON ENDFILE(READER)
+       BEGIN ;
+             MYMSG  = "ΔΕΝ ΒΡΕΘΗΚΕ CONTROL-CARD ΜΕ ΚΩΔΙΚΟ "!!
+               " ΚΑΤΑΣΤΗΜΑΤΟΣ ";
+             MYLINE = SOURCELINE();
+             CALL ERROR(MYPROC,MYLINE,MYMSG);
+      END;
+
+    /*----------------------------------------------------------*/
+    /*                    MAIN  PROGRAM                         */
+    /*----------------------------------------------------------*/
+    OPEN FILE(FCS);
+    OPEN FILE(PRT) ;
+    OPEN FILE(READER) ;
+
+    READ  FILE(READER) INTO(CC_REC);
+    CALL PROC_ALL ;
+ /**************************************************************
+ *   PROC_ALL                       START                      *
+ **************************************************************/
+   PROC_ALL: proc;
+     MYPROC = PROCEDURENAME();
+     FCS_EOF    = 0   ;
+     DO WHILE (FCS_EOF = 0                );
+     READ FILE(FCS)      INTO(E2_REC);
+     TYPE_CURR4 = SUBSTR(E2_REC,1,4);
+     CNT_Records_Read = CNT_Records_Read + 1;
+     SELECT(TYPE_CURR4);
+           WHEN ('1000') DO;
+               CALL PRINTDATA_L23;
+           END;
+           WHEN ('2000') DO;
+               CALL PRINTDATA_L24;
+           END;
+           WHEN ('3000') DO;
+               CALL PRINTDATA_L25;
+           END;
+       WHEN ('4000','4001','4002','4003','4004','4005','4006') DO;
+               CALL PRINTDATA_L26;
+           END;
+           WHEN ('4101') DO;
+               CALL PRINTDATA_L27;
+           END;
+           WHEN ('4102') DO;
+               CALL PRINTDATA_L28;
+           END;
+           WHEN ('4103') DO;
+               CALL PRINTDATA_L29;
+           END;
+           WHEN ('7000') DO;
+               CALL PRINTDATA_L210;
+           END;
+           WHEN ('8000') DO;
+               CALL PRINTDATA_L211;
+           END;
+           WHEN ('9000') DO;
+               CALL PRINTDATA_L212;
+           END;
+           OTHERWISE DO;
+             MYMSG  = "TO RECORD NUM : "!!
+                         CHAR( CNT_Records_Read)!!
+               " ΠΕΡΙΕΧΕΙ INVALID TYPE_CURR4 = "!!TYPE_CURR4 ;
+                         MYLINE = SOURCELINE();
+                         CALL ERROR(MYPROC,MYLINE,MYMSG);
+           END;
+       END;/*SELECT*/
+       END;
+   END  PROC_ALL;
+  /**************************************************************
+  *   PROC_ALL                       END                        *
+  **************************************************************/
+ /**************************************************************
+ *  PRINTDATA_L23                   START                      *
+ **************************************************************/
+ PRINTDATA_L23:PROC                  ;
+   L = '***********************************';CALL MYPRT;
+   L = '*File  Header*          '           ;CALL MYPRT;
+   L = '***********************************';CALL MYPRT;
+   L = L23(01)!!TYPE_CURR4                  ;CALL MYPRT;
+   L = L23(02)!!E23.Cod_Bank                ;CALL MYPRT;
+   L = L23(03)!!E23.File_type               ;CALL MYPRT;
+   L = L23(04)!!E23.File_Ident              ;CALL MYPRT;
+   L = L23(05)!!CONV_DATE(E23.Settl_Date)   ;CALL MYPRT;
+   L = L23(06)!!E23.Settl_Cycle             ;CALL MYPRT;
+
+   /*L = L23(07)!!E23.Deb_or_Cre1             ;CALL MYPRT;*/
+   MY_DEC = E23.Final_pos;
+   L = L23(08)!!MY_DEC!!E23.Deb_or_Cre1     ;CALL MYPRT;
+
+ END PRINTDATA_L23;
+ /**************************************************************
+ *   PRINTDATA_L23                   END                        *
+ **************************************************************/
+ /**************************************************************
+ *  PRINTDATA_L24                   START                      *
+ **************************************************************/
+ PRINTDATA_L24:PROC                  ;
+   L = '***********************************';CALL MYPRT;
+   L = '*Group Header* ';                         CALL MYPRT;
+   L = '***********************************';CALL MYPRT;
+   L = L24(01)!!TYPE_CURR4                  ;     CALL MYPRT;
+   L = L24(02)!!E24.System_Code                   ;CALL MYPRT;
+   L = L24(03)!!E24.Csm_ekkatharisis              ;CALL MYPRT;
+   L = L24(04)!!E24.Sistima_diakanonismou         ;CALL MYPRT;
+   L = L24(05)!!E24.Cod_anaforas_Diakanonismou    ;CALL MYPRT;
+   L = L24(06)!!E24.Sisxetizomenos_logariasmos    ;CALL MYPRT;
+   L = L24(07)!!E24.Logariasmos_Diakanonismou     ;CALL MYPRT;
+   L = L24(08)!!E24.Logariasmos_ekkatharisis      ;CALL MYPRT;
+   /*L = L24(09)!!E24.Deb_or_Cre1                   ;CALL MYPRT;*/
+   MY_DEC = E24.Poso_ekkatharizomeno;
+   L = L24(10)!!MY_DEC!!E24.Deb_or_Cre1           ;CALL MYPRT;
+   L = L24(11)!!SUBSTR(E24.Remittance_Inf,1,100)  ;CALL MYPRT;
+
+   if (E24.Status = 'S') then do ;
+        L = L24(12)!!E24.Status!!' Settled' ;CALL MYPRT;
+   end;
+   else do;
+        L = L24(12)!!E24.Status!!' Failed '  ;CALL MYPRT;
+   end;
+ END PRINTDATA_L24;
+ /**************************************************************
+ *   PRINTDATA_L24                   END                        *
+ **************************************************************/
+ /**************************************************************
+ *  PRINTDATA_L25                   START                      *
+ **************************************************************/
+ PRINTDATA_L25:PROC                  ;
+   L = '***********************************';CALL MYPRT;
+   L = '*Subgroup Header*       ';CALL MYPRT;
+   L = '***********************************';CALL MYPRT;
+   L = L25(01)!!TYPE_CURR4                  ;CALL MYPRT;
+   L = L25(02)!!E25.Csm                     ;CALL MYPRT;
+   L = L25(03)!!E25.Emplekomeni_Trapeza     ;CALL MYPRT;
+   /*L = L25(04)!!E25.Deb_or_cre1             ;CALL MYPRT;*/
+   /*L = L25(05)!!E25.Poso_ekkatharizomeno    ;CALL MYPRT;*/
+   MY_DEC = E25.Poso_ekkatharizomeno;
+   L = L25(05)!!MY_DEC!!E25.Deb_or_Cre1           ;CALL MYPRT;
+ END PRINTDATA_L25;
+ /**************************************************************
+ *   PRINTDATA_L25                   END                        *
+ **************************************************************/
+ /**************************************************************
+ *  PRINTDATA_L26                   START                      *
+ **************************************************************/
+ PRINTDATA_L26:PROC                  ;
+   DCL T CHAR(50);
+   L = '*******************************';CALL MYPRT;
+   L = '* Detail Record - Συναλλαγές*  ';CALL MYPRT;
+   L = '*******************************';CALL MYPRT;
+
+   SELECT(TYPE_CURR4);
+   WHEN ('4000')
+   T = 'Συγκεντρωτική εγγραφή για την Τράπεζα Οργανισμού';
+   WHEN ('4001') T = 'Collections                               ';
+   WHEN ('4002') T = 'Returns of collection                     ';
+   WHEN ('4003') T = 'Refunds                                   ';
+   WHEN ('4004') T = 'Reversals                                 ';
+   WHEN ('4005') T = 'Returns of reversal                       ';
+   WHEN ('4006') T = 'Requests for cancellation                 ';
+   END;
+   L = L26(01)!!T                           ;CALL MYPRT;
+
+   if(E26.DB_OR_CB = 'DB') then do;
+      L = L26(02)!!E26.DB_OR_CB!!' ως Τράπεζα Οφειλέτη ';CALL MYPRT;
+   end;
+   else do;
+      L = L26(02)!!E26.DB_OR_CB!!' ως Τράπεζα Οργανισμού  ';CALL MYPRT;
+   end;
+
+   MY_D = E26.TOTAL_TRANS;
+   L = L26(03)!!MY_D                        ;CALL MYPRT;
+   /*L = L26(04)!!E26.Deb_or_cre1             ;CALL MYPRT;*/
+   MY_DEC =E26.Poso_ekkatharizomeno;
+   L = L26(05)!!MY_DEC!!E26.Deb_or_cre1 ;CALL MYPRT;
+   /*L = L26(06)!!E26.Deb_or_cre2             ;CALL MYPRT;*/
+   MY_DEC =E26.Compensation_amount;
+   L = L26(07)!!MY_DEC!!E26.Deb_or_cre2     ;CALL MYPRT;
+   /*L = L26(08)!!E26.Deb_or_cre3             ;CALL MYPRT;*/
+   MY_DEC = E26.EXPENCES;
+   L = L26(09)!!MY_DEC!!E26.Deb_or_cre3     ;CALL MYPRT;
+   L = L26(10)!!E26.COD_PROD                ;CALL MYPRT;
+ END PRINTDATA_L26;
+ /**************************************************************
+ *   PRINTDATA_L26                   END                        *
+ **************************************************************/
+ /**************************************************************
+ *  PRINTDATA_L27                   START                      *
+ **************************************************************/
+ PRINTDATA_L27:PROC                  ;
+   L = '***********************************';CALL MYPRT;
+   L = '*Detail Περιοδικ Διατραπεζ αμοιβες*';CALL MYPRT;
+   L = '***********************************';CALL MYPRT;
+   L = L27(01)!!TYPE_CURR4                  ;CALL MYPRT;
+   L = L27(02)!!CONV_DATE(E27.Start_period_Tim) ;CALL MYPRT;
+   L = L27(03)!!CONV_DATE(E27.End_period_tim)   ;CALL MYPRT;
+   MY_D = E27.TOTAL_TRANS;
+   L = L27(04)!!MY_D                            ;CALL MYPRT;
+   /*L = L27(05)!!E27.Deb_or_cre1             ;CALL MYPRT;*/
+   MY_DEC=E27.Poso_amivis;
+   L = L27(06)!!MY_DEC!!E27.Deb_or_cre1         ;CALL MYPRT;
+   /*L = L27(07)!!E27.Deb_or_cre2             ;CALL MYPRT;*/
+   MY_DEC=E27.Poso_fpa   ;
+   L = L27(08)!!MY_DEC!!E27.Deb_or_cre2         ;CALL MYPRT;
+   /*L = L27(09)!!E27.Deb_or_cre3             ;CALL MYPRT;*/
+   MY_DEC=E27.Poso_kratisis;
+   L = L27(10)!!MY_DEC!!E27.Deb_or_cre3         ;CALL MYPRT;
+   L = L27(11)!!SUBSTR(E27.Etiologia,1,100)     ;CALL MYPRT;
+ END PRINTDATA_L27;
+ /**************************************************************
+ *   PRINTDATA_L27                   END                        *
+ **************************************************************/
+ /**************************************************************
+ *  PRINTDATA_L28                   START                      *
+ **************************************************************/
+ PRINTDATA_L28:PROC                  ;
+   L = '***********************************';CALL MYPRT;
+   L = '*Detail Περιοδικ αμοιβες ΔΙΑΣ *    ';CALL MYPRT;
+   L = '***********************************';CALL MYPRT;
+   L = L28(01)!!TYPE_CURR4                    ;CALL MYPRT;
+   L = L28(02)!!E28.kodikos_eggrafis          ;CALL MYPRT;
+   L = L28(03)!!CONV_DATE(E28.Start_period_Tim) ;CALL MYPRT;
+   L = L28(04)!!CONV_DATE(E28.End_period_tim) ;CALL MYPRT;
+   MY_D = E28.TOTAL_TRANS_1 ;
+   L = L28(05)!!MY_D                          ;CALL MYPRT;
+   MY_D = E28.TOTAL_TRANS_2 ;
+   L = L28(06)!!MY_D                          ;CALL MYPRT;
+   /*L= L28(07)!!E28.Deb_or_cre1               ;CALL MYPRT;*/
+   MY_DEC=E28.Poso_ekatharizomeno;
+   L = L28(08)!!MY_DEC!!E28.Deb_or_cre1       ;CALL MYPRT;
+   L = L28(09)!!E28.Description               ;CALL MYPRT;
+ END PRINTDATA_L28;
+ /**************************************************************
+ *   PRINTDATA_L28                   END                        *
+ **************************************************************/
+ /**************************************************************
+ *  PRINTDATA_L29                   START                      *
+ **************************************************************/
+ PRINTDATA_L29:PROC                  ;
+   L = '***********************************';CALL MYPRT;
+   L = '*Detail Κίνηση Λογαρισμού ΔΙΑΣ    *';CALL MYPRT;
+   L = '***********************************';CALL MYPRT;
+   L = L29(01)!!TYPE_CURR4                  ;CALL MYPRT;
+   /*L = L29(02)!!E29.Deb_or_cre1             ;CALL MYPRT;*/
+   MY_DEC=E29.Poso_amivis;
+   L = L29(03)!!MY_DEC!!E29.Deb_or_cre1     ;CALL MYPRT;
+   L = L29(04)!!SUBSTR(E29.Etiologia,1,100) ;CALL MYPRT;
+ END PRINTDATA_L29;
+ /**************************************************************
+ *   PRINTDATA_L29                   END                        *
+ **************************************************************/
+ /**************************************************************
+ *  PRINTDATA_L210                  START                      *
+ **************************************************************/
+ PRINTDATA_L210:PROC                  ;
+   L = '***********************************';CALL MYPRT;
+   L = '*Subgroup Trailer                 *' ;CALL MYPRT;
+   L = '***********************************';CALL MYPRT;
+   L = L210(01)!!TYPE_CURR4                  ;CALL MYPRT;
+   MY_D = E210.Total_detail_rec;
+   L = L210(02)!!MY_D                        ;CALL MYPRT;
+ END PRINTDATA_L210;
+ /**************************************************************
+ *   PRINTDATA_L210                   END                        *
+ **************************************************************/
+ /**************************************************************
+ *  PRINTDATA_L211                   START                      *
+ **************************************************************/
+ PRINTDATA_L211:PROC                  ;
+   L = '***********************************' ;CALL MYPRT;
+   L = '*Group Trailer                    *' ;CALL MYPRT;
+   L = '***********************************' ;CALL MYPRT;
+   L = L211(01)!!TYPE_CURR4                  ;CALL MYPRT;
+   MY_D = E211.Total_detail_Subgroups;
+   L = L211(02)!!MY_D                         ;CALL MYPRT;
+ END PRINTDATA_L211;
+ /**************************************************************
+ *   PRINTDATA_L211                   END                        *
+ **************************************************************/
+ /**************************************************************
+ *  PRINTDATA_L212                   START                      *
+ **************************************************************/
+ PRINTDATA_L212:PROC                  ;
+   L = '***********************************';CALL MYPRT;
+   L = '*File  Trailer                    *' ;CALL MYPRT;
+   L = '***********************************';CALL MYPRT;
+   L = L212(01)!!TYPE_CURR4                  ;CALL MYPRT;
+   MY_D = E212.Total_detail_Groups;
+   L = L212(02)!!MY_D                        ;CALL MYPRT;
+ END PRINTDATA_L212;
+ /**************************************************************
+ *   PRINTDATA_L212                 END                        *
+ **************************************************************/
+ /**************************************************************
+ *  CONV_DATE                        START                      *
+ **************************************************************/
+     CONV_DATE          : PROC (IN_DATE) RETURNS (CHAR(10));
+       DCL IN_DATE  PIC'(08)9';
+       DCL C_DATE   CHAR(08) ;
+       DCL RET_DATE CHAR(10) ;
+       C_DATE = IN_DATE;
+       RET_DATE=SUBSTR(C_DATE ,7,2)!!'.'!!
+                SUBSTR(C_DATE ,5,2)!!'.'!!
+                SUBSTR(C_DATE ,1,4);
+
+          RETURN (RET_DATE);
+ END CONV_DATE     ;
+ /**************************************************************
+ *   CONV_DATE                      END                        *
+ **************************************************************/
+ /**************************************************************
+ *  MYPRT                            START                     *
+ **************************************************************/
+ MYPRT         :PROC                  ;
+     IF MOD(LINES,60)=0  THEN
+        CALL HEADER  ;
+     ELSE  LINES = LINES + 1;
+     L2 = L;
+     WRITE FILE(PRT) FROM(LINE);
+ END MYPRT         ;
+ /**************************************************************
+ *   MYPRT                          END                        *
+ **************************************************************/
+ HEADER:   PROC      ;
+     P2 = DIVIDE(LINES,60,4,0) + 1;
+   /* TYpOpOIHrH  COBRANCH */
+   BANK = 0;
+   BRAN = CC_KATMA;
+   PROG = 'DDPFCS    ' ;
+   CALL COBRANC(BANK,BRAN,PROG,HDR1,HDR2);
+
+   L1    = '1' ;
+   L2    = HDR1;
+   WRITE FILE(PRT) FROM(LINE);
+   L1    = ' ' ;
+   L2    = HDR2!!(75)' ';/*!!'rEkIdA:'!! ZPAGENO;*/
+   WRITE FILE(PRT) FROM(LINE);
+   /* TELOS  TYpOpOIHrH  COBRANCH */
+     L1 = '0';
+     L2 = 'ΕΚΤΥΠΩΣΗ ΑΡΧΕΙΟΥ ΘΕΣΗΣ ( FCS ) ';
+     WRITE FILE(PRT) FROM(LINE);
+     L1 = ' ';
+     L2 = 'ΗΜΕΡΟΜΗΝΙΑ KAI ΩΡΑ : '!!MY_DATETIME
+           !!(63)' '!!'AΡΙΘΜΟΣ ΣΕΛΙΔΑΣ : '!!P2;
+     WRITE FILE(PRT) FROM(LINE);
+
+     LINES = LINES + 5;
+
+ END HEADER;
+ /**************************************************************
+ *  ERROR                           START                      *
+ **************************************************************/
+ ERROR        :PROC (PRC,LINE,MSG  ) ;
+    DCL MSG      CHAR  (132)  ;
+    DCL LINE     PIC '99999'  ;
+    DCL PRC      CHAR (40)   ;
+    DCL WS_BOOM   FIXED(1) INIT(1);
+    DCL WS_ZERO   FIXED(1) INIT(0);
+
+       ERLIN1='1';
+       ERLIN2='***************************************************';
+       WRITE FILE(PRT) FROM(ERLINE);
+       ERLIN1='0';
+
+       ERLIN2=' * DDPFCS   ΗΜΕΡΑ ΡΟΗΣ         = '!!DATE ();
+       WRITE FILE(PRT) FROM(ERLINE);
+       ERLIN1=' ';
+
+       ERLIN2='ΠΡΟΒΛΗΜΑ ΣΤΟ ΠΡΟΓΡΑΜΜΑ DDPFCS  TΟ ΠΡΟΓΡΑΜΜΑ ΘΑ ΣΚΑΣΕΙ';
+       WRITE FILE(PRT) FROM(ERLINE);
+       ERLIN2='ΤΟ ΠΡΟΒΛΗΜΑ ΠΑΡΟΥΣΙΑΣΤΗΚΕ ΣΤHN PROCEDURE : '!!PRC;
+       WRITE FILE(PRT) FROM(ERLINE);
+       ERLIN2='ΣΤΟ RECORD ΜΕ ΑΡΙΘΜΟ    : '!!CHAR(CNT_Records_Read);
+       WRITE FILE(PRT) FROM(ERLINE);
+       ERLIN2='ΣΤΗΝ ΓΡΑΜΜΗ ΤΟΥ ΚΩΔΙΚΑ  : '!!LINE;
+       WRITE FILE(PRT) FROM(ERLINE);
+       ERLIN2=MSG;
+       WRITE FILE(PRT) FROM(ERLINE);
+       ERLIN2='***************************************************';
+       WRITE FILE(PRT) FROM(ERLINE);
+       WS_BOOM = WS_BOOM /  WS_ZERO  ; /*JUST CRASH*/
+   END ERROR        ;
+  /**************************************************************
+  *  ERROR                           END                        *
+  **************************************************************/
+ TELOS:
+   L1 = '1';
+   L2 =' *Σύνολα Προγράμματος DDPFCS  *';
+   WRITE FILE(PRT) FROM(LINE);
+   L1     = ' ';
+   L2 =
+  ' *************************************************************** ' ;
+   WRITE FILE(PRT) FROM(LINE);
+   L2 =' *Ημέρα Καί Ωρα Ροής :  '!!MY_DATETIME;
+   WRITE FILE(PRT) FROM(LINE);
+   L =
+  ' *************************************************************** ' ;
+   WRITE FILE(PRT) FROM(LINE);
+   CNT = CNT_Records_Read ;
+   L2 =' Διαβάστηκαν '!!CNT!!' εγγραφές απο το αρχείο : '
+          !!FILEDDWORD(FCS,'FILENAME');
+   WRITE FILE(PRT) FROM(LINE);
+   L2 =
+  ' *************************************************************** ' ;
+   WRITE FILE(PRT) FROM(LINE);
+  END  DDPFCS;
+

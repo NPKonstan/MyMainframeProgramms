@@ -1,0 +1,484 @@
+ /* PROCESS A,GOSTMT,NEST,OPT(TIME),AG,MI('+'),MAP,X,S,INCLUDE;       */
+ /*                     DK366                                     */
+ /* ************************************************************* */
+ /* c                                                             */
+ /*      Y2000                                                    */
+ /*                    ***  D K 3 6 6   ***                       */
+ /*        dHMIOYPcIA APXEIxN cIA PANAFON                         */
+ /*                                                               */
+ /*        MAYPOcIxPcH ANdPIANH                                   */
+ /*  UPDATE      Y2000  XxPIr AkkAcH           r.A.    1.7.98     */
+ /*  UPDATE      OXI ASCII APXEIA              r.A.   25.2.2000   */
+ /*  UPDATE      AkkAcH rTHN EKTYpxrH          r.A.   25.4.2000   */
+ /*  UPDATE      AkkAcH rTIr EpxNYMIEr         r.A.   25.5.2001   */
+ /*  UPDATE      AkkAcH rTIr EpxNYMIEr         r.A.   08.6.2001   */
+ /*  UPDATE      аккацг стом ояисло тоу PPOSO ысте ма деветаи     */
+ /*              дейадийа(циа еуяы). еписис,аккацг стис летабкгтес*/
+ /*              ейтупысгс                 THEODOG    27.12.2001  */
+ /* ************************************************************* */
+ PROG: PROC OPTIONS(MAIN);
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+ /*** MVS-MS DATE SIMULATION VARIABLES ***/
+ DCL CZX3VDAT CHAR(6); FETCH CZXDATEP;
+ DCL CZXDATEP ENTRY OPTIONS(INTER,ASM) ;
+ /***            END OF MVS-MS INSERT            ***/
+ /* ------------------------------------------------------------- */
+                                          /*    APXEIA            */
+ DCL FILMOV  FILE RECORD  INPUT ENV(
+     FB RECSIZE(74)                            );
+ DCL FILOUT1 FILE RECORD OUTPUT ENV(
+     FB RECSIZE(118)                                       );
+ /*  FB RECSIZE(118)                           ASCII       ); */
+ DCL FILOUT2 FILE RECORD OUTPUT ENV(
+     FB RECSIZE(118)                                       );
+ DCL FILOUT3 FILE RECORD OUTPUT ENV(
+     FB RECSIZE(118)                                       );
+ DCL FILOUT4 FILE RECORD OUTPUT ENV(
+     FB RECSIZE(118)                                       );
+ DCL FILOUT5 FILE RECORD OUTPUT ENV(
+     FB RECSIZE(118)                                       );
+ DCL FILOUT6 FILE RECORD OUTPUT ENV(
+     FB RECSIZE(118)                                       );
+ DCL PRINT FILE RECORD OUTPUT
+     ENV(FB RECSIZE(133)                    CTLASA);
+ DCL FFILE FILE VARIABLE;
+ /* ------------------------------------------------------------- */
+                                          /*    RECORDS           */
+ DCL  IOAREA    CHAR(74) BASED(ADDR(RECISKAT));
+ %INCLUDE  RECMOV ;
+
+ DCL 1 R0OUT,
+     2  R0TYPE   CHAR(1)     INIT('0'),
+     2  R0FIL0   CHAR(06)    INIT('0'),
+     2  R0BANK   CHAR(09)    INIT('0'),
+     2  R0DJUL,
+        3  R0DYJ CHAR(2)     INIT('0'),
+        3  R0DDJ CHAR(3)     INIT('0'),
+     2  R0PEL    CHAR(7)     INIT('0'),
+     2  R0DATE   CHAR(6)     INIT('0'),
+     2  R0FIL    CHAR(84)    INIT(' ');
+
+ DCL 1 R1OUT,
+     2  R1TYPE   CHAR(1)      INIT('1'),
+     2  R1TUN,
+        3  R1DATE   CHAR(6)   INIT('0'),
+        3  R1KATM   CHAR(3)   INIT('0'),
+        3  R1WSTA   CHAR(3)   INIT('0'),
+        3  R1FIL0   CHAR(1)   INIT('0'),
+        3  R1SNUM   CHAR(3)   INIT('0'),
+     2  R1ANTIF  CHAR(1)      INIT('0'),
+     2  R1ANTI   CHAR(15)     INIT('0'),
+     2  R1KVDA   CHAR(3)      INIT('0'),
+     2  R1POSO   CHAR(10)     INIT('0'),
+     2  R1XRPS   CHAR(1)      INIT('0'),
+     2  R1NEPI   CHAR(8)      INIT('0'),
+     2  R1VALE   CHAR(6)      INIT('0'),
+     2  R1FIL1   CHAR(5)      INIT(' '),
+     2  R1AMS    CHAR(08)     INIT('0'),
+     2  R1FIL2   CHAR(12)     INIT(' '),
+     2  R1FIL3   CHAR(32)     INIT('0');
+
+ DCL 1 R2OUT,
+     2  R2TYPE   CHAR(1)     INIT('2'),
+     2  R2ARKI   CHAR(9)     INIT('0'),
+     2  R2SPOS   CHAR(12)    INIT('0'),
+     2  R2FILE   CHAR(96)    INIT(' ');
+
+ DCL LINE CHAR(133) INIT(' ');
+
+ DCL 1 H1,
+     2 H1C        CHAR(01)    INIT('1'),
+     2 H1F1       CHAR(10)             INIT(' ETAIPIA: '),
+     2 H1LO       PIC'ZZZZZZZZZZZZZZ9' INIT(0),
+     2 H1LEK      CHAR(22)             INIT(' '),
+     2 H1F2       CHAR(85)             INIT(' ');
+
+ DCL 1 H2,
+     2 H2C        CHAR(01)    INIT('0'),
+     2 H2F1       CHAR(59)    INIT(
+ 'HM/NIA KAT W.ST.      pOrO X/p VALEUR AP.MHTPxOY rYNd.'),
+     2 H2F2       CHAR(73)    INIT(' ');
+
+ DCL 1 LINE2,
+     2 L2C        CHAR(1)        INIT(' '),
+     2 L2HMNIA,
+       3 L2D1     PIC'99'        INIT(0),
+       3 L2M1     PIC'99'        INIT(0),
+       3 L2Y1     PIC'99'        INIT(0),
+     2 L2F1       CHAR(1)        INIT(' '),
+     2 L2KAT      CHAR(3)        INIT(' '),
+     2 L2F2       CHAR(1)        INIT(' '),
+     2 L2TER      CHAR(1)        INIT(' '),
+     2 L2F3       CHAR(1)        INIT(' '),
+     2 L2TRT      CHAR(3)        INIT(' '),
+     2 L2F4       CHAR(1)        INIT(' '),
+     2 L2POS      PIC'ZZZZZZZZ9' INIT(0),
+     2 L2F5       CHAR(1)        INIT(' '),
+     2 L2XRPS     PIC'9'         INIT(0),
+     2 L2F6       CHAR(1)        INIT(' '),
+     2 L2DATE,
+       3 L2D2     PIC'99'        INIT(0),
+       3 L2M2     PIC'99'        INIT(0),
+       3 L2Y2     PIC'99'        INIT(0),
+     2 L2F7       CHAR(1)        INIT(' '),
+     2 L2AMS      PIC'ZZZZZZZ9'  INIT(0),
+     2 L2F8       CHAR(88)       INIT(' ');
+
+ DCL 1 LINE3,
+     2 L3C        CHAR(1)        INIT(' '),
+     2 L3F1       CHAR(30)       INIT(' pkHhOr KINHrExN kOcAPIArMOY: '),
+     2 L3ARLO     PIC'ZZZZZZZZ9' INIT(0),
+     2 L3F2       CHAR(2)        INIT(' '),
+     2 L3PLKI     PIC'ZZZZZZZZ9' INIT(0),
+     2 L3F3       CHAR(10)       INIT(' '),
+     2 L3F4       CHAR(15)       INIT('rYNOkIKO pOrO: '),
+     2 L3SPOS     PIC'ZZZZZZZZZZZ9V,99' INIT(0),
+     2 L3F5       CHAR(42)       INIT(' ');
+
+ /* ------------------------------------------------------------- */
+                                          /*    WORK AREA         */
+ DCL ARIN    PIC'(15)9'  INIT(0);
+ DCL AROU1   PIC'(9)9'   INIT(0);         /* pkHhOr KIN.kOcAP.ET.1*/
+ DCL SYNPO1  PIC'(10)9V99'  INIT(0);      /* rYNOkIKO pOrO ETAIP  */
+ DCL FSYNPO1 FIXED(15,2) INIT(0);         /* rYNOkIKO pOrO ETAIP  */
+
+ DCL FIRST   PIC'9'      INIT(1);         /* FIRST TIME READ      */
+ DCL ARGRA   PIC'99'     INIT(0);         /* AhPOIrTHr cPAMMxN     */
+ DCL OLDET   FIXED(9,0)  INIT(0);         /* OLD COMPANY          */
+
+ DCL ADDR      BUILTIN;
+ DCL PRIORITY  BUILTIN;/****  DATE SIMULATION DEFINED FUNCTION  ****/
+ DATE: PROC IRREDUCIBLE RETURNS(CHAR(6)) ;
+       CALL CZXDATEP          ( CZX3VDAT) ;
+       RETURN (CZX3VDAT) ;
+       END DATE ;
+ /****        END OF MVS-MS INSERT        ****/
+ DCL MOD       BUILTIN;
+
+ DCL CDATE     CHAR(6)    INIT(' ');
+ DCL PDATE     PIC'(6)9'   BASED(ADDR(CDATE));
+ DCL PKSMSKAT  PIC'(3)9'   BASED(ADDR(KSMSKAT));
+ DCL PKSMSTERM PIC'9'      BASED(ADDR(KSMSTERM));
+ DCL PKSMARTRT PIC'(3)9'   BASED(ADDR(KSMARTRT));
+ /*DCL PPOSO     PIC'(10)9'  INIT(0); */
+ DCL PPOSO     PIC'(8)9V99'  INIT(0); /* ALLAGH GIA TO EURO */
+ DCL PKSMARLOG PIC'(09)9'  INIT(0);
+ DCL PKSMAREP  PIC'(09)9'  INIT(0);
+ DCL PKSMARE8  PIC'(08)9'  BASED(ADDR(PKSMAREP));
+ DCL KSMARE8B  BIT(40)     BASED(ADDR(KSMAREP));
+ DCL MAXI      PIC'(2)9'   INIT(6);         /* MAX TIMH APXEIxN     */
+ DCL II        PIC'(2)9'   INIT(0);         /* METPHTHr A           */
+
+                                           /* pINAKAr kEKTIKxN ET.*/
+                        /* 25.05.2001 */   /* pINAKAr kEKTIKxN ET.*/
+ DCL PINLEK(MAXI) CHAR(25) INIT('NEXTNET SA(pP.CITICOM SA)'  ,
+                                'NEXTNET SA(pP.KORASIDIS)'   ,
+                                'PANAFON AEET(pP.UNIFON)' ,
+                                'VIAFON SA'                  ,
+                                'PANAFON AEET(pP.PANAVOX)',
+                                'MOBITEL  ')                 ;
+                                           /* pINAKAr kOcAPIArMxN */
+ DCL PLOG(MAXI)  PIC'(9)9' INIT(082925261                      ,
+                                083370025                      ,
+                                083370068                      ,
+                                083370076                      ,
+                                083379251                      ,
+                                084048020)                     ;
+                                      /* pINAKAr rYN.pOrOY / kOcAP */
+ DCL PPOS(MAXI)  PIC'(10)9V,99' INIT(0);
+     PPOS ='';                        /* pINAKAr rYN.RECORDS / kOcAP */
+ DCL PAROU1(MAXI)  PIC'(09)9' INIT(0);
+     PAROU1 = '';
+ /* ------------------------------------------------------------- */
+ /* BOHhHTIKA pEdIA cIA THN METATPOpH THr HMEPOMHNIAr rE IOYkIANH */
+ /* ------------------------------------------------------------- */
+     DCL   LEAPF           PIC'9'     INIT(0);
+     DCL   REM             PIC'(3)9'  INIT(0);
+     DCL 1 JDOUT1,
+         2  YEAROUT        PIC'(2)9'  INIT(0),  /* YEAR OUTPUT      */
+         2  DAYOUT         PIC'(3)9'  INIT(0);  /* DAY OUTPUT JOYLIAN */
+
+     DCL  YEARALLH         PIC'9999'  INIT(0);  /* ETOr rE pkHPH MOPuH*/
+     DCL 1 YEARALL,
+         2  YA1            PIC'99'    INIT(0),
+         2  YA2            PIC'99'    INIT(0);
+      DCL   DHELP1 PIC'(6)9' INIT(0);
+      DCL 1 DHELP BASED(ADDR(DHELP1)),    /* INPUT HMEPOMHNIA    */
+          2  YYH            PIC'99',
+          2  MMH            PIC'99',
+          2  DDH            PIC'99';
+     DCL COUNT_REC FIXED(15) INIT(1);
+ /* ------------------------------------------------------------- */
+ /*                  MAIN PROGRAM                                 */
+ /* ------------------------------------------------------------- */
+     OPEN FILE(FILMOV),
+          FILE(PRINT);
+     ON ENDFILE(FILMOV) BEGIN;
+               KSMARLOG=999999999;
+               IF COUNT_REC  = 1 THEN GOTO TELALL;
+     END;
+
+     CDATE = DATE;
+     READ FILE(FILMOV) INTO(IOAREA);        /*READ FIST TIME      */
+     DO II = 1 TO MAXI;
+        IF II = 1 THEN FFILE = FILOUT1;
+        IF II = 2 THEN FFILE = FILOUT2;
+        IF II = 3 THEN FFILE = FILOUT3;
+        IF II = 4 THEN FFILE = FILOUT4;
+        IF II = 5 THEN FFILE = FILOUT5;
+        IF II = 6 THEN FFILE = FILOUT6;
+
+        OPEN  FILE(FFILE);
+        FIRST = 1;
+        ARGRA = 1;
+
+ RR:
+        KSMHMNIA=DATE;
+        IF FIRST ^=1 THEN DO;
+            READ FILE(FILMOV) INTO(IOAREA);
+            COUNT_REC = COUNT_REC  + 1;
+        END;
+        /* IF KSMTYPE^='KMOVESEG' THEN GOTO RR;NPK DONT LOOP */
+
+        IF FIRST = 1 THEN DO;
+           FIRST = 0;
+
+           R0FIL0 = '000000';
+           PKSMARLOG = PLOG(II);
+           R0BANK = PKSMARLOG;
+           DHELP1 = KSMHMNIA;
+           CALL CHDATE;
+           R0DYJ = YEAROUT;
+           R0DDJ = DAYOUT;
+           R0PEL = '0000000';
+           R0DATE = CDATE ;
+           WRITE FILE(FFILE) FROM(R0OUT);
+           H1LO = PLOG(II);
+           H1LEK = PINLEK(II);
+      /*   WRITE FILE(PRINT) FROM(H1);      25.04.2000 */
+           ARGRA = ARGRA + 1;
+           LINE = ' '!!(132)'-';
+      /*   WRITE FILE(PRINT) FROM(LINE);    25.04.2000 */
+           LINE = ' ';
+           ARGRA = ARGRA + 1;
+      /*   WRITE FILE(PRINT) FROM(H2);      25.04.2000 */
+           ARGRA = ARGRA + 1;
+           LINE = ' '!!(132)'-';
+      /*   WRITE FILE(PRINT) FROM(LINE);   25.04.2000 */
+           LINE = ' ';
+           ARGRA = ARGRA + 1;
+        END;
+
+        IF KSMARLOG=PLOG(II) THEN GOTO WRREC1;
+        IF KSMARLOG>PLOG(II) THEN DO;
+           GOTO TELOS ;
+        END;
+        IF KSMARLOG<PLOG(II) THEN CALL MESS;
+
+ WRREC1:
+        ARIN = ARIN + 1;
+        DHELP1 = KSMHMNIA;
+        R1DATE = DHELP1;
+        R1KATM = PKSMSKAT;
+        R1WSTA = PKSMSTERM;
+        R1SNUM = PKSMARTRT;
+        R1ANTI = (15)'0';
+        R1KVDA = '000';
+        PPOSO = KSMPOSON;
+        R1POSO = PPOSO;
+
+        R1XRPS = '1';
+        IF (KSMTRKWD = 'KTX1' ! KSMTRKWD = 'KTE1') THEN DO;
+           R1XRPS = '2';
+        END;
+
+ R1:    IF R1XRPS = '1' THEN FSYNPO1 =FSYNPO1 + KSMPOSON;
+        ELSE FSYNPO1 = FSYNPO1 - KSMPOSON;
+        SYNPO1 = FSYNPO1;
+        R1NEPI = (8)'0';
+        DHELP1 = KSMAXIA;
+        R1VALE = DHELP1;
+        R1AMS = '0';
+        IF (KSMTRKWD = 'KK11' ! KSMTRKWD = 'KTX1' !
+            KSMTRKWD = 'KTp1' )    THEN DO;
+            IF KSMARE8B^='0'B THEN DO;
+               PKSMAREP = KSMAREP;
+               R1AMS = PKSMARE8;
+           END;
+        END;
+        R1FIL2 = (12)' ';
+        R1FIL3 = (32)'0';
+        WRITE FILE(FFILE) FROM(R1OUT);
+        AROU1 = AROU1 + 1;
+        IF ARGRA > 60 THEN DO;
+           ARGRA = 0;
+        /* WRITE FILE(PRINT) FROM(H2);       25.04.2000 */
+           ARGRA = ARGRA + 1;
+           LINE = ' '!!(132)'-';
+        /* WRITE FILE(PRINT) FROM(LINE);     25.04.2000 */
+           LINE = ' ';
+           ARGRA = ARGRA + 1;
+        END;
+ /*------------ ETOIMArIA ANAkYTIKHr cPAMMHr EKTYpxrHr --------------*/
+        DHELP1 = KSMHMNIA;
+        L2D1  = DDH;
+        L2M1  = MMH;
+        L2Y1  = YYH;
+        L2KAT = KSMSKAT;
+        L2TER = KSMSTERM;
+        L2TRT = KSMARTRT;
+        L2POS = KSMPOSON;
+        L2XRPS = 1;
+        IF (KSMTRKWD = 'KTX1' ! KSMTRKWD = 'KTE1') THEN  DO;
+           L2XRPS = 2;
+        END;
+   L2:  DHELP1 = KSMAXIA;
+        L2D2   = DDH;
+        L2M2  = MMH;
+        L2Y2  = YYH;
+        L2AMS = 0;
+        IF (KSMTRKWD = 'KK11' ! KSMTRKWD = 'KTX1' !
+            KSMTRKWD = 'KTp1' )    THEN DO;
+            IF KSMARE8B^='0'B THEN DO;
+               PKSMAREP = KSMAREP;
+               L2AMS = PKSMARE8;
+           END;
+        END;
+    /*  WRITE FILE(PRINT) FROM(LINE2);           25.04.2000 */
+        ARGRA = ARGRA + 1;
+ /*--------END  ETOIMArIA ANAkYTIKHr cPAMMHr EKTYpxrHr --------------*/
+        GOTO RR;
+
+ TELOS:
+        R2ARKI = AROU1;
+        R2SPOS = SYNPO1;
+        PPOS(II) = SYNPO1;
+        PAROU1(II) = AROU1;              /* 25.04.2000 */
+        WRITE FILE(FFILE) FROM(R2OUT);
+
+        LINE   = ' '!!(132)'-';
+   /*   WRITE FILE(PRINT)  FROM(LINE);     25.04.2000 */
+        LINE   = ' ';
+ /*------------ ETOIMArIA cPAMMHr rYNOkxN ---------------------------*/
+       L3ARLO  =  PLOG(II);
+       L3PLKI  = AROU1;
+       L3SPOS  = SYNPO1;
+  /*   WRITE FILE(PRINT)  FROM(LINE3);      25.04.2000 */
+       SYNPO1  = 0;
+       FSYNPO1  = 0;
+       AROU1   = 0;
+       ARGRA   = 0;
+        LINE   = ' '!!(132)'-';
+  /*    WRITE FILE(PRINT)  FROM(LINE); 25.04.2000 */
+        LINE   = ' ';
+ /*--------END  ETOIMArIA cPAMMHr rYNOkxN ---------------------------*/
+        CLOSE FILE(FFILE);
+    END;
+
+ TELALL:
+ /*-----------  ETOIMArIA rYMuxNIAr   -------------------------------*/
+    AROU1      = 0;
+    SYNPO1 = 0;
+    FSYNPO1 = 0;
+ /*-----------  ETOIMArIA rEkIdAr cIA I/O ---------------------------*/
+    LINE       = '1'!!'*** D K 3 6 6 ***';
+    WRITE FILE(PRINT)      FROM(LINE);
+
+    IF COUNT_REC = 1 THEN DO ;
+         LINE  = ' дем бяехгйе йаллиа еццяажг !!!  ';
+         WRITE FILE(PRINT)      FROM(LINE);
+         GOTO PIOTELOS;
+    END;
+
+    LINE       = ' ';
+    LINE       = ' '!!'ETAIPIA                       kOcAPIArMOr    '!!
+                  'EccPAuEr             pOrO';    /* 25.04.2000 */
+    WRITE FILE(PRINT)      FROM(LINE);
+    LINE       = ' ';
+    LINE       = ' '!!'--------------------------------------------'!!
+                  '--------------------------';
+    WRITE FILE(PRINT)      FROM(LINE);
+    LINE       = ' ';
+    II = 1;
+    DO II = 1 TO MAXI;
+       LINE = ' '!!PINLEK(II)!!'     '!!PLOG(II)!!'     '!!PAROU1(II)!!
+               '     ' !! PPOS(II)  ;        /* 25.04.2000 */
+       WRITE FILE(PRINT) FROM(LINE);
+       LINE = ' ';
+    END;
+    CLOSE FILE(FFILE) ;
+
+    PIOTELOS:
+    CLOSE FILE(FILMOV),
+          FILE(PRINT);
+ /* ------------------------------------------------------------- */
+ /*    PROCEDURE    cIA THN METATPOpH THr HMEPOMHNIAr rE IOYkIANH */
+ /* ------------------------------------------------------------- */
+ CHDATE: PROC;
+         YA2 = YYH;
+         IF YA2 > 89 THEN YA1=19;
+         IF YA2 <= 89 THEN YA1=20;
+         CALL FLEAP;
+         CALL WROUT;
+
+    FLEAP: PROC;
+           LEAPF = 0;
+           REM = MOD(YEARALLH,400);
+           IF REM = 0 THEN  LEAPF = 1;
+           ELSE DO;
+              REM = MOD(YEARALLH,100);
+              IF REM^= 0 THEN  DO;
+                 REM = MOD(YEARALLH,4);
+                 IF REM = 0 THEN  LEAPF = 1;
+              END;
+          END;
+    END FLEAP;
+
+    WROUT: PROC;
+           YEAROUT = YYH;
+           IF LEAPF = 1 THEN CALL FJOULL;
+           ELSE  CALL FJOUL;
+    END WROUT;
+
+    FJOULL: PROC;
+            IF MMH = 01 THEN DAYOUT = 001+DDH-1;
+            IF MMH = 02 THEN DAYOUT = 032+DDH-1;
+            IF MMH = 03 THEN DAYOUT = 061+DDH-1;
+            IF MMH = 04 THEN DAYOUT = 092+DDH-1;
+            IF MMH = 05 THEN DAYOUT = 122+DDH-1;
+            IF MMH = 06 THEN DAYOUT = 153+DDH-1;
+            IF MMH = 07 THEN DAYOUT = 183+DDH-1;
+            IF MMH = 08 THEN DAYOUT = 214+DDH-1;
+            IF MMH = 09 THEN DAYOUT = 245+DDH-1;
+            IF MMH = 10 THEN DAYOUT = 275+DDH-1;
+            IF MMH = 11 THEN DAYOUT = 306+DDH-1;
+            IF MMH = 12 THEN DAYOUT = 336+DDH-1;
+    END FJOULL;
+
+    FJOUL: PROC;
+           IF MMH = 01 THEN DAYOUT = 001+DDH-1;
+           IF MMH = 02 THEN DAYOUT = 032+DDH-1;
+           IF MMH = 03 THEN DAYOUT = 060+DDH-1;
+           IF MMH = 04 THEN DAYOUT = 091+DDH-1;
+           IF MMH = 05 THEN DAYOUT = 121+DDH-1;
+           IF MMH = 06 THEN DAYOUT = 152+DDH-1;
+           IF MMH = 07 THEN DAYOUT = 182+DDH-1;
+           IF MMH = 08 THEN DAYOUT = 213+DDH-1;
+           IF MMH = 09 THEN DAYOUT = 244+DDH-1;
+           IF MMH = 10 THEN DAYOUT = 274+DDH-1;
+           IF MMH = 11 THEN DAYOUT = 305+DDH-1;
+           IF MMH = 12 THEN DAYOUT = 335+DDH-1;
+    END FJOUL;
+ END CHDATE;
+ /* ------------------------------------------------------------- */
+ /*    PROCEDURE    MESSAGES                                      */
+ /* ------------------------------------------------------------- */
+ MESS: PROC;
+           LINE = ' '!!'ApAPAdEKTOr kOcAPIArMOr KINHrHr';
+           WRITE FILE(PRINT) FROM(LINE);
+           LINE = ' ';
+           ARGRA = ARGRA/0;               /* CANCEL>>>>>>>>>>>> */
+ END MESS;
+ /* ------------------------------------------------------------- */
+ END PROG;
+

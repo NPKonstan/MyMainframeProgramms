@@ -1,0 +1,1007 @@
+ /* *************************************************************** */
+ /* коцистийа циа пкаисио 77102 KAI OXI MONO                        */
+ /* EFDATID = 11 пкаисио            77102   */
+ /* EFDATID = 13 SFS HELLAS FINANCE 73002 N */
+ /* EFDATID = 14 TELLAS             70502   */
+ /* EFDATID = 15 E.T.A.O.           76002   */
+ /* EFDATID = 16 INTERASCO          75402 N */
+ /* EFDATID = 17 лисекем            74102 N */
+ /* EFDATID = 18 BMW                72302 N */
+ /* EFDATID = 19 IATA BSP           75802   */
+ /* EFDATID = 20 IATA CASS          75902   */
+ /* *************************************************************** */
+ /* EFDATID = 21 TEAGE              76502   */
+ /* EFDATID = 22 ING ZOHS           76702 N */
+ /* EFDATID = 23 ING GENIKON ASFALE 76802 N */
+ /* *************************************************************** */
+ EF126 : PROC OPTIONS(MAIN);
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+ DCL CZX3VDAT CHAR(6); FETCH CZXDATEP;
+ DCL CZXDATEP ENTRY OPTIONS(INTER,ASM) ;
+ DCL EXTRAIT FILE RECORD OUTPUT ENV( FB RECSIZE(91) );
+ DCL EFORIA  FILE RECORD INPUT  ENV( FB RECSIZE(190) );
+ DCL MSAFIL  FILE RECORD OUTPUT ENV( FB RECSIZE(80) );
+ DCL PRINTF  FILE RECORD OUTPUT ENV( FB RECSIZE(133) CTLASA);
+ DCL READER  FILE RECORD INPUT  ENV( FB RECSIZE(80) );
+ %PAGE;
+ %INCLUDE EFFILDS  ;
+ %INCLUDE DAYRTNS  ;
+ %INCLUDE COBRANDS ;
+ %INCLUDE RECTABLE;
+ DCL TABLES FILE RECORD DIRECT INPUT
+     KEYED
+     ENV ( VSAM );
+ DCL VSAM_KEY             CHAR ( 10 ) BASED ( ADDR ( TABLEKEY ) );
+ DCL WKEY            PIC '999999'   INIT(0);
+ DCL PROM_ENPL1(99999)  PIC'999V99'    INIT((99999)0);
+ DCL PROM_ENPL2(99999)  PIC'999V99'    INIT((99999)0);
+ DCL PROM_ENPL3(99999)  PIC'999V99'    INIT((99999)0);
+ DCL PROM_ENPL4(99999)  PIC'999V99'    INIT((99999)0);
+ DCL PROM_ORG(99999)   PIC'999999'    INIT((99999)0);
+ DCL PROM_ORG555(99999)   PIC'999999'    INIT((99999)0);
+ DCL PROM_ORGATM(99999)   PIC'999999'    INIT((99999)0);
+ DCL II              PIC'99999'    INIT(0);
+  /*************  cPAMMH  EKTYpxrHr   ********************************/
+  DCL 1 LIN,
+        2 CTR   CHAR(1)   INIT('1')     ,
+        2 GRAMM CHAR(132) INIT((132)' ');
+  /*************  cPAMMH  EKTYpxrHr   ********************************/
+    DCL  ENA  STATIC CHAR(24)
+        INIT ('ABcdEZHhIKkMNnOpPrTYuXwx');
+    DCL  DYO  STATIC CHAR(24) STATIC
+        INIT ('абцдефгхийклмнопястужвьы');
+
+
+ %PAGE;
+   DCL   1   RECREAD,
+             2 C1        CHAR(1)         INIT(' '),
+             2 CORG      CHAR(5)         INIT(' '),
+             2 C2        CHAR(1)         INIT(' '),
+             2 CPROM     CHAR(4)         INIT(' '),
+             2 C3        CHAR(69)        INIT(' ');
+
+ %PAGE;
+   DCL   1   BATHEAD,
+             2 ITRXCOD   CHAR(2)         INIT('BH'),
+             2 ICOMP     CHAR(4)         INIT('CEUR'),
+             2 ISYSNO    CHAR(4)         INIT('  01'), /*DES MESA */
+             2 IDTYPE    PIC'9'          INIT(2),
+             2 IAMOUNT   PIC'999999999999V99'  INIT(0),
+             2 ICAPO     CHAR(1)         INIT(' '),
+             2 IEFFDATE  PIC'(6)9'       INIT(0),
+             2 IREST     CHAR(48)        INIT((48)' ');
+   DCL   1   PT1REC,
+             2 ITRXCOD1  CHAR(2)         INIT('PT'),
+             2 IITEM1    PIC'(4)9'       INIT(0),
+             2 IID1      PIC'9'          INIT(1),
+             2 IDRCR     PIC'(2)9'       INIT(0),
+             2 ICOMP1    CHAR(4)         INIT('CEUR'),
+             2 IACCFIL   CHAR(08)        INIT((08)' '),
+             2 IACCOUNT  CHAR(10)         INIT((10)' '),
+             2 ICENTFIL  CHAR(8)         INIT((8)' '),
+             2 ICENTER   PIC'(4)9'       INIT(0),
+             2 ISOURCE   CHAR(2)         INIT(' '), /* DES MESA */
+             2 ISOUFIL   CHAR(8)         INIT((8)' '),
+             2 IEFFDAT1  PIC'(6)9'       INIT(0),
+             2 IAMT1     PIC'99999999999V99' INIT(0),
+             2 IFILLER1  CHAR(8)         INIT((8)' ');
+   DCL   1   PT2REC,
+             2 ITRXCOD2  CHAR(2)         INIT('PT'),
+             2 IITEM2    PIC'(4)9'       INIT(0),
+             2 IID2      PIC'9'          INIT(2),
+             2 IDESC1    CHAR(30)        INIT((30)' '),
+             2 IDESC2    CHAR(2)         INIT('  '), /* DES MESA */
+             2 IDESC22   CHAR(3)         INIT(' '),
+             2 IFILLER2  CHAR(38)        INIT((38)' ');
+ %PAGE;
+     /***************************************************************/
+ DCL     POSO_NO_FPA   FIXED(15,2) INIT(0);/*посо пяолгхеиас выяис жпа*/
+ DCL     WORK_FPA      FIXED(15,3) INIT(0);
+ DCL     WKR2          FIXED(15,2) INIT(0);
+ DCL     SUMEUR        FIXED(15,2) INIT(0);
+ DCL     CONCAT        CHAR(1) INIT(' ');
+ DCL     RETCOD        CHAR(1) INIT(' ');
+ DCL     ZPOSON        PIC 'ZZZZ.ZZZ.ZZZ.ZZ9V,99';
+
+ /*   RECORD   cIA EXTRAITS  YpOKATArTHMATxN                   */
+ DCL 1   RECEXTRAITS   ,
+      2  HMKATOL       CHAR(6)     INIT(' '), /* HMEPOMHNIA KAhOkIKOY */
+      2  TRAPEZA       PIC '9'     INIT(0),   /* TPApEZA              */
+      2  KATSYN        PIC '999'   INIT(0),   /* KATArTHMA rYNAkkAcHr */
+      2  HMKATAS       CHAR(6)     INIT(' '), /* HMEPOMHNIA KATAr/TOr */
+      2  SYNXRE        FIXED(15,2) INIT(0)  , /* rYNOkO XPExrHr       */
+      2  SYNPIS        FIXED(15,2) INIT(0)  , /* rYNOkO pIrTxrHr      */
+      2  EPIPIS        FIXED(7)    INIT(0),   /* pIrTxrH EpITAcxN     */
+      2  EPIXRE        FIXED(7)    INIT(0),   /* XPExrH  EpITAcxN     */
+      2  ENTPIS        FIXED(7)    INIT(0),   /* pIrTxrH ENTOkxN      */
+      2  ENTXRE        FIXED(7)    INIT(0),   /* XPExrH  ENTOkxN      */
+      2  LIPPIS        FIXED(7)    INIT(0),   /* pIrTxrH kOIpxN       */
+      2  LIPXRE        FIXED(7)    INIT(0),   /* XPExrH  kOIpxN       */
+      2  AITIOL        CHAR(2)     INIT(' '), /* AITIOkOcIA           */
+      2  FILLER2       CHAR(33)    INIT(' '); /* KENO                 */
+
+
+ /************   K A T H R C     ****************************/
+ /* ***AKATMA=hYPIdA ***** BKATMA = KATMA pOY ANHKEI H hYPIdA */
+ DCL KATHRC  ENTRY(        PIC'999',PIC'999')
+             OPTIONS(ASSEMBLER,INTER); FETCH KATHRC  ;
+   DCL   1   AKATMA  PIC'999' INIT(0);
+   DCL   1   BKATMA  PIC'999' INIT(0);
+ /* ***********************************************************/
+
+   DCL Z             FIXED(3)  INIT(0);
+   DCL 1 LINE1,
+         2 L1SKIP  CHAR(01)   INIT('1'),
+         2 L1FIL1  CHAR(40)   INIT('EMпояийг TPAпEZA THс Eккадос AE'),
+         2 L1FIL2  CHAR(10)   INIT((10)' '),
+         2 L1FIL3  CHAR(55)   INIT((*)' '),
+         2 L1FIL4  CHAR(15)   INIT('*EF126*    сEк:'),
+         2 L1SEL   PIC'(05)Z' INIT(0),
+         2 L1FIL5  CHAR(07)   INIT((*)' ');
+   DCL 1 LINE2,
+         2 L2SKIP  CHAR(01)   INIT(' '),
+         2 L2FIL1  CHAR(40)   INIT('дIEYхумсг пкгяожояийгс  '),
+         2 L2FIL2  CHAR(30)   INIT(' HMEPOMHNIA коцистийопоигсгс:'),
+         2 L2FIL5  PIC'99.'   INIT(0),
+         2 L2FIL6  PIC'99.'   INIT(0),
+         2 L2FIL7  PIC'99'    INIT(0),
+         2 L2FIL4  CHAR(54)   INIT((*)' ');
+   DCL 1 LINE3,
+         2 L3SKIP  CHAR(01)   INIT(' '),
+         2 L3FIL1  CHAR(10)   INIT('ежаялоцг :'),
+         2 L3FIL2  CHAR(122)   INIT((122)' ');
+   DCL 1 LINE4,
+         2 L4SKIP  CHAR(01)   INIT(' '),
+         2 L4FIL1  CHAR(132)
+           INIT('коцистийес еццяажес циа TO MSA');
+   DCL 1 LINE6,
+         2 L6FIL1 CHAR(01)    INIT(' '),
+         2 L6FIL2 CHAR(132)   INIT((132)' ');
+   DCL 1 LINE8,
+         2 L8FIL1  CHAR(01)   INIT(' '),
+         2 L8FIL3  CHAR(132)   INIT((132)'-');
+   DCL 1 LINE17,
+         2 L17FIL1  CHAR(01)             INIT('0'),
+         2 L17FIL2  CHAR(12)             INIT('сумоко RECOR'),
+         2 L17FIL3  CHAR(18)             INIT('DS поу цяажTHKAN  '),
+         2 L17FIL4  CHAR(20)             INIT(' сто MSA     '),
+         2 OUTCOUNT PIC'ZZZZZ9'          INIT(0),
+         2 L17FIL5  CHAR(13)             INIT('             '),
+         2 L17FIL6  CHAR(63)             INIT(' ');
+   DCL 1 LINE18,
+         2 L18FIL1  CHAR(01)             INIT('0'),
+         2 L18FIL2  CHAR(15)             INIT('сумоко BATCH HE'),
+         2 L18FIL3  CHAR(05)             INIT('ADER '),
+         2 L18FIL4  CHAR(12)             INIT(' '),
+         2 L18SSUMA    PIC'Z.ZZZ.ZZZ.ZZZV,ZZ' INIT(0),
+         2 L18FIL6  CHAR(04)             INIT('EYPx'),
+         2 L18FIL7  CHAR(80)             INIT(' ');
+   DCL 1 LINE19,
+         2 L19FIL1  CHAR(01)             INIT('0'),
+         2 L19FIL2  CHAR(30) INIT('сYNOкO RECORDS поу дIABAсTHKAN'),
+         2 INTCOUNT PIC'ZZZZZ9'          INIT(0),
+         2 L19FIL5  CHAR(1)              INIT(' '),
+         2 INTPOSON PIC'ZZZZ.ZZZ.ZZ9V,99' INIT(0),
+         2 L19FIL6  CHAR(19)          INIT(' пяолгхеиа пекатым:'),
+         2 INTPROMH PIC'ZZZ.ZZ9V,99' INIT(0),
+         2 L19FIL7  CHAR(51)             INIT(' ');
+
+   DCL 1 LINE20,
+         2 L20FIL1  CHAR(01)              INIT('0'),
+         2 L20FIL2  CHAR(30) INIT('посо пяолгхеиас 4800000106 :  '),
+         2 L20PROM  PIC'ZZZZ.ZZZ.ZZ9V,99' INIT(0),
+         2 L20FIL5  CHAR(23)           INIT(' посо жпа 5400010024 : '),
+         2 L20FPA   PIC'ZZZZ.ZZZ.ZZ9V,99' INIT(0),
+         2 L20FIL6  CHAR(21)             INIT(' пяолгхеиа выяис жпа '),
+         2 L20FIL7  CHAR(13)             INIT('7434610042 : '),
+         2 L20KATH  PIC'ZZZZ.ZZZ.ZZ9V,99' INIT(0);
+   /*    2 L20FIL8  CHAR(02)             INIT(' ');  */
+
+   DCL SWEOF     PIC'(01)9'    INIT(0);
+   DCL OK        CHAR(2)       INIT(' ');
+   DCL LINENO    FIXED(05)     INIT(0);
+   DCL VERIFY    BUILTIN              ;
+   DCL SUBSTR    BUILTIN              ;
+   DCL TIME      BUILTIN              ;
+   DCL ADDR      BUILTIN              ;
+
+  /* ******************************************************** */
+  /* ******************************************************** */
+
+   DCL SUMABATCH   FIXED(15,2)   INIT(0);
+   DCL SUMAKAT     FIXED(15,2)   INIT(0);
+   DCL OUTCOUNT2   FIXED(15,2)   INIT(0);
+   DCL OUTCOUNT3   PIC'ZZZ.ZZZ.ZZ9V,99'   INIT(0);
+   /* TAMEIO KATArTHMATOr 3800000008 cIA EKTOr TOY KATMA 555 */
+   /* YpOXPExrEIr ApO INTERNET 5998040678 cIA TO 555 EIDIKA       */
+   DCL KATMA_TAMEIOX   FIXED(15,2)   INIT(0) ;
+   DCL KATMA_TAMEIOP   FIXED(15,2)   INIT(0);
+   DCL PROMH_TAMEIOX   FIXED(15,2)   INIT(0);
+   DCL PROMH_TAMEIOP   FIXED(15,2)   INIT(0);
+   DCL PROMH_SUMX      FIXED(15,2)   INIT(0);
+   DCL PROMH_SUMP      FIXED(15,2)   INIT(0);
+   /* емдотяапефийос      4800000106  */
+   DCL KATMAENDOP      FIXED(15,2)   INIT(0);
+   DCL KATMAENDOX      FIXED(15,2)   INIT(0);
+   DCL PROMHENDOP      FIXED(15,2)   INIT(0);
+   DCL PROMHENDOX      FIXED(15,2)   INIT(0);
+   /* емдотяапефийос  йемтяийоу йаттос    4800000106  */
+   DCL ENDO001X        FIXED(15,2)   INIT(0);
+   DCL ENDO001P        FIXED(15,2)   INIT(0);
+
+   DCL APOD001X        FIXED(15,2)   INIT(0);
+   DCL PROM001X        FIXED(15,2)   INIT(0);
+   DCL PROMAA          FIXED(7)      INIT(0);
+   DCL PROMAAN         FIXED(7)      INIT(0);
+   DCL WPROM           PIC '999V99'    INIT(0);
+   DCL WPROM555        PIC '999V99'    INIT(0);
+   DCL WPROMATM        PIC '999V99'    INIT(0);
+   DCL WPROMAPS        PIC '999V99'    INIT(0);
+   DCL WPROMD          PIC 'ZZ9V.99'    INIT(0);
+
+   /*********************************************/
+   /*EIдийои ахяоистес циа тA EXTRAITS CC       */
+   /*********************************************/
+   DCL EXTR_P     FIXED(15,2)   INIT(0);
+   DCL EXTR_X     FIXED(15,2)   INIT(0);
+   /*********************************************/
+   /*EIдийои ахяоистес циа то йемтяийо йатастгла*/
+   /*********************************************/
+   DCL EXTR_P_001 FIXED(15,2)   INIT(0);
+   DCL EXTR_X_001 FIXED(15,2)   INIT(0);
+   /*********************************************/
+   /*********************************************/
+   /*EIдийои ахяоистес циа то 907      йатастгла*/
+   /*********************************************/
+   DCL EXTR_P_907 FIXED(15,2)   INIT(0);
+   DCL EXTR_X_907 FIXED(15,2)   INIT(0);
+   /*********************************************/
+
+   DCL FOROI001P       FIXED(15,2)   INIT(0);
+   DCL FOROI001X       FIXED(15,2)   INIT(0);
+   DCL I         FIXED(04)     INIT(0);
+   DCL SYSDATE   PIC'(6)9' INIT(0);
+   DCL SYSTIME   PIC'(9)9' INIT(0);
+   DCL WDATE     CHAR(08)  INIT(' ');
+   DCL 1 WREC   BASED(ADDR(WDATE)),
+         2 WYY2     PIC'(02)9',
+         2 WYY      PIC'(02)9',
+         2 WMM      PIC'(02)9',
+         2 WDD      PIC'(02)9';
+
+   DCL  PRIORITY BUILTIN;     /*DATE SIMULATION DEFINED FUNCTION */
+   DATE: PROC IRREDUCIBLE RETURNS(CHAR(6)) ;
+         CALL CZXDATEP          ( CZX3VDAT) ;
+         RETURN (CZX3VDAT) ;
+         END DATE ;
+
+
+   DCL SW1         PIC'999'      INIT(0);
+   DCL GKATMA      PIC'(04)9'    INIT(0);
+   DCL DKATMA      PIC'(04)9'    INIT(0);
+   DCL IDESC222    PIC'999'      INIT(0);
+
+ /* AhPOIrTEr ANAkOcA AN TO KATMA rYN.=KATMA kOc H OXI               */
+ /*                                                                  */
+ /*   MAIN  PROCEDURE                                                */
+ /*                                                                  */
+     OPEN FILE(EXTRAIT),FILE(TABLES);
+     OPEN FILE(EFORIA), FILE(PRINTF), FILE(MSAFIL);
+     OPEN FILE(READER);
+     SYSDATE = DATE();
+     SYSTIME = TIME;
+     IITEM1  = 0;
+
+     READ FILE(READER) INTO (RECREAD);
+  /* IF CORG ^= '71102' THEN DO;*/  /* пкаисио */
+     IF CORG ^= '99999' THEN DO;/* пкаисио,SFS,TELLAS,IATA KTL */
+        PUT SKIP LIST('кахос ояцамислос стгм йаята');
+        PUT SKIP LIST('дем еимаи 99999            ');
+        PUT SKIP LIST('ха йамеи ZERODIVIDE ERROR  ');
+        INTCOUNT = INTCOUNT / 0;
+        GOTO TELOS;
+     END;
+     IF CORG = '99999' THEN DO;    /* пкаисио,SFS,TELLAS,IATA KTL */
+        ISYSNO = 'DE01';
+        IDESC2 = 'DE';
+        ISOURCE= 'DE';
+     END;
+     WPROM    = CPROM;
+
+     ON ENDFILE(EFORIA)  BEGIN;
+        IF INTCOUNT = 0 THEN GOTO TELOS;
+        SWEOF = 1;
+        CALL WRITE_KATMA;
+        IF (GKATMA ^= 001 ) & (GKATMA ^= 907 )  THEN DO;
+           CALL WRITE_EXTRAITS(GKATMA,EXTR_P    ,EXTR_X    );
+        END;
+
+
+        /*
+           WRITE_PROMH, WRITE_907,
+           KAкоумтаи ломом сто текос тоу пяоцяаллатос
+        */
+
+        CALL WRITE_PROMH;
+        CALL WRITE_907;
+        CALL WRITE_EXTRAITS(001,EXTR_P_001,EXTR_X_001);
+        CALL WRITE_EXTRAITS(907,EXTR_P_907,EXTR_X_907);
+        CALL FINAL;
+        GOTO TELOS;
+     END;
+
+ PROCMAIN:
+
+  DO WHILE (SWEOF = 0);
+  R1 :
+     READ FILE(EFORIA) INTO (IOAREA);
+
+
+     /* CONTROL RECORD   */
+     IF ( EFAFM1  = 0 & EFNOTE1 = 0 & EFAMOUN1 = 0 )   THEN GOTO R1;
+     IF ( EFTYPE1 = 1 )   THEN GOTO R1;
+     /*
+     IF CORG = '71102' THEN DO;
+        IF EFDATID ^= 11 THEN GOTO R1;
+     END;*/
+     IF ^( EFDATID = 11 !
+           EFDATID = 13 !
+           EFDATID = 14 !
+           EFDATID = 15 !
+           EFDATID = 16 !
+           EFDATID = 17 !
+           EFDATID = 18 !
+           EFDATID = 19 !
+           EFDATID = 20 !
+           EFDATID = 21 !
+           EFDATID = 22 !
+           EFDATID = 23 !
+           EFDATID = 24 !
+           EFDATID = 25 !
+           EFDATID = 26 !
+           EFDATID = 27 !
+           EFDATID = 28 !
+           EFDATID = 50 ) THEN DO;
+                          GOTO R1;
+     END;
+     IF EFREF1 = 40101 ! EFREF1 = 40102 !
+        EFREF1 = 40201 ! EFREF1 = 40202 THEN DO;
+                          GOTO R1;
+     END;
+     IF VERIFY(EFRDATE2,'0123456789')^=0   THEN DO ;
+        L6FIL1 = '0';
+        L6FIL2 =  ' A P X E I O  E u O P I A r  KENO ' ;
+        WRITE FILE(PRINTF) FROM (LINE6);
+        GOTO TELOS ;
+     END;
+     WDATE = EFRDATE2 ;
+     L2FIL5 = WDD;
+     L2FIL6 = WMM;
+     L2FIL7 = WYY;
+
+     INTCOUNT = INTCOUNT + 1;
+     INTPOSON = INTPOSON + EFCLAMOU;
+     INTPROMH = INTPROMH + EFPROM2;
+
+     IF SW1 = 0 THEN DO;
+        GKATMA = EFKATMA2;
+        CALL EPIKWRT;
+        CALL START1 ;
+        SW1=1;
+     END;
+
+     IF GKATMA ^= EFKATMA2  THEN DO;
+        CALL WRITE_KATMA;
+        /**************************************************/
+        /*Eпеидг сто йемтяийо ахяифомтаи йаи ои пяол╧хеиес*/
+        /*дем цяажомтаи EXTRAITS тыяа акка сто текос      */
+        /**************************************************/
+        IF GKATMA = 1  THEN DO;/*йемтяийо йатастгла*/
+           KATMAENDOP = 0;
+           KATMAENDOX = 0;
+           KATSYN = 0;
+        END;
+        ELSE DO; /*Oка та йатастглата ейтос йемтяийоу*/
+           CALL WRITE_EXTRAITS(GKATMA,EXTR_P    ,EXTR_X    );
+           EXTR_P     = 0;
+           EXTR_X     = 0;
+        END;
+
+        GKATMA = EFKATMA2;
+     END;
+
+   RSEL :;
+
+      /* START Eды йамомийа + амтикоцислема   START*/
+      KATMA_TAMEIOX= KATMA_TAMEIOX+ EFCLAMOU ;
+      KATMAENDOP   = KATMAENDOP   + EFCLAMOU ;
+      ENDO001X     = ENDO001X     + EFCLAMOU ;
+      FOROI001P    = FOROI001P    + EFCLAMOU ;
+      PROMH_TAMEIOX= PROMH_TAMEIOX+ EFPROM2  ;
+      PROMHENDOP   = PROMHENDOP   + EFPROM2  ;
+      PROMH_SUMX   = PROMH_SUMX   + EFPROM2  ;
+      /* END  Eды йамомийа + амтикоцислема    END  */
+
+     IF EFSTATUS ^= 1  &
+        ( EFDATID = 13 !
+          EFDATID = 16 !
+          EFDATID = 17 !
+          EFDATID = 18 !
+          EFDATID = 22 !
+          EFDATID = 23 !
+          EFDATID = 24 !
+          EFDATID = 25 !
+          EFDATID = 27 !
+          EFDATID = 28 !
+          EFDATID = 50 ) THEN  DO;
+         PROMAAN  = PROMAAN  + 1;
+     END;
+
+     IF EFSTATUS ^= 1   THEN  DO;
+         PROMAA   = PROMAA   + 1;
+         WKEY = EFREF1;
+         IF EFKATMA2 ^= 555 THEN DO;
+            PROM_ORG(WKEY) = PROM_ORG(WKEY) + 1;
+         END;
+         IF EFKATMA2 = 555 THEN DO;
+            PROM_ORG555(WKEY) = PROM_ORG555(WKEY) + 1;
+         END;
+     END;
+     ELSE DO ; /*   ANTIкOцIсMOс */
+      /* стом амтикоцисло пяыта г йамомийг еццяажг йаи
+      лета о амтикоцислос                         */
+
+         KATMA_TAMEIOP= KATMA_TAMEIOP+ EFCLAMOU ;
+         KATMAENDOX   = KATMAENDOX   + EFCLAMOU ;
+         ENDO001P     = ENDO001P     + EFCLAMOU ;
+         FOROI001X    = FOROI001X    + EFCLAMOU ;
+         PROMH_TAMEIOP= PROMH_TAMEIOP+ EFPROM2  ;
+         PROMHENDOX   = PROMHENDOX   + EFPROM2  ;
+         PROMH_SUMP   = PROMH_SUMP   + EFPROM2  ;
+     END;
+
+   END ;   /*   WHILE  */
+
+   WRITE_KATMA : PROC;
+     IF GKATMA ^=555 THEN DO;
+
+        CALL ACC_REC(GKATMA,10,KATMA_TAMEIOX,'3800000008');
+        CALL ACC_REC(GKATMA,60,KATMA_TAMEIOX,'4800000106');
+
+        /*пихамои амтикоцислои*/
+        CALL ACC_REC(GKATMA,60,KATMA_TAMEIOP,'3800000008');
+        CALL ACC_REC(GKATMA,10,KATMA_TAMEIOP,'4800000106');
+
+     END ;
+     ELSE DO;
+
+        CALL ACC_REC(GKATMA,10 ,KATMA_TAMEIOX,'5998040678');
+        CALL ACC_REC(GKATMA,60 ,KATMA_TAMEIOX,'4800000106');
+
+        /*пихамои амтикоцислои*/
+        CALL ACC_REC(GKATMA,60 ,KATMA_TAMEIOP,'5998040678');
+        CALL ACC_REC(GKATMA,10 ,KATMA_TAMEIOP,'4800000106');
+     END  ;
+
+     SUMABATCH = SUMABATCH + KATMA_TAMEIOX + KATMAENDOX ;
+     KATMA_TAMEIOX= 0;
+     KATMA_TAMEIOP= 0;
+     CALL WRITE_PROMH1;
+
+   END WRITE_KATMA;
+
+ /*                   */
+ /*                   */
+   WRITE_907 : PROC;
+
+    CALL   ACC_REC(907  , 10 ,ENDO001X  ,'4800000106');
+    CALL   ACC_REC(907  , 60 ,ENDO001X  ,'5933000094');
+    SUMABATCH = SUMABATCH + ENDO001X+FOROI001X    ;
+    CALL   ACC_REC(907  , 10 ,ENDO001X  ,'5933000094');
+    CALL   ACC_REC(907  , 60 ,ENDO001X  ,'3806000000');
+    APOD001X = APOD001X + ENDO001X;
+    SUMABATCH = SUMABATCH + ENDO001X+FOROI001X    ;
+   /*пихамои амтикоцислои*/
+    CALL   ACC_REC(907  , 60 ,ENDO001P  ,'4800000106');
+    CALL   ACC_REC(907  , 10 ,ENDO001P  ,'5933000094');
+    CALL   ACC_REC(907  , 60 ,ENDO001P  ,'5933000094');
+    CALL   ACC_REC(907  , 10 ,ENDO001P  ,'3806000000');
+    APOD001X = APOD001X - ENDO001P;
+
+
+    FOROI001P = 0;
+    FOROI001P = 0;
+ /* ENDO001P  = 0;*/
+
+   END WRITE_907 ;
+   WRITE_PROMH1: PROC;
+      CALL   ACC_REC(GKATMA , 10 ,PROMH_SUMX ,'3800000008');
+      CALL   ACC_REC(GKATMA , 60 ,PROMH_SUMX ,'7498800241');
+      CALL   ACC_REC(GKATMA , 60 ,PROMH_SUMP ,'3800000008');
+      CALL   ACC_REC(GKATMA , 10 ,PROMH_SUMP ,'7498800241');
+      PROMH_SUMX = 0;
+      PROMH_SUMP = 0;
+   END WRITE_PROMH1;
+
+   WRITE_PROMH : PROC;
+   DO II = 1 TO 99998;
+      IF PROM_ORG(II) > 0 THEN DO;
+         WPROM = 0;
+         CALL ORG;
+         WPROMD = WPROM;
+         PROM001X = PROM001X + PROM_ORG(II) * WPROM;
+      END;
+      IF PROM_ORG555(II) > 0 THEN DO;
+         WPROM555 = 0;
+         CALL ORG;
+         WPROMD = WPROM555;
+         PROM001X = PROM001X + PROM_ORG555(II) * WPROM555;
+      END;
+      IF PROM_ORGATM(II) > 0 THEN DO;
+         WPROMATM = 0;
+         CALL ORG;
+         WPROMD = WPROMATM;
+         PROM001X = PROM001X + PROM_ORGATM(II) * WPROMATM;
+      END;
+   END;
+
+   DCL ROUND    BUILTIN;
+   DCL MULTIPLY BUILTIN;
+   DCL DIVIDE   BUILTIN;
+
+   POSO_NO_FPA = 0;
+   WORK_FPA    = 0;
+
+ /*WPROM    = CPROM;*/
+ /*PROM001X = ( PROMAA - PROMAAN ) *  ( WPROM / 100 );*/
+
+   /*CALCULATE POSO_NO_FPA ROUNDED*/
+   WORK_FPA    = DIVIDE(PROM001X , 1.23, 15,3);/*npk 01-07-2010*/
+   POSO_NO_FPA = ROUND(WORK_FPA,2);
+
+   /*
+   CALL   ACC_REC(001  , 10 ,PROM001X               ,'4800000106');
+   CALL   ACC_REC(001  , 60 ,POSO_NO_FPA            ,'7434610042');
+   CALL   ACC_REC(001  , 60 ,PROM001X - POSO_NO_FPA ,'5400010024');
+   SUMABATCH = SUMABATCH + PROM001X ;
+   */
+   CALL   ACC_REC(907  , 10 ,PROM001X  ,'3806000000');
+   CALL   ACC_REC(907  , 60 ,PROM001X  ,'7498820218');
+   APOD001X = APOD001X - PROM001X;
+   SUMABATCH = SUMABATCH + PROM001X ;
+
+ END WRITE_PROMH ;
+ ORG: PROC;
+    ON KEY ( TABLES )
+       BEGIN;
+         SELECT ( ONCODE );
+            WHEN ( 51 )
+                   DO;
+                     GRAMM = ' ** кAхOс сTO TABLES        ** '!!
+                            ' ONCODE = 51      ** ';
+                     GRAMM = TRANSLATE(GRAMM,DYO,ENA);
+                     WRITE FILE (PRINTF) FROM (LIN);
+                     DIASPAY_NAME = 'ANYpAPKTO pPOION';
+                   END;
+                 OTHERWISE
+                   DO;
+                 GRAMM  = ' ** кAхOс сTO TABLES ** '!!TBLCODE!!TBLREC!!
+                            ' ONCODE диажояо тоу 51 ** '!!ONCODE;
+                     GRAMM = TRANSLATE(GRAMM,DYO,ENA);
+                     WRITE FILE (PRINTF) FROM (LIN);
+                     STOP;
+                   END;
+               END; /* SELECT */
+             END; /* BEGIN */
+
+          RECTABLE = '';
+          TBLCODE  = '0050';
+          WKEY     = II;
+          TBLREC   = WKEY;
+          READ  FILE ( TABLES   )
+          INTO       ( RECTABLE )
+          KEY        ( VSAM_KEY );
+
+   WPROM    = DIASDDB_ENPL2;
+   WPROM555 = DIASDDB_ENPL1;
+   WPROMATM = DIASDDB_ENPL3;
+   PROM_ENPL1(WKEY) = DIASDDB_ENPL1;
+   PROM_ENPL2(WKEY) = DIASDDB_ENPL2;
+   PROM_ENPL3(WKEY) = DIASDDB_ENPL3;
+   PROM_ENPL4(WKEY) = DIASDDB_ENPL4;
+ END ORG;
+
+ WRITE_MSA : PROC;
+       WRITE FILE (MSAFIL) FROM (PT1REC);
+       L6FIL1 = '0';
+       L6FIL2 = ' ';
+       ZPOSON = IAMT1;
+       L6FIL2 = ITRXCOD1!!IITEM1!!IID1!!' '!!IDRCR!!' '!!ICOMP1!!' '!!
+                IACCOUNT!!' '!!ICENTER!!' '!!ISOURCE!!
+                SUBSTR(ISOUFIL,1,3)!!' '!!
+                IEFFDAT1!!' '!!ZPOSON;
+       WRITE FILE (PRINTF) FROM (LINE6);
+       OUTCOUNT = OUTCOUNT + 1;
+
+       WRITE FILE (MSAFIL) FROM (PT2REC);
+       L6FIL1 = ' ';
+       L6FIL2 = ' ';
+       L6FIL2 = ITRXCOD2!!IITEM2!!IID2!!' '!!
+                IDESC1!!' '!!
+                IDESC2!!' '!!
+                IDESC22;
+       WRITE FILE (PRINTF) FROM (LINE6);
+       OUTCOUNT = OUTCOUNT + 1;
+       LINENO = LINENO + 3;
+       IF LINENO > 58 THEN DO;
+          CALL EPIKWRT;
+       END;
+   END WRITE_MSA ;
+
+ /*                   */
+ /*                   */
+ EPIKWRT : PROC;
+   L1SEL = L1SEL + 1;
+   /* TYpOpOIHrH  COBRANCH */
+   BANK = 0;
+   BRAN = 907;
+   PROG = 'EF126' ;
+   CALL COBRANC(BANK,BRAN,PROG,HDR1,HDR2);
+   CTR   = '1' ;
+   GRAMM = HDR1;
+   WRITE FILE (PRINTF) FROM (LIN) ;
+
+   CTR   = ' ' ;
+   GRAMM = HDR2!!(75)' '!!'сEкIдA:'!! L1SEL;
+   LIN = TRANSLATE(LIN,DYO,ENA);
+   WRITE FILE (PRINTF) FROM (LIN) ;
+   /* TELOS  TYpOpOIHrH  COBRANCH */
+
+   L2FIL4 = ' ыPA=' !!SUBSTR(SYSTIME,1,2)!!':'
+            !!SUBSTR(SYSTIME,3,2)!!':' !!SUBSTR(SYSTIME,5,3);
+ /*WRITE FILE(PRINTF) FROM (LINE1);*/
+   L2FIL4 = TRANSLATE(L2FIL4,DYO,ENA);
+   WRITE FILE(PRINTF) FROM (LINE2);
+   L3FIL2 = ' kAhOr KxdIKOr pPOIONTOr   ';
+ /*IF CORG = '71102' THEN DO;
+      L3FIL2 = ' пкаисио ';
+   END;*/
+   IF CORG = '99999' THEN DO;
+      L3FIL2 = ' DIASDEBIT';
+   END;
+   L3FIL2 = TRANSLATE(L3FIL2,DYO,ENA);
+   WRITE FILE(PRINTF) FROM (LINE3);
+   WRITE FILE(PRINTF) FROM (LINE4);
+   LINENO = 7;
+
+ END EPIKWRT;
+ /*                                                                  */
+ FINAL: PROC;
+      /*     IAMOUNT = SUMABATCH; */
+      IAMOUNT = SUMEUR / 2;
+      ICAPO ='0';
+      ITRXCOD='BT';
+      IEFFDATE = WDD !! WMM !! WYY;
+      IF (SUMABATCH  ^= 0 ) THEN DO;
+         WRITE FILE (MSAFIL) FROM (BATHEAD);
+         OUTCOUNT = OUTCOUNT + 1;
+         L6FIL1 = '0';
+         L6FIL2 = ' ';
+         ZPOSON = IAMOUNT;
+         L6FIL2 = ITRXCOD!!ICOMP!!ISYSNO!!
+                  ZPOSON!!' EYPx';
+         WRITE FILE (PRINTF) FROM (LINE6);
+      END;
+
+ END FINAL;
+ /******************************************************/
+ /* WRITE_EXTRAITS START                               */
+ /******************************************************/
+ /* пяосовг ста CC циметаи амтистожг                   */
+ /*    H вяеысг  паеи стгм пистысг  йаи                */
+ /*    г пистысг паеи стгм вяеысг                      */
+ /*                                                    */
+ /******************************************************/
+ WRITE_EXTRAITS: PROC(MY_KATMA,MY_PIST,MY_XRE);
+      DCL MY_KATMA   PIC'(3)9'   ;
+      DCL MY_XRE     FIXED(15,2) ;
+      DCL MY_PIST    FIXED(15,2) ;
+
+      /* debug
+      PUT SKIP LIST ('KATASTHMA = ' ,MY_KATMA );
+      PUT SKIP LIST ('XR = ' ,MY_PIST,' PIS = ',MY_XRE);
+      */
+
+      SYNXRE  = MY_PIST     ; /*H вяеысг  паеи стгм пистысг*/
+      SYNPIS  = MY_XRE      ; /*г пистысг паеи стгм вяеысг*/
+
+      AITIOL  ='DE';  /*                       */
+      HMKATOL,HMKATAS  = WDD !! WMM !! WYY;
+      KATSYN  = MY_KATMA;
+      TRAPEZA = 0      ;
+      IF ^ ( SYNXRE = 0 & SYNPIS = 0 ) THEN DO;
+           WRITE FILE (EXTRAIT) FROM (RECEXTRAITS);
+           OUTCOUNT2 = OUTCOUNT2 + 1;
+      END;
+
+      KATMAENDOP = 0;
+      KATMAENDOX = 0;
+      KATSYN = 0;
+ END WRITE_EXTRAITS ;
+ /******************************************************/
+ /* WRITE_EXTRAITS END                                 */
+ /******************************************************/
+
+ /*                                                                  */
+ START1: PROC;
+      IAMOUNT = 0;
+      ICAPO   = '0';
+      IEFFDATE = WDD !! WMM !! WYY;
+      WRITE FILE (MSAFIL) FROM (BATHEAD);
+      OUTCOUNT = OUTCOUNT + 1;
+      L6FIL1 = '0';
+      L6FIL2 = ' ';
+      ZPOSON = IAMOUNT;
+      L6FIL2 = ITRXCOD!!ICOMP!!ISYSNO!!
+               ZPOSON!!' EYPx';
+      WRITE FILE (PRINTF) FROM (LINE6);
+ END START1 ;
+ /*                                                                  */
+ FINAL2: PROC;
+        IDRCR = 0;
+        IACCOUNT = 0;
+        IAMT1 = 0;
+        IEFFDATE = 0;
+        ICENTER = 0;
+        IDESC22 = '000';
+ END FINAL2;
+
+ /*                                                                  */
+ ACC_REC: PROC(R_CENTER,R_XP,R_POSON,R_KATHOLIKO);
+        DCL    R_CENTER    PIC'(4)9'   ;
+        DCL    R_XP        PIC'(2)9'   ;
+        DCL    R_POSON     FIXED(15,2) ;
+        DCL    R_KATHOLIKO CHAR(10)    ;
+
+
+        DCL    R_XRE       FIXED(15,2) INIT(0);
+        DCL    R_PIS       FIXED(15,2) INIT(0);
+
+     IAMT1 = R_POSON       ;
+
+     IF IAMT1 > 0  THEN DO;
+
+
+        IITEM1 = IITEM1 + 1;
+        IITEM2 = IITEM1;
+        IDRCR = R_XP;  /*10=Xяеысг,60=пистысг*/
+        IACCOUNT = R_KATHOLIKO;
+        SUMEUR=SUMEUR + IAMT1  ;
+        IEFFDAT1 = WDD !! WMM !! WYY;
+        ICENTER = R_CENTER ;
+        SUBSTR(ISOUFIL,1,3) = SUBSTR(R_CENTER ,2,3);
+
+        /* GKATMA  = R_CENTER;  SOS PROSOXI */
+        DKATMA  = R_CENTER;
+        CALL  KATTHR_PROC;
+        CALL WRITE_MSA;
+
+        /*******************************************/
+        /*START LOADING EXTRAITS-CC                */
+        /*MONO TO KAхокийо '4800000106' цяажеи CC  */
+        /*******************************************/
+        IF R_KATHOLIKO = '4800000106'  THEN DO;
+
+           IF R_XP = 10 THEN DO; /*10=Xяеысг,60=пистысг*/
+                 R_XRE  = R_POSON ;
+           END;
+           ELSE DO;
+                 R_PIS  = R_POSON ;
+           END;
+
+           IF R_CENTER = 001 THEN DO;
+
+                 EXTR_X_001 = EXTR_X_001 + R_XRE   ;
+                 EXTR_P_001 = EXTR_P_001 + R_PIS   ;
+
+           END;/*текос йатастглатос 001*/
+           ELSE IF R_CENTER = 907 THEN DO;
+
+                 EXTR_X_907 = EXTR_X_907 + R_XRE   ;
+                 EXTR_P_907 = EXTR_P_907 + R_PIS   ;
+
+           END;/*907 END*/
+           ELSE  DO;
+
+                 EXTR_X     = EXTR_X     + R_XRE   ;
+                 EXTR_P     = EXTR_P     + R_PIS   ;
+
+           END;/*текос йатастглатос диажояоу 001 йаи 907*/
+        END ;
+        /*******************************************/
+        /*END   LOADING EXTRAITS-CC                */
+        /*******************************************/
+     END;
+
+     R_XRE = 0;
+     R_PIS = 0;
+
+     CALL FINAL2;
+
+ END ACC_REC ;
+ /*                                                                  */
+
+ KATTHR_PROC : PROC;
+
+   BKATMA = 0;
+   IDESC222 = DKATMA;
+   IDESC22 = IDESC222;
+    /*  KAkErMA YpOpPOcPAMMATOr KATHRC  ****/
+       AKATMA=DKATMA;
+       CALL KATHRC (AKATMA,BKATMA);
+       ICENTER  = BKATMA;
+ END KATTHR_PROC;
+   /* ************************************ */
+   /* PROC METATPOpHS ApO dPAXMEr rE EURO  */
+   CONVX:PROC;
+      SUMEUR=SUMEUR + IAMT1  ;
+   END CONVX;
+   /* ************************************ */
+ /*                                                                  */
+ TELOS:
+
+   CALL EPIKWRT;
+   L19FIL1 = '0';
+   L19FIL2 = TRANSLATE(L19FIL2,DYO,ENA);
+   L19FIL6 = TRANSLATE(L19FIL6,DYO,ENA);
+   WRITE FILE(PRINTF) FROM (LINE19);
+   L19FIL1 = '0';
+   L6FIL1  = '0';
+   WRITE FILE(PRINTF) FROM (LINE17);
+   L18SSUMA   = SUMABATCH ;
+ /*WRITE FILE(PRINTF) FROM (LINE18);*/
+   OUTCOUNT = OUTCOUNT2 ;
+   L17FIL4 = ' ста евTRAITS   : ' ;
+   L17FIL4 = TRANSLATE(L17FIL4,DYO,ENA);
+   WRITE FILE(PRINTF) FROM (LINE17);
+
+   L6FIL1 = '0';
+
+   IF CORG = '99999' THEN DO;
+      L6FIL2 =  ' AITIOкOцIA сTA C.C  DE ' ;
+   END;
+   L6FIL2 = TRANSLATE(L6FIL2,DYO,ENA);
+   WRITE FILE(PRINTF) FROM (LINE6);
+   IF CORG = '99999' THEN DO;
+      L6FIL2 =  ' APXEIO C.C :EF.P.XS.MSAPLA1';
+   END;
+   L6FIL2 = TRANSLATE(L6FIL2,DYO,ENA);
+   WRITE FILE(PRINTF) FROM (LINE6);
+   IF CORG = '99999' THEN DO;
+      L6FIL2 =  ' APXEIO C.C :EF.P.XS.AAPLA1' ;
+   END;
+   L6FIL2 = TRANSLATE(L6FIL2,DYO,ENA);
+   WRITE FILE(PRINTF) FROM (LINE6);
+
+   OUTCOUNT3 = ENDO001X ;
+   L6FIL1 = '0';
+   L6FIL2 =  ' посо вяеысгс TAMEIOY KAT/TыN :' !! OUTCOUNT3!!' EYPы';
+   L6FIL2 = TRANSLATE(L6FIL2,DYO,ENA);
+   WRITE FILE(PRINTF) FROM (LINE6);
+   OUTCOUNT3 = PROMH_SUMX - PROMH_SUMP;
+   L6FIL2 =  ' пяолгхеиа еиспяангс KAT/TыN  :' !! OUTCOUNT3!!' EYPы';
+   L6FIL2 = TRANSLATE(L6FIL2,DYO,ENA);
+   WRITE FILE(PRINTF) FROM (LINE6);
+   OUTCOUNT3 = ENDO001X + PROMH_SUMX - PROMH_SUMP;
+   L6FIL1 = '0';
+   L6FIL2 =  ' сумокийо посо вяеысгс TAMEIOY:' !! OUTCOUNT3!!' EYPы';
+   L6FIL2 = TRANSLATE(L6FIL2,DYO,ENA);
+   WRITE FILE(PRINTF) FROM (LINE6);
+
+   OUTCOUNT3 = EXTR_P_907;
+   L6FIL1 = '0';
+   L6FIL2 =  ' посо вяеысгс EXTRAITS 907    :' !! OUTCOUNT3!!' EYPы';
+   L6FIL2 = TRANSLATE(L6FIL2,DYO,ENA);
+   WRITE FILE(PRINTF) FROM (LINE6);
+
+   OUTCOUNT3 = EXTR_X_907; /* 001P*/
+   L6FIL1 = '0';
+   L6FIL2 =  ' посо пистысгс EXTRAITS 907   :' !! OUTCOUNT3!!' EYPы';
+   L6FIL2 = TRANSLATE(L6FIL2,DYO,ENA);
+   WRITE FILE(PRINTF) FROM (LINE6);
+
+   L6FIL1 = '0';
+   L6FIL2 =  '====================r Y M u x N I A==================';
+   L6FIL2 = TRANSLATE(L6FIL2,DYO,ENA);
+   WRITE FILE(PRINTF) FROM (LINE6);
+   L6FIL2 =  ' еццяажес выяис пяолгхеиа     :' !! PROMAAN;
+   L6FIL2 = TRANSLATE(L6FIL2,DYO,ENA);
+   WRITE FILE(PRINTF) FROM (LINE6);
+   L6FIL2 =  ' еццяажес циA пяолгхеиа       :' !! PROMAA;
+   L6FIL2 = TRANSLATE(L6FIL2,DYO,ENA);
+   WRITE FILE(PRINTF) FROM (LINE6);
+   WPROMD = WPROM;
+   L6FIL2 =  ' пяолгхеиа ама сумаккацг,ама пяоиом,апо пимайа';
+   L6FIL2 = TRANSLATE(L6FIL2,DYO,ENA);
+   WRITE FILE(PRINTF) FROM (LINE6);
+   OUTCOUNT3 = PROM001X ;
+   DO II = 1 TO 99998;
+      IF PROM_ORG(II) > 0 THEN DO;
+         CALL ORG;
+         WPROMD = WPROM;
+         GRAMM  = II!!' '!!SUBSTR(DIASDDB_NAME,1,18)!!' '!!
+                  ' йINHSеис:'!!PROM_ORG(II)!!
+                  ' пяолгхеиа:'!!WPROMD!!' посо:'!!PROM_ORG(II) * WPROM;
+         GRAMM = TRANSLATE(GRAMM,DYO,ENA);
+         WRITE FILE (PRINTF) FROM (LIN);
+         LINENO = LINENO + 1;
+         IF LINENO > 58 THEN DO;
+            CALL EPIKWRT;
+         END;
+      END;
+      IF PROM_ORG555(II) > 0 THEN DO;
+         CALL ORG;
+         WPROMD = WPROM555;
+         GRAMM  = II!!' '!!SUBSTR(DIASDDB_NAME,1,18)!!' '!!
+                  ' INTERNET:'!!PROM_ORG555(II)!!
+                  ' пяолгхеиа:'!!WPROMD!!' посо:'!!
+                  PROM_ORG555(II) * WPROM555;
+         GRAMM = TRANSLATE(GRAMM,DYO,ENA);
+         WRITE FILE (PRINTF) FROM (LIN);
+         LINENO = LINENO + 1;
+         IF LINENO > 58 THEN DO;
+            CALL EPIKWRT;
+         END;
+      END;
+      IF PROM_ORGATM(II) > 0 THEN DO;
+         CALL ORG;
+         WPROMD = WPROMATM;
+         GRAMM  = II!!' '!!SUBSTR(DIASDDB_NAME,1,18)!!' '!!
+                  '      ATM:'!!PROM_ORGATM(II)!!
+                  ' пяолгхеиа:'!!WPROMD!!' посо:'!!
+                  PROM_ORGATM(II) * WPROMATM;
+         GRAMM = TRANSLATE(GRAMM,DYO,ENA);
+         WRITE FILE (PRINTF) FROM (LIN);
+         LINENO = LINENO + 1;
+         IF LINENO > 58 THEN DO;
+            CALL EPIKWRT;
+         END;
+      END;
+   END;
+   L6FIL2 =  ' посо пяолгхеиас=еццяажес*пяол.:' !! OUTCOUNT3!!' EYPы';
+   L6FIL2 = TRANSLATE(L6FIL2,DYO,ENA);
+   WRITE FILE(PRINTF) FROM (LINE6);
+   OUTCOUNT3 = ENDO001X + PROMH_SUMX;
+   L6FIL2 =  ' посо еиспяангс               :' !! OUTCOUNT3!!' EYPы';
+   L6FIL2 = TRANSLATE(L6FIL2,DYO,ENA);
+   WRITE FILE(PRINTF) FROM (LINE6);
+   OUTCOUNT3 = ENDO001P + PROMH_SUMP;
+   L6FIL2 =  ' посо амтикоцислемо           :' !! OUTCOUNT3!!' EYPы';
+   L6FIL2 = TRANSLATE(L6FIL2,DYO,ENA);
+   WRITE FILE(PRINTF) FROM (LINE6);
+   OUTCOUNT3 = ENDO001X - ENDO001P + PROMH_SUMX - PROMH_SUMP;
+   L6FIL2 =  ' посо Eиспяангс - ANTIкоц/NO  :' !! OUTCOUNT3!!' EYPы';
+   L6FIL2 = TRANSLATE(L6FIL2,DYO,ENA);
+   WRITE FILE(PRINTF) FROM (LINE6);
+   OUTCOUNT3 = APOD001X ;
+   L6FIL2 =  ' посо циа     TP.еккадос      :' !! OUTCOUNT3!!' EYPы';
+   L6FIL2 = TRANSLATE(L6FIL2,DYO,ENA);
+   WRITE FILE(PRINTF) FROM (LINE6);
+   L6FIL1 = '0';
+   L6FIL2 =  '=====================================================';
+   WRITE FILE(PRINTF) FROM (LINE6);
+
+   /** PROMHQEIES        **/
+   L20PROM = PROM001X;
+   L20FPA  = PROM001X - POSO_NO_FPA ;
+   L20KATH = POSO_NO_FPA;
+   L20FIL2 = TRANSLATE(L20FIL2,DYO,ENA);
+   L20FIL5 = TRANSLATE(L20FIL5,DYO,ENA);
+   L20FIL6 = TRANSLATE(L20FIL6,DYO,ENA);
+ /*WRITE FILE(PRINTF) FROM (LINE20);*/
+
+    CLOSE FILE(EFORIA), FILE(PRINTF), FILE(MSAFIL);
+    CLOSE FILE(EXTRAIT),FILE(TABLES);
+    CLOSE FILE(READER);
+ END EF126;
+

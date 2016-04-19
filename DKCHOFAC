@@ -1,0 +1,410 @@
+ /* PROCESS A,GOSTMT,NEST,OPT(TIME),AG,MI('+'),S,X,OF,INCLUDE,MAP;    */
+ START: PROC OPTIONS(MAIN);
+ /*****       VSE/MVS TRANSLATION PROCESSED BY MVS-MS       *****/
+ /*****          SUNDAY    96/05/12  AT  00.06.04           *****/
+ /*** PL/1 OPTIMIZER EXECUTION TIME OPTIONS ***/
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+      /*--------- ---- PROGRAM DKCHOFAC -------------- */
+      /*-аккацес йатастглатым дедолемым коцаяиаслым    */
+      /*-стгм OFF-LINE DATA-BASE                       */
+      /*поу диабафомтаи апо                       ---- */
+      /*-CONTROL-CARDS                             --- */
+      /*-----------------------------------------------*/
+
+ DCL  NTAPE FILE RECORD SEQUENTIAL INPUT
+      ENV(FB RECSIZE(670)                                             );
+
+ DCL  WTAPE FILE RECORD SEQUENTIAL OUTPUT
+      ENV(FB RECSIZE(670)                                             );
+
+ DCL  PRINT FILE RECORD SEQUENTIAL  OUTPUT
+      ENV(FB RECSIZE(133)                               CTLASA);
+
+  DCL  CARD FILE RECORD ENV(                    FB RECSIZE(80));
+
+  DCL  I FIXED (15,0) INIT(0);
+
+       /*---------------------*/
+       /* INPUT WORK AREA */
+       /*---------------------*/
+
+        DCL 1 RECIN,                     /*PERIOXH EGRAFHS OFF-LINE*/
+             2 NBANK     PIC'9'    INIT(0),
+             2 NKATH     PIC'9999' INIT(0),
+             2  F1       PIC'9' INIT(0),
+             2   TKAT    PIC'999' INIT(0),
+             2 NARFYL    CHAR(04) INIT(' '),
+             2 NARLOG    PIC'(6)9' INIT(0),
+             2  ARLOG    PIC'(8)9' INIT(0),
+             2 NKOIN2    CHAR(02) INIT(' '),
+             2 NKOIN3    CHAR(01) INIT(' '),
+             2 NDIAKR    CHAR(02) INIT(' '),
+             2 NONOMA1   CHAR(64) INIT(' '),
+             2 NONOMA2   CHAR(64) INIT(' '),
+             2 NONOMA3   CHAR(64) INIT(' '),
+             2 NLATIN1   CHAR(01) INIT(' '),
+             2 NONMHTR   CHAR(10) INIT(' '),
+             2 NLATIN2   CHAR(01) INIT(' '),
+             2 NANAKAT  CHAR(192) INIT(' '),
+             2 NLATIN3   CHAR(01) INIT(' '),
+             2 NSYNTM    CHAR(30) INIT(' '),
+             2 NLATIN4   CHAR(01) INIT(' '),
+             2 NHMGEN    CHAR(08) INIT(' '),
+             2 NTOPGEN   CHAR(20) INIT(' '),
+             2 NLATIN5   CHAR(01) INIT(' '),
+             2 NETOSEKD  CHAR(04) INIT(' '),
+             2 NARTAYT   CHAR(08) INIT(' '),
+             2 NARSYST   CHAR(06) INIT(' '),
+             2 NKWDEPAG  CHAR(02) INIT(' '),
+             2 NXWRA     CHAR(15) INIT(' '),
+             2 NPOLH     CHAR(15) INIT(' '),
+             2 NODOS     CHAR(20) INIT(' '),
+             2 NLATIN6   CHAR(01) INIT(' '),
+             2 NXWRANT   CHAR(15) INIT(' '),
+             2 NPOLANT   CHAR(15) INIT(' '),
+             2 NODOANT   CHAR(20) INIT(' '),
+             2 NLATIN7   CHAR(01) INIT(' '),
+             2 NEIDOROI  CHAR(01) INIT(' '),
+             2 NAPANT    CHAR(01) INIT(' '),
+             2 NLHXNOM,
+               3 LHXNOHH CHAR(02) INIT(' '),
+               3 LHXNOMM CHAR(02) INIT(' '),
+               3 LHXNO   CHAR(02) INIT('19'),
+               3 LHXNOEE CHAR(02) INIT(' '),
+             2 NEPITOK   CHAR(04) INIT(' '),
+             2 NHMANLOG,
+               3 HMANLHH CHAR(02) INIT(' '),
+               3 HMANLMM CHAR(02) INIT(' '),
+               3 HMANL   CHAR(02) INIT('19'),
+               3 HMANLEE CHAR(02) INIT(' '),
+             2 NCIFNR    CHAR(08) INIT(' '),
+             2 NTAYT1    BIT(28)  INIT('0'B),
+             2 NTAYT2    BIT(04)  INIT('1100'B),
+             2 NHMAPOGR,
+               3 HMAPOHH CHAR(02) INIT(' '),
+               3 HMAPOMM CHAR(02) INIT(' '),
+               3 HMAPOEE CHAR(02) INIT(' '),
+             2 NENDDIOR  CHAR(01) INIT(' '),
+             2 NLATH     BIT(24)  INIT('0'B),
+             2 FIL1      CHAR(15) INIT(' ');
+
+ DCL  1  FLRXX               BASED(ADDR(TKAT)),
+        2   FILLR            BIT (20),
+        2   BITKTM           BIT (4);
+
+ DCL  1  LINE,
+         2  CTLCHR     CHAR(1)  INIT('1'),
+         2  GRAMH      CHAR(132);
+
+  DCL  (ATHR1,ATHR2)   FIXED(15,0)  INIT(0);
+  DCL   ATHR3          FIXED(15,0)  INIT(0);
+
+  DCL (ALLOCATE,SUBSTR,FREE,VERIFY) BUILTIN ;
+
+     OPEN FILE(NTAPE), FILE(WTAPE), FILE(CARD);
+
+     ON ENDFILE(NTAPE)  GOTO TELOS;
+
+
+     ON ENDFILE(CARD) BEGIN;
+       IF  COUNT_REC =  0  THEN  DO;
+           CTLCHR = '1';
+           GRAMH = ' *** дем упаявоум дедолема циа аккацг ** ';
+           WRITE FILE (PRINT) FROM (LINE);
+           GOTO TELOS;
+       END;
+
+       CTLCHR = '1';
+       GRAMH = ' * пяепеи ма аккавхоум '!!COUNT_REC!!' коцаяиаслои';
+       WRITE FILE (PRINT) FROM (LINE);
+       EOF_CC = 1;
+       GOTO A;
+     END;
+
+ /******************* APO EDO DIKO MOY ************************/
+ DCL EOF       FIXED(1)  INIT(0); /*FLAG текос аявеиоу INPUT*/
+ DCL EOF_CC    FIXED(1)  INIT(0);
+ DCL COUNT_REC FIXED(15) INIT(0); /*аяихлос еццяажым циа аккацг */
+ DCL ATHR4     FIXED(15) INIT(0); /*RECORDS FOR CHECKING */
+ DCL ATHR5     FIXED(15) INIT(0); /*коцаяиаслои поу епенеяцасхгйам */
+ DCL ATHR6     FIXED(15) INIT(0); /*коцаяиаслои поу дем епенеяцасх. */
+
+ DCL 1 MY_CC  CONTROLLED  ,
+        2  C_LOGAR PIC '(8)9' ,
+        2  C_FROM  PIC '(3)9' ,
+        2  C_TO    PIC '(3)9' ,
+        2  C_COUNT PIC '(15)9' ,
+        2  C_FOUND PIC '(1)9' ;
+
+ DCL 1 PINAX (*) CONTROLLED  ,/* пимайас поу йяатаеи тис CONTROL CARDS*/
+       2 P_LOGAR FIXED(9),
+       2 P_FROM  FIXED(5),
+       2 P_TO    FIXED(5),
+       2 P_COUNT FIXED(15),
+       2 P_FOUND FIXED(1);
+
+ CALL VALIDATE_INP  ;
+ /*CALL COUNT_CHANGES ;  */
+ A:
+ CALL LOAD_TABLE    ;
+ CALL MAIN_PROC     ;
+ TELOS :;
+ CALL CHECK_FOUND   ;
+
+ /**************************************************************/
+ /* MAIN_PROC      START                                       */
+ /*аявеио йимгсеым = NTAPE                                     */
+ /*аявеио Aккацлемо= WTAPE                                     */
+ /**************************************************************/
+ /* 1)диабасе то аявеио йимгсеым еыс то текос тоу              */
+ /* 2)ам то RECORD поу диабасес еимаи тупоу :                  */
+ /*                  RECTYPE = 'MOVESEG' ! RECTYPE = 'STATSEG' */
+ /* летяа то йаи йакесе тгм CHANGE_KATMA  циа пихамо UPDATE    */
+ /* 3)цяаье то RECORD сто OUTPUT асветA ам то ейамес UPDATE ╧  */
+ /*                                                  OXI       */
+ /**************************************************************/
+ MAIN_PROC    :PROC ;
+
+   DO WHILE (EOF ^= 1)  ; /*левяи то текос тоу аявеиоу*/
+
+        READ FILE(NTAPE)  INTO(RECIN);
+        ATHR1=ATHR1 + 1;/*поса RECORDS диабасес ;*/
+        ATHR4=ATHR4 + 1;/*поса RECORDS Eпенеяцасхгйес ;*/
+        CALL CHANGE_KATMA;
+
+        WRITE FILE(WTAPE)   FROM(RECIN);
+        ATHR3=ATHR3 + 1;/*поса RECORDS ецяаьес ;*/
+        END;
+ END MAIN_PROC     ;
+ /**************************************************************/
+ /* MAIN_PROC      END                                         */
+ /**************************************************************/
+
+ /**************************************************************/
+ /* CHANGE_KATMA   START                                       */
+ /**************************************************************/
+ /*Aккацг йатастглатос се дедолемо коцаяиасло апо йаята        */
+ /**************************************************************/
+ /*пимайас аккацым = PINAX                                     */
+ /*аявеио йимгсеым = NTAPE                                     */
+ /*йатастгла коцаяиаслоу сто аявеио йимгсеым = тйат            */
+ /*йатастгла коцаяиаслоу стоN пимайа аккацым пакио = PINAX.P_FROM*/
+ /*йатастгла коцаяиаслоу стоN пимайа аккацым мео   = PINAX.P_то*/
+ /**************************************************************/
+ /* EAN о аяихлос коцаяиаслоу йаи то йатастгла коцаяиаслоу     */
+ /* сто аявеио KINHсеым,таутифетаи ле йапоио RECORD стом пимайа*/
+ /* аккацым (PINAX)                                            */
+ /* тоте аккафоуле тоN йыдийо йатастглатос ле то мео сто аявеио*/
+ /* йимгсеым (NTAPE)          дгкадг TKAT = PINAX.P_TO(I)      */
+ /**************************************************************/
+ CHANGE_KATMA :PROC ;
+
+     DO I = 1 TO COUNT_REC ; /*ьане ма деис ам хекеи аккацг*/
+         IF ( ARLOG = PINAX(I).P_LOGAR  &
+               TKAT = PINAX(I).P_FROM   ) THEN DO;
+
+                 TKAT = PINAX(I).P_TO; /*UPDATE KATMA*/
+                 F1 = 0;
+                 ATHR2=ATHR2 + 1;      /*поса RECORDS Aкканам ;*/
+                 PINAX(I).P_FOUND = 1; /*O коцаяиаслос бяехгйе*/
+                 PINAX(I).P_COUNT =
+                 PINAX(I).P_COUNT+1; /*посес йимгсеис евеи о коц*/
+                 GO TO SKIP_NEXT;/*IF FOUND DONT LOOP    */
+         END;
+
+     END; /*DO WHILE END*/
+
+     SKIP_NEXT:;
+
+ END CHANGE_KATMA  ;
+ /*************************************************************/
+ /* CHANGE_KATMA   END                                        */
+ /*************************************************************/
+
+ /*************************************************************/
+ /* VALIDATE_INP   START                                      */
+ /*************************************************************/
+ VALIDATE_INP :PROC ;
+
+   DCL 1 CCARD ,
+          2 F1      CHAR(1),
+          2 CC_LOG  CHAR(8),
+          2 F2      CHAR(3),
+          2 CC_FROM CHAR(3),
+          2 F3      CHAR(3),
+          2 CC_TO   CHAR(3),
+          2 F4      CHAR(59);
+
+   DO WHILE (EOF_CC  ^= 1) ;
+
+        READ FILE (CARD) INTO (CCARD);
+
+        IF ( 0 =VERIFY(CC_LOG ,'0123456789') &
+             0 =VERIFY(CC_FROM,'0123456789') &
+             0 =VERIFY(CC_TO  ,'0123456789') &
+             CC_FROM ^= CC_TO         &
+             CC_FROM ^= '000'         &
+             CC_TO   ^= '000'  )
+        THEN DO;
+
+             ALLOCATE  MY_CC;
+
+             MY_CC.C_LOGAR = CC_LOG;
+             MY_CC.C_FROM  = CC_FROM;
+             MY_CC.C_TO    = CC_TO;
+             MY_CC.C_COUNT = 0;
+             MY_CC.C_FOUND = 0;
+             COUNT_REC = COUNT_REC +1;
+
+        END;
+        ELSE DO ;
+             GRAMH = '* еRROR  стгм йаята **** ' ;
+             WRITE FILE(PRINT)  FROM(LINE);
+             GRAMH = ' коцаяиаслос : '!!CC_LOG    ;
+             WRITE FILE(PRINT)  FROM(LINE);
+             GRAMH = ' пакио йатла : '!!CC_FROM  ;
+             WRITE FILE(PRINT)  FROM(LINE);
+             GRAMH = ' NEO   йатла : '!!CC_TO  ;
+             WRITE FILE(PRINT)  FROM(LINE);
+
+        END;
+
+   END;
+
+
+
+
+
+ END VALIDATE_INP  ;
+ /*************************************************************/
+ /* VALIDATE_INP   END                                        */
+ /*************************************************************/
+
+ /*************************************************************/
+ /* COUNT_CHANGES  START                                      */
+ /*************************************************************/
+ COUNT_CHANGES:PROC ;
+ END COUNT_CHANGES ;
+ /*************************************************************/
+ /* COUNT_CHANGES  END                                        */
+ /*************************************************************/
+
+ /*************************************************************/
+ /* CHECK_FOUND    START                                      */
+ /* летяаеи посои коцаяиаслои евоум акканеи,ам дем евоум окои */
+ /* тоте бцафеи лиа амажояа ле тоус коцаяиаслоус аутоус       */
+ /* (амупаяйтоус ╧  се акко йатастгла)                        */
+ /*************************************************************/
+ CHECK_FOUND  :PROC ;
+    DCL J FIXED(15) INIT(0);
+    DCL NOT_F FIXED(1) INIT(0);
+
+    /*Eкецвос циа то ам евоум епенеяцасхеи окои ои коцаяиаслои*/
+    DO J = 1 TO COUNT_REC ;
+       IF PINAX(J).P_FOUND = 0 THEN DO ;
+
+             ATHR5 = ATHR5  +1;
+             NOT_F = 1;
+       END;
+       ELSE DO;
+             ATHR6 = ATHR6  +1;
+             GRAMH = ' коцаяиаслос : '!!PINAX(J).P_LOGAR;
+             WRITE FILE(PRINT)  FROM(LINE);
+             GRAMH = ' пакио йатла : '!!PINAX(J).P_FROM;
+             WRITE FILE(PRINT)  FROM(LINE);
+             GRAMH = ' NEO   йатла : '!!PINAX(J).P_TO;
+             WRITE FILE(PRINT)  FROM(LINE);
+             GRAMH = ' сумоко аккацым сто коц. : '!!PINAX(J).P_COUNT;
+             WRITE FILE(PRINT)  FROM(LINE);
+
+       END;
+
+
+    END;
+
+    /*дем евоум епенеяцасхеи окои ои коцаяиаслои*/
+    IF    NOT_F = 1   THEN DO;
+         CTLCHR = '1';
+         GRAMH = '****************** еRROR IN  DKCHOFAC ***********';
+         WRITE FILE(PRINT)  FROM(LINE);
+         CTLCHR = '0';
+         GRAMH = 'пяосовг пяосовг пяобкгла ста дедолема тоу DKCHOFAC';
+         WRITE FILE(PRINT)  FROM(LINE);
+         CTLCHR = '0';
+
+        DO J = 1 TO COUNT_REC ;
+           IF PINAX(J).P_FOUND = 0 THEN DO ;
+             GRAMH = '* еRROR ***** ' ;
+             WRITE FILE(PRINT)  FROM(LINE);
+             GRAMH = ' коцаяиаслос : '!!PINAX(J).P_LOGAR;
+             WRITE FILE(PRINT)  FROM(LINE);
+             GRAMH = ' пакио йатла : '!!PINAX(J).P_FROM;
+             WRITE FILE(PRINT)  FROM(LINE);
+             GRAMH = ' NEO   йатла : '!!PINAX(J).P_TO;
+             WRITE FILE(PRINT)  FROM(LINE);
+
+           END;
+        END;
+        END;
+        ELSE DO ;  /*евоум епенеяцасхеи окои ои коцаяиаслои*/
+         CTLCHR = '1';
+         GRAMH = '*ока та дедолема епенеяцасхгйам сыста сто DKCHOFAC*';
+         WRITE FILE(PRINT)  FROM(LINE);
+        END;
+
+ END CHECK_FOUND   ;
+ /*************************************************************/
+ /* CHECK_FOUND    END                                        */
+ /*************************************************************/
+
+ /*************************************************************/
+ /* LOAD_TABLE     START                                      */
+ /*************************************************************/
+ LOAD_TABLE   :PROC ;
+   DCL K FIXED(15) INIT(0);
+
+   ALLOCATE PINAX(COUNT_REC);
+   /*LOAD REVERSE */
+   DO K = COUNT_REC TO 1 BY -1 ;
+        PINAX(K).P_LOGAR =  MY_CC.C_LOGAR       ;
+        PINAX(K).P_FROM  =  MY_CC.C_FROM        ;
+        PINAX(K).P_TO    =  MY_CC.C_TO          ;
+        PINAX(K).P_COUNT =  MY_CC.C_COUNT       ;
+        PINAX(K).P_FOUND =  MY_CC.C_FOUND       ;
+        FREE MY_CC ;/*REALEASE A GENERATION*/
+
+   END;
+
+ END LOAD_TABLE    ;
+ /*************************************************************/
+ /* LOAD_TABLE     END                                        */
+ /*************************************************************/
+
+      FREE PINAX ;
+
+      CTLCHR = '1';
+      GRAMH = 'диабасхгйам '!! ATHR1  !! ' RECORDS';
+      WRITE FILE(PRINT)  FROM(LINE);
+
+      CTLCHR = '0';
+      GRAMH = 'цяажтгйам   '!! ATHR3  !! ' RECORDS';
+      WRITE FILE(PRINT)  FROM(LINE);
+
+      GRAMH = 'аккавхгйам  '!! ATHR2  !! ' RECORDS';
+      WRITE FILE(PRINT)  FROM(LINE);
+
+      GRAMH = 'циа епенеяц.'!! ATHR4  !! ' RECORDS';
+      WRITE FILE(PRINT)  FROM(LINE);
+
+      GRAMH = 'коцаяиаслои пяос аккацг  '!!COUNT_REC;
+      WRITE FILE (PRINT) FROM (LINE);
+
+      GRAMH = 'дем епенеяц.  '!! ATHR5!!' коцаяиаслои '  ;
+      WRITE FILE(PRINT)  FROM(LINE);
+
+      GRAMH = 'епенеяцасхгйам'!! ATHR6!!' коцаяиаслои'  ;
+      WRITE FILE(PRINT)  FROM(LINE);
+
+      CLOSE FILE(NTAPE), FILE(WTAPE);
+    END START;
+

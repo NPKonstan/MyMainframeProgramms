@@ -1,0 +1,77 @@
+ /*********************************************************************/
+ /* ауто то пяоцяалла Eпистяежеи пистытийо SPREAD                     */
+ /* паиямеи сам INPUT :                                               */
+ /*                                                                   */
+ /*  INDATE        CHAR (10)  DD.MM.YYYY   глеяолгмиа исвуос          */
+ /*  ARLOGAR       FIXED(8)                аяихлос коцаяиаслоу        */
+ /*                                                                   */
+ /* йаи епистяежеи                                                    */
+ /*  EPITOK      PIC'S99V.99'     XREOSTIKO SPREAD                    */
+ /*                               OXI PISTOTIKO SPREAD                */
+ /*********************************************************************/
+ /*********************************************************************/
+ /* мпй 23-01-2004                                                    */
+ /* мпй 15-10-2004  JUST COMPILE                                      */
+ /* мпй 11-04-2006  пя╪бкеьг циа вяеыстий╧ й╬ламсг                    */
+ /*********************************************************************/
+ DKR001 : PROC(INDATE,ARLOGAR) OPTIONS(FETCHABLE)
+                                RETURNS(PIC'S99V.99');
+
+   DCL INDATE        CHAR  (10)  ;
+   DCL ARLOGAR       FIXED (8)   ;
+
+   DCL EPITOK     PIC'S99V.99'  INIT(0)  ;
+
+ EXEC SQL
+      INCLUDE CTDKINTR;
+
+ EXEC SQL
+      INCLUDE SQLCA;
+
+
+        KEY_ACCN1  = ARLOGAR ;
+        DAT_VALEUR = INDATE  ;
+        /*NPK 11-04-2006 FLG_SIGN1 = 1 пистыти╪ SPREAD
+                         FLG_SIGN1 = 8 вяеыстийо  SPREAD
+        H яоутима дем йакуптеи то вяеыстийо      SPREAD */
+        EXEC SQL
+        SELECT NUM_INTRC1   INTO :DKINTR.NUM_INTRC1
+        FROM      CTDKINTR
+        WHERE     KEY_ACCN1  = :DKINTR.KEY_ACCN1 AND
+                  FLG_AKYR   <> '1'              AND
+                  FLG_STYPE  =  '01'             AND
+                  FLG_SIGN1  =   1               AND
+        DAT_VALEUR =
+        ( SELECT   MAX(DAT_VALEUR)
+                   FROM    CTDKINTR
+                WHERE     KEY_ACCN1  = :DKINTR.KEY_ACCN1 AND
+                          FLG_AKYR   <> '1'              AND
+                          FLG_STYPE  =  '01'             AND
+                          FLG_SIGN1  =   1               AND
+                          DAT_VALEUR <= :DKINTR.DAT_VALEUR
+        )
+        WITH UR;
+
+        IF SQLCODE ^= 0  THEN  DO;
+            EPITOK = 0 ;
+            IF  SQLCODE ^= 100 THEN DO;/*ONLY REAL ERRORS*/
+                 PUT SKIP LIST('START DKR001 ERROR' ) ;
+                 PUT SKIP LIST('SQLCODE   = ',SQLCODE ) ;
+                 PUT SKIP LIST('INDATE    = ',INDATE ) ;
+                 PUT SKIP LIST('ARI.LOGAR = ',ARLOGAR) ;
+                 PUT SKIP LIST('END  DKR001 ERROR  ' ) ;
+             END;
+        END;
+        ELSE DO;
+            EPITOK = NUM_INTRC1 ;
+        /*  PUT SKIP LIST('START DKR001' ) ;
+            PUT SKIP LIST('INDATE    = ',INDATE ) ;
+            PUT SKIP LIST('ARI.LOGAR = ',ARLOGAR) ;
+            PUT SKIP LIST('EPITOK    = ',EPITOK ) ;
+            PUT SKIP LIST('END         ' ) ;            */
+       END;
+ RETURN ( EPITOK  );
+
+ END  DKR001           ;
+
+

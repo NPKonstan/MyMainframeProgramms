@@ -1,0 +1,299 @@
+     /* EYPErH kOcAPIArMxN pEkATxN(IMS) ApO TO CIDB NUMBER pEkATH */
+
+ /* PROCESS A,GOSTMT,NEST,OPT(TIME),AG,MI('+'),MAP,M,OF,NIS;          */
+
+ /********************************************************************/
+ /*  SOURCE  NAME  : DK546                                           */
+ /*  CREATION DATE : 13/05/2005                                      */
+ /*  PROGRAMMER    : лпаялпетайг йатеяима                            */
+ /*  LANGUAGE      : PLI-DB2                                         */
+ /*  пеяицяажг     : BK.T.XS.XAR200.G0040V00                         */
+ /********************************************************************/
+
+ MANT: PROC OPTIONS(MAIN);
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+ DCL CZX3VDAT CHAR(6); FETCH CZXDATEP;
+ DCL CZXDATEP ENTRY OPTIONS(INTER,ASM) ;
+ DCL READER FILE RECORD INPUT  ENV( FB RECSIZE(80) );
+ DCL CARD   FILE RECORD INPUT  ENV( FB RECSIZE(80) );
+ DCL MISTH  FILE RECORD INPUT  ENV( FB RECSIZE(200) );
+ DCL LIST1  FILE RECORD OUTPUT ENV( FB RECSIZE(132) CTLASA);
+
+ %INCLUDE DAWATNS;
+ %INCLUDE DAYATNS;
+ %INCLUDE RECDBCR;
+
+ EXEC SQL INCLUDE T04CNV97;
+ EXEC SQL INCLUDE T04DBA01;
+ EXEC SQL INCLUDE CTBKREL;
+ EXEC SQL INCLUDE SQLCA;
+
+
+ DCL    DATEFROM          CHAR(10);
+ DCL 1 RECDATA1,
+       2 LABEL1            CHAR(8)    INIT ('гл/миа: '),
+       2 DATEFR            ,
+         3 DD1             PIC '99'   INIT(00),
+         3 P11             CHAR(1)    INIT('.'),
+         3 MM1             PIC '99'   INIT(00),
+         3 P21             CHAR(1)    INIT('.'),
+         3 YYYY1           PIC '9999' INIT(0000),
+       2 FILLER1           CHAR(1)    INIT(' '),
+       2 LABEL2            CHAR(10)   INIT('ежаялоцг: '),
+       2 PROION1           CHAR(2)    INIT('00'),
+       2 FILLER2           CHAR(1)    INIT(' '),
+       2 LABEL3            CHAR(10)   INIT('йахокийо: '),
+       2 KATHO             PIC'9999'  INIT(0000),
+       2 FILLER3           CHAR(34)   INIT (' ');
+
+ DCL    KATHOL             CHAR(4);
+ DCL   COUNT_INP         FIXED(15)    INIT(0);
+ DCL 1 RECDATA,
+       2 CIDBNUM           PIC '(8)9'  INIT (''),
+       2 FILLER            CHAR(72)    INIT (' ');
+
+ DCL (ADDR,TRANSLATE,SUBSTR,LENGTH) BUILTIN;
+ DCL (BASED,VERIFY,PRIORITY,NULL) BUILTIN;
+ DCL TIME   BUILTIN;
+
+ DCL   GREEK     CHAR(27)  INIT('ABcdEZHhIKkMNnOpPrTYuXwx./');
+ DCL   LATIN     CHAR(27)  INIT('ABCDEFGHIJKLMNOQRSUVWXYZ.P');
+
+ DCL    PREV_CIDBNUM      PIC '(8)9'  INIT ('');
+ DCL    NEWARLOG          PIC '(9)9'  INIT ('');
+ DCL    WS_ARLOGAR        PIC '(8)Z'  INIT ('');
+ DCL    COMP              PIC '(9)9'  INIT ('');
+ DCL    EMPL              PIC '(9)9'  INIT ('');
+ DCL    PREV_BIRTHDATE    CHAR (10)  INIT ('');
+ DCL    PREV_DATINIT      CHAR (10)  INIT ('');
+ DCL    QUERY2            CHAR(50)  VAR;
+ DCL    QUERY1            CHAR(500)  VAR;
+ DCL    SYS_DATE          CHAR(6)    INIT(' ');
+ DCL    SYS_TIME          CHAR(9)    INIT(' ');
+ DCL    WSYS_DATE         PIC '999999' BASED(ADDR(SYS_DATE));
+ DCL    W_DATE            PIC '999999';
+ DCL    LINES             PIC '9999999';
+ DCL    SWEOF             PIC '9' INIT (0);
+ DCL    I                 PIC '999' INIT (0);
+ DCL    G                 PIC '999' INIT (0);
+ DCL    J                 PIC '999' INIT (0);
+ DCL  1 P1            CHAR(7) ;
+ DCL  1 P2            PIC 'ZZZZ9';
+
+ DCL    CNTARLOGAR        PIC 'ZZZ.ZZ9' INIT(0) ;
+ DCL    WS_IND1           BIN FIXED(3);   /*--CHAR(18); */
+ DCL    WS_IND2           BIN FIXED(3);   /*--CHAR(18); */
+ DCL    WS_IND3           BIN FIXED(3);   /*--CHAR(18); */
+ DCL    WS_IND4           BIN FIXED(3);   /*--CHAR(18); */
+ DCL    WS_IND5           BIN FIXED(3);   /*--CHAR(18); */
+ DCL    WS_CODEFARM       CHAR(2);
+ DCL    WS_ONOMA          CHAR(60);
+
+       /*-------------------------------*/
+       /* EXTERNAL PROCEDURE VALDAY     */
+       /*-------------------------------*/
+     DCL WRKDT            CHAR (6);
+     DCL WRKDATE          PIC '999999' BASED(ADDR(WRKDT));
+      DCL VALDAY  EXTERNAL ENTRY(CHAR(44))
+          OPTIONS(INTER,ASM);
+      FETCH VALDAY ;
+
+    DCL  ENA  CHAR(24)
+         INIT('ABcdEZHhIKkMNnOpPrTYuXwx');
+    DCL  DYO  CHAR(24)
+         INIT('абцдефгхийклмнопястужвьы');
+
+ DATE: PROC IRREDUCIBLE RETURNS(CHAR(6)) ;
+       CALL CZXDATEP          ( CZX3VDAT) ;
+       RETURN (CZX3VDAT) ;
+       END DATE ;
+
+ /* **********               *****************************  */
+ DCL  1 LINE,
+         2 L1            CHAR(1),
+         2 L2            CHAR(131);
+
+     OPEN FILE(LIST1);
+
+     OPEN FILE(READER);
+
+     ON ENDFILE(READER) BEGIN;
+        GO TO TELOS;
+        END;
+
+     OPEN FILE(MISTH);
+
+     ON ENDFILE(MISTH) BEGIN;
+        GO TO TELOS;
+        END;
+
+     EXEC SQL DECLARE ARLOGAR_CUR CURSOR WITH HOLD  FOR
+        SELECT
+        NUM_AR_LOGAR, PEL.COD_EFARM,COD_PELATH,
+        COALESCE(FEC_NACIMIENTO, '01.01.0001'),
+        COD_NUM_DOC_OFICIA
+        FROM
+        T04CNV97 PEL
+        , T04DBA01
+        WHERE
+        COD_PELATH = COD_PERSONA AND
+        NUM_AR_LOGAR = :NUM_AR_LOGAR AND
+        IND_OPEN_CLOSE = 0 AND
+        PEL.COD_EFARM IN ('70','90')
+        ORDER BY 3, 4;
+
+     EXEC SQL DECLARE ERGODOT_CUR CURSOR WITH HOLD  FOR
+        SELECT COD_PERSONA_COMP, KEY_ARLOG, COD_PERSONA_EMPL,
+        DAT_INIT
+        FROM CTBKREL ERG
+        WHERE
+        COD_PERSONA_EMPL = :COD_PERSONA_EMPL
+        ORDER BY 3, 4;
+
+  R1:
+
+     READ FILE(MISTH) INTO(RECDBCR);
+
+     L2 = TRANSLATE(RECDBCR.ONOMA, DYO, ENA);
+
+     WS_ARLOGAR = RECDBCR.ARLOG;
+     IF (RECDBCR.ARLOG>80000000) THEN
+        NUM_AR_LOGAR = WS_ARLOGAR!!'        01';
+     ELSE
+        NUM_AR_LOGAR = '0'!!WS_ARLOGAR!!'       01';
+
+     EXEC SQL OPEN ARLOGAR_CUR;
+
+     IF SQLCODE ^= 0 THEN
+     DO;
+        L2 = 'DB2 ERROR - '!!SQLCODE!!' : кахос сто амоицла тоу' ;
+        WRITE FILE(LIST1) FROM(LINE);
+        P2 = DIVIDE(LINES,0,1,1);
+     END;
+
+     /*    READ ACCOUNTS FOR CIDBNUM                */
+     EXEC SQL FETCH ARLOGAR_CUR INTO
+               :NUM_AR_LOGAR, :T04CNV97.COD_EFARM,:COD_PELATH,
+               :FEC_NACIMIENTO, :COD_NUM_DOC_OFICIA;
+
+     IF (SQLCODE = 100 ) THEN DO;
+         EXEC SQL CLOSE ARLOGAR_CUR;
+         GOTO R1;
+     END;
+     ELSE IF SQLCODE ^= 0 THEN /* DB2 ERROR */
+     DO;
+        L2 = 'DB2 ERROR - '!!SQLCODE!!' : кахос сто FETCH тоу' ;
+        WRITE FILE(LIST1) FROM(LINE);
+        P2 = DIVIDE(LINES,0,1,1);
+     END;
+
+
+     IF (T04CNV97.COD_EFARM = '90') THEN
+        L2 = SUBSTR(NUM_AR_LOGAR, 2, 8)!!';'!!L2;
+     ELSE
+        L2 = SUBSTR(NUM_AR_LOGAR, 1, 8)!!';'!!L2;
+
+
+     COD_PERSONA_EMPL = COD_PELATH;
+
+     EXEC SQL OPEN ERGODOT_CUR;
+
+     IF SQLCODE ^= 0 THEN
+     DO;
+        L2 = 'DB2 ERROR - '!!SQLCODE!!' : кахос сто амоицла тоу' ;
+        WRITE FILE(LIST1) FROM(LINE);
+        P2 = DIVIDE(LINES,0,1,1);
+     END;
+
+     EXEC SQL FETCH ERGODOT_CUR INTO
+               :COD_PERSONA_COMP, :KEY_ARLOG, :COD_PERSONA_EMPL,
+               :DAT_INIT;
+
+     COMP = COD_PERSONA_COMP;
+     NEWARLOG = KEY_ARLOG;
+     IF (SQLCODE = 100 ) THEN DO;
+         COMP = 0;
+         NEWARLOG = 0;
+         COD_PERSONA_EMPL = 0;
+         DAT_INIT = '01.01.0001';
+         KEY_ARLOG = 0;
+     END;
+     ELSE IF SQLCODE ^= 0 THEN /* DB2 ERROR */
+     DO;
+        L2 = 'DB2 ERROR - '!!SQLCODE!!' : кахос сто FETCH тоу' ;
+        WRITE FILE(LIST1) FROM(LINE);
+        P2 = DIVIDE(LINES,0,1,1);
+     END;
+
+     EMPL = COD_PELATH;
+
+     L2 = COMP!!';'!!EMPL!!';'!!
+          FEC_NACIMIENTO!!';'!!substr(COD_NUM_DOC_OFICIA,10,7)!!';'!!
+          DAT_INIT!!';'!!NEWARLOG!!';'!!L2;
+     WRITE FILE(LIST1) FROM(LINE);
+
+         EXEC SQL CLOSE ARLOGAR_CUR;
+         EXEC SQL CLOSE ERGODOT_CUR;
+     GOTO R1;
+
+
+ /* епийежакида тгс секидас */
+ HEAD: PROC;
+
+     P2 = DIVIDE(LINES,60,4,0) + 1;
+
+     L1 = '1';
+     L2 = 'елпояийг TPAпEZA THс EккAдOс A.E';
+     WRITE FILE(LIST1) FROM(LINE);
+     L1 = ' ';
+     L2 = 'глеяолгмиа:  '!!SUBSTR(SYS_DATE,5,2)!!'.'
+                 !!SUBSTR(SYS_DATE,3,2)!!'.'!!'20'
+                 !!SUBSTR(SYS_DATE,1,2)!! ' xPA: '
+                 !!SUBSTR(SYS_TIME,1,2)!! ':'
+                 !!SUBSTR(SYS_TIME,3,2)!! ':'
+                 !!SUBSTR(SYS_TIME,5,2)!!(60)' '!!'*** DK546 *** '!!
+                 (5)' '!!P1!!P2;
+     WRITE FILE(LIST1) FROM(LINE);
+
+     L2 = (131)' ';
+     WRITE FILE(LIST1) FROM(LINE);
+     WRITE FILE(LIST1) FROM(LINE);
+
+
+     L2 = '        ейтупысг сумокым аяихлым коцаяиаслым ама CIDB '!!
+          'йыдийо пекатг ';
+     WRITE FILE(LIST1) FROM(LINE);
+     L2 = (131)' ';
+     WRITE FILE(LIST1) FROM(LINE);
+     L2 = (132)'=';
+     WRITE FILE(LIST1) FROM(LINE);
+     L2 = 'CIDBNUM   епымулиа '!!(52)' '!!'аяихлос коцаяиаслоу '!!
+          ' ежаялоцг  глеяолгмиа  йахокийо';
+     WRITE FILE(LIST1) FROM(LINE);
+     L2 = (132)'=';
+     WRITE FILE(LIST1) FROM(LINE);
+
+   LINES =LINES + 9;
+ END HEAD;
+
+ /* аккафеи секида стгм ейтупысг */
+ CHANGEL: PROC;
+     IF MOD(LINES,60)=0  THEN
+     DO;
+        CALL HEAD;
+     END;
+     ELSE  LINES = LINES + 1;
+ END CHANGEL;
+
+ TELOS:;
+  /*
+   CALL HEAD;
+
+   CALL HEADPROD;
+    */
+
+   CLOSE FILE(MISTH);
+   CLOSE FILE(READER);
+   CLOSE FILE(LIST1);
+ END MANT;
+

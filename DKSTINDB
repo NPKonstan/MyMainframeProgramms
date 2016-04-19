@@ -1,0 +1,264 @@
+* PROCESS XOPTS(DLI);
+ DKSTINDB: PROC OPTIONS(MAIN);
+ /********************************************************************/
+ /*  SOURCE  NAME  : DKSTINDB                                        */
+ /*  CREATION DATE : 07/01/2005                                      */
+ /*  PROGRAMMER    : лпаялпетайг йатеяима                            */
+ /*  LANGUAGE      : DB2-PLI-IMS                                     */
+ /*  пеяицяажг     : еисацыцг тым статистийым стоивеиым тым коцаяиа- */
+ /*                  слым поу упаявоум сто истояийо аявеио се пимайа */
+ /*                  DB2 (CTDKSTTP). ха тяенеи лиа ломо жояа ста     */
+ /*                  пкаисиа тгс аккацгс тгс диадийасиас             */
+ /********************************************************************/
+ /*NPK CHANGES FOR ENTERPRISE PLI 21-05-2007 DIVIDE ******************/
+ /********************************************************************/
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+ DCL CZX3VDAT CHAR(6); FETCH CZXDATEP;
+ DCL CZXDATEP ENTRY OPTIONS(INTER,ASM) ;
+
+ DCL FUGHN  CHAR(4)  INIT('GHN ') ;
+ DCL REPL   CHAR(4)  INIT('REPL') ;
+ DCL VALDAY EXTERNAL ENTRY (CHAR(44))
+                               OPTIONS(INTER, ASM);
+ % INCLUDE CUAVDCDS  ;
+ % INCLUDE DAYATNS;
+ % INCLUDE  KSDBMAP ;
+
+ DCL     (KFIOROOT,KFIOSADD) POINTER;
+ DCL     WRKAREA             CHAR(450) INIT(' ');
+
+ /****************************************************************/
+  FETCH VALDAY ;        /* LOAD VALDAY    */
+ /**** ояислос аявеиым  *******/
+ DCL ANAK FILE RECORD INPUT ENV( FB RECSIZE(1250));
+ DCL PRINTER FILE RECORD OUTPUT ENV( FB RECSIZE(133)  CTLASA) ;
+ DCL LINE CHAR(133) INIT(' ') ;
+
+ DCL    PRIORITY BUILTIN;
+ /****  DATE SIMULATION DEFINED FUNCTION  ****/
+ DATE: PROC IRREDUCIBLE RETURNS(CHAR(6)) ;
+        CALL CZXDATEP          ( CZX3VDAT) ;
+        RETURN (CZX3VDAT) ;
+        END DATE ;
+
+ /****** COUNTERS   ****/
+ DCL   (STAL,STAK,LINES) PIC'ZZZ.ZZZ.ZZZ.ZZ9'  INIT(0) ;
+ DCL   (CNTINS,CNTREAD)  PIC'ZZZ.ZZZ.ZZZ.ZZ9'  INIT(0) ;
+ DCL   CNTNF             PIC'ZZZ.ZZZ.ZZZ.ZZ9'  INIT(0) ;
+ DCL   I                 PIC '99' INIT (0);
+ DCL   X                 PIC '999999999' INIT (0);
+ DCL   YY                PIC '99' INIT (0);
+ DCL   MM                PIC '99' INIT (0);
+ DCL   YYMM              PIC '9999' INIT (0);
+ DCL   ARLOGAR           PIC '(9)Z';
+ DCL   PREV_ARLOG        FIXED(9) INIT(0);
+ DCL   NFARLOG(999999)   FIXED DEC(9,0) INIT(0);
+
+ /******** DB2 TABLES *********/
+ EXEC SQL INCLUDE CTDKSTTP;
+ EXEC SQL INCLUDE SQLCA;
+
+ /******** RECORD ARXEIOY    *****/
+ DCL 1 ANAKEF,
+       2 KATHO          FIXED(5)       INIT(0),
+       2 KAT            FIXED(5)       INIT(0),
+       2 ARLOG          FIXED DEC(9,0) INIT(0),
+       2 ETOS           FIXED(3) INIT(0),
+       2 TAB,
+          3  MHNAS(12)   CHAR(102),
+       2 FLR1           CHAR(13) INIT(' ');
+  DCL 1    TBL(12)  BASED(ADDR(TAB)),
+       2 TMESONYPOL FIXED (15,2)  INIT(0)  ,
+       2 TTXRAR     FIXED (7)     INIT(0)  ,
+       2 TTXRPOS    FIXED (15,2)  INIT(0)  ,
+       2 TTPIAR     FIXED (7)     INIT(0)  ,
+       2 TTPIPOS    FIXED (15,2)  INIT(0)  ,
+       2 THXRAR     FIXED (7)    INIT(0)  ,
+       2 THXRPOS    FIXED (15,2)   INIT(0)  ,
+       2 THPIAR     FIXED (7)    INIT(0)  ,
+       2 THPIPOS    FIXED (15,2)  INIT(0)  ,
+       2 TEXRAR     FIXED (7)     INIT(0)  ,
+       2 TEXRPOS    FIXED (15,2)  INIT(0)  ,
+       2 TEPIAR     FIXED (7)      INIT(0) ,
+       2 TEPIPOS    FIXED (15,2)   INIT(0) ,
+       2 TAKALAR    FIXED (7)      INIT(0) ,
+       2 TAKALPOS   FIXED (15,2)   INIT(0) ,
+       2 TFILLER    CHAR  (10)     INIT(0)  ;
+
+ DCL 1 RECTBL,
+       2 MESONYPOL FIXED (15,2)  INIT(0)  ,
+       2 TXRAR     FIXED (7)     INIT(0)  ,
+       2 TXRPOS    FIXED (15,2)  INIT(0)  ,
+       2 TPIAR     FIXED (7)     INIT(0)  ,
+       2 TPIPOS    FIXED (15,2)  INIT(0)  ,
+       2 HXRAR     FIXED (7)    INIT(0)  ,
+       2 HXRPOS    FIXED (15,2)   INIT(0)  ,
+       2 HPIAR     FIXED (7)    INIT(0)  ,
+       2 HPIPOS    FIXED (15,2)  INIT(0)  ,
+       2 EXRAR     FIXED (7)     INIT(0)  ,
+       2 EXRPOS    FIXED (15,2)  INIT(0)  ,
+       2 EPIAR     FIXED (7)      INIT(0) ,
+       2 EPIPOS    FIXED (15,2)   INIT(0) ,
+       2 AKALAR    FIXED (7)      INIT(0) ,
+       2 AKALPOS   FIXED (15,2)   INIT(0) ,
+       2 FILLER    CHAR  (10)     INIT(0) ;
+
+ /**************** MAIN PROGRAM **************************************/
+ KFIOROOT = ADDR(WRKAREA);
+ KFIOSADD = ADDR(WRKAREA);
+
+ OPEN FILE(ANAK),FILE(PRINTER);
+     ON ENDFILE(ANAK) GOTO TELOS;
+  LINE='  еисацыцг статистийым стоивеиым апо тгм IMS се DB2 ';
+  WRITE FILE(PRINTER) FROM(LINE) ;
+  LINE='  ******  DKSTINDB ******* '!!DAYR8SA(DAYA6R8(DATE));
+  WRITE FILE(PRINTER)  FROM(LINE);
+  LINE='-***********************************************************';
+  WRITE FILE(PRINTER) FROM(LINE);
+  NFARLOG = 0;
+ CNTNF = 1;
+ CNTINS = 1;
+ READANAK: /* амацмысг аявеиоу */
+   READ FILE(ANAK) INTO(ANAKEF) ;
+   CNTREAD = CNTREAD + 1;
+   IF ARLOG >= 90000000 THEN DO; /* EINAI STATISTIKA KATASTHMATOS */
+      STAK = STAK + 1;
+      GOTO READANAK;
+   END;
+   STAL = STAL + 1;
+
+   DO I=1 TO 12;
+      RECTBL = TBL(I);
+      /* ха еисавхеи г еццяажг стом пимайа */
+      IF ( MESONYPOL^= 0 !
+         TXRPOS ^= 0 ! TPIPOS ^= 0 ! HXRPOS ^= 0 ! HPIPOS ^= 0 !
+         EXRPOS ^= 0) THEN DO;
+         /*** еуяесг тгс текеутаиас глеяас тоу лгма ***/
+         YY = ETOS;
+         MM = I + 1;
+         IF (MM = 13 ) THEN DO;
+           MM = 1; YY = YY + 1;
+         END;
+         CUAHMERX = '01'!!MM!!YY;
+         CUAKLEIT = 'VD';
+         CUAOFORM = 'Z';
+         CUAEKAE  = 'B';
+         CUAEHMER = '1';
+         CALL VALDAY(CUAVDCDS);
+         DAT_FDATE = DAYR8SA(DAYS6R8(CUAHMERZ));
+         /* еуяесг ам о коцаяиаслос еимаи йкеистос апо тгм IMS басг */
+         EXEC DLI
+            GHU USING PCB(2)
+            SEGMENT (KROOTSEG)
+            WHERE (KSRARLOG=ARLOG)
+            INTO (WRKAREA);
+
+         IF DIBSTAT = 'GB' THEN GOTO TELOS;
+         IF DIBSTAT = 'GE' THEN DO;
+            X = 1;
+            DO WHILE (X<CNTNF & NFARLOG(X)^= ARLOG);
+               X = X + 1;
+            END;
+            IF (X = CNTNF & NFARLOG(X)^= ARLOG) THEN  DO;
+              NFARLOG(CNTNF)= ARLOG;
+              CNTNF = CNTNF + 1;
+            END;
+
+         END;
+         IF DIBSTAT ^= ' ' & DIBSTAT ^= 'GA' & DIBSTAT ^= 'GK' &
+            DIBSTAT ^= 'GE' THEN DO;
+            LINE=' IMS DB RETURN '!!DIBSTAT!!' циа том коцаяиасло '!!
+                ARLOG;
+            WRITE FILE(PRINTER)    FROM(LINE);
+            GOTO TELOS;
+         END;
+         PREV_ARLOG = ARLOG;
+         IF DIBSTAT = ' ' THEN DO;
+           ARLOGAR = ARLOG;
+           KEY_KATHEG = KSRKATHO;
+           KEY_BRANCH = KAT; KEY_EFARM = '70';
+          KEY_ACCN1 = SUBSTR(ARLOGAR,2,LENGTH(ARLOGAR)-1)!!'        01';
+          KEY_YEAR = SUBSTR(DAT_FDATE,7, 4);
+          KEY_MONTH = I;       NUM_MDLBAL = MESONYPOL;
+          NUM_TAMDNR = TXRAR; NUM_TAMDAM = TXRPOS;
+          NUM_TAMCNR = TPIAR; NUM_TAMCAM = TPIPOS;
+          NUM_HMEDNR = HXRAR; NUM_HMEDAM = HXRPOS;
+          NUM_HMECNR = HPIAR; NUM_HMECAM = HPIPOS;
+          NUM_CHEDNR = EXRAR; NUM_CHEDAM = EXRPOS;
+          NUM_CHECNR = EPIAR; NUM_CHECAM = EPIPOS;
+          NUM_UNCOVNR=AKALAR; NUM_UNCOVAM = AKALPOS;
+          FLG_CLOSED= KSRAKYR;
+          COD_ID = MOD((KEY_YEAR * 12 + KEY_MONTH), 24) + 1;
+         /*** еисацыцг стг басг ******/
+         INS:
+         EXEC SQL INSERT INTO CTDKSTTP (
+            KEY_KATHEG, KEY_BRANCH, KEY_EFARM  , KEY_ACCN1  ,
+            KEY_YEAR  , KEY_MONTH , DAT_FDATE  , DAT_RDATE  ,NUM_MDLBAL,
+            NUM_TAMDNR, NUM_TAMDAM, NUM_TAMCNR , NUM_TAMCAM ,NUM_HMEDNR,
+            NUM_HMEDAM, NUM_HMECNR, NUM_HMECAM , NUM_CHEDNR ,NUM_CHEDAM,
+            NUM_CHECNR, NUM_CHECAM, NUM_UNCOVNR, NUM_UNCOVAM,FLG_CLOSED,
+            COD_ID
+          )
+         VALUES (
+           :KEY_KATHEG,:KEY_BRANCH ,:KEY_EFARM ,:KEY_ACCN1 ,:KEY_YEAR,
+           :KEY_MONTH ,:DAT_FDATE,CURRENT_DATE,:NUM_MDLBAL,:NUM_TAMDNR,
+           :NUM_TAMDAM,:NUM_TAMCNR ,:NUM_TAMCAM,:NUM_HMEDNR,:NUM_HMEDAM,
+           :NUM_HMECNR,:NUM_HMECAM ,:NUM_CHEDNR,:NUM_CHEDAM,:NUM_CHECNR,
+           :NUM_CHECAM,:NUM_UNCOVNR,:NUM_UNCOVAM,:FLG_CLOSED,
+           :COD_ID
+         );
+         IF SQLCODE = -803 THEN
+         DO;
+            LINE = 'упаявеи гдг г еццяажг циа том коцаяиасло ';
+            WRITE FILE(PRINTER) FROM(LINE);
+            P2 = DIVIDE(LINES,0,1,1);/*NPK CHANGES FOR ENTPLI 21-05-07*/
+         END;
+         ELSE IF SQLCODE = -904 THEN
+         DO;
+            LINE = '*** собаяо кахос стгм DB2 *** SQLCODE: '!!SQLCODE;
+            WRITE FILE(PRINTER) FROM(LINE);
+            GOTO TELOS;
+         END;
+         ELSE IF SQLCODE ^= 0 THEN
+         DO;
+            LINE = '*** собаяо кахос стгм DB2 *** SQLCODE: '!!SQLCODE;
+            WRITE FILE(PRINTER) FROM(LINE);
+            P2 = DIVIDE(LINES,0,1,1);/*NPK CHANGES FOR ENTPLI 21-05-07*/
+         END;
+         ELSE DO;
+             CNTINS = CNTINS + 1;
+         END;
+        END;
+      END;
+   END;
+   GOTO READANAK;
+
+ /*------------------------------------------------------------------*/
+ /*  елжамисг апотекеслатым                                          */
+ /*------------------------------------------------------------------*/
+ TELOS:
+  CLOSE FILE(ANAK),FILE(STAT) ;
+  IF ( CNTNF ^= 0 ) THEN DO;
+       LINE='  дем бяехгйам ои коцаяиаслои:'!!NFARLOG(X);
+       WRITE FILE(PRINTER)    FROM(LINE);
+     DO X= 1 TO CNTNF - 1;
+       LINE=' '!!NFARLOG(X);
+       WRITE FILE(PRINTER)    FROM(LINE);
+     END;
+     LINE='1  сумоко: '!!CNTNF;
+     WRITE FILE(PRINTER)  FROM(LINE);
+  END;
+
+  LINE='  амацмысг еццяажым апо аявеио ' !!CNTREAD;
+  WRITE FILE(PRINTER) FROM(LINE);
+  LINE='         статистийа йатастглатым ' !!STAK;
+  WRITE FILE(PRINTER) FROM(LINE);
+  LINE='         статистийа коцаяиаслым  ' !!STAL;
+  WRITE FILE(PRINTER) FROM(LINE);
+  LINE='  еисацыцг еццяажым стг басг ' !!CNTINS;
+  WRITE FILE(PRINTER) FROM(LINE);
+ LINE='-**************************************************************';
+  WRITE FILE(PRINTER) FROM(LINE);
+     CLOSE FILE(PRINTER);
+ END DKSTINDB;
+

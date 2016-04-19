@@ -1,0 +1,765 @@
+* PROCESS XOPTS(CICS,SP),LIMITS (FIXEDDEC(15,31));
+ DD11: PROC(COM_PTR) OPTIONS(MAIN,REENTRANT) ;
+ /********************************************************************/
+ /*                                                                  */
+ /*   ONLINE PLI + DB2      MEMBER = APPTDD11                        */
+ /*                                                                  */
+ /*   AÍAZHTHÓH ÅÍÔÏËÙÍ ÁÍÁÈÅÓÇÓ SEPA : ÃÉÁ INTERNET                 */
+ /*                                                                  */
+ /********************************************************************/
+ /* Ôá ëÜèç åðéóôñÝöïíôáé óôá ðéï êÜôù ðåäßá :                       */
+ /* CA_ANSWER_CODE  PIC '(3)9'                                       */
+ /* CA_ANSWER_DESC  CHAR(100)                                        */
+ /********************************************************************/
+ /* NPK 17-03-2010                                                   */
+ /********************************************************************/
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+ % INCLUDE  EFHWEBDS ;           /* WEB COMMAREA                     */
+
+ /*  DCL  CA_ANSWER_CODE  PIC '(3)9'  ;
+   DCL CA_ANSWER_DESC  CHAR(100)    ;
+   DCL 1 DAT_IN          , */
+     DCL 1 DAT_IN         BASED(ADDR(COM_AREA_DATA)),
+       2  DD_COD_PERSONA  PIC '(09)9', /*APIÈMOÓ ÐÅËÁÔÇ ÏÖÅÉËÅÔH*/
+       2  CHR_C_S_I_I_517 CHAR(035), /*ÊÙÄ. ÏÑÃÁÍÉÓÌÏ¾ (0 ->ÏËÁ)*/
+       2  PAGE_START      CHAR(026),
+       2  PAGE_END        CHAR(026),
+       2  DEC_FLG         PIC'(01)9';/*1=NEXT 2 =PREVIOUS*/
+     DCL 1 DAT_OUT         BASED(ADDR(COM_AREA_DATA)),
+       2  DD_COD_PERSONA    PIC '(09)9', /*APIÈMOÓ ÐÅËÁÔÇ ÏÖÅÉËÅÔH*/
+       2  PAGE_START        CHAR(026),
+       2  PAGE_END          CHAR(026),
+       2  NUM_OF_REC        PIC'(05)9',
+       2  HAS_PREV          PIC'(01)9',/*1 = NAI , 0 = OXI     */
+       2  HAS_NEXT          PIC'(01)9',/*1 = NAI , 0 = OXI     */
+       2  TBL(10),
+           4  DEC_ARLOG         PIC '(08)9', /*               */
+           4  CHR_CR_NAME       CHAR(0070) , /*               */
+           4  CHR_C_S_I_I_517   CHAR(0035) , /*               */
+           4  CHR_MANDAT_ID     CHAR(0035) , /*               */
+           4  CHR_ULT_DB_NAME   CHAR(0070) , /*               */
+           4  DEC_DAT_OF_SIGN   PIC '(08)9', /*               */
+           4  AMT_LIMIT         PIC '(08)9', /*               */
+           4  IS_ACTIVE         PIC '(01)9'; /* 0 INACTIVE,1 ACTIVE */
+
+     DCL   EOC           BIT(1)    INIT('0'B);
+     DCL   CNT           FIXED(9)  INIT(0);
+     DCL   SAVEPAGE_END  CHAR(26);
+   /****************************************************************
+       INCLUDED TABLES
+    ***************************************************************/
+        EXEC SQL INCLUDE SQLCA      ;
+        EXEC SQL INCLUDE T04CNV97   ;
+        EXEC SQL INCLUDE CTDDMD10   ;
+    /***************************************************************/
+    /*  DECLARE CURSORS UP AND DOWN          ========  */
+    /***************************************************************/
+     EXEC SQL DECLARE CUR_NEXT CURSOR WITH HOLD FOR SELECT
+       DEC_ARLOG         ,
+       CHR_CR_NAME       ,
+       CHR_C_S_I_I_517   ,
+       CHR_MANDAT_ID     ,
+       CHR_ULT_DB_NAME   ,
+       DEC_DAT_OF_SIGN   ,
+       AMT_LIMIT         ,
+       DAT_LAST_DEBIT    ,
+       DAT_DATETIME_INIT
+     FROM CTDDMD10
+     WHERE
+        DEC_CIDB_CUST  = :CTDDMD10.DEC_CIDB_CUST            AND
+        DEC_GROUP_TYPE =  40                                AND
+        DAT_DATETIME_INIT > :CTDDMD10.DAT_DATETIME_INIT     AND
+        CHR_C_S_I_I_517 =
+        CASE WHEN  SUBSTR(:CTDDMD10.CHR_C_S_I_I_517,1,2) = 'GR'
+             THEN :CTDDMD10.CHR_C_S_I_I_517
+             ELSE CHR_C_S_I_I_517
+        END                                                 AND
+        DEC_ARLOG IN (
+        SELECT
+        CASE WHEN COD_EFARM  = '70'
+                   THEN DEC(SUBSTR(NUM_AR_LOGAR,1,8))
+                   ELSE DEC(SUBSTR(NUM_AR_LOGAR,2,8))
+        END
+        FROM            T04CNV97
+        WHERE
+        COD_PELATH     =:CTDDMD10.DEC_CIDB_CUST AND
+        IND_OPEN_CLOSE = 0                      AND
+        IND_INTERNET  = '1'                     AND
+        COD_EMPRESA   = '0012'                  AND
+        COD_EFARM  IN('90','70')
+        )
+     ORDER BY DAT_DATETIME_INIT ASC
+     FETCH FIRST  11 ROWS ONLY
+     WITH UR;
+ /*  =============================================  */
+     EXEC SQL DECLARE CUR_PREV CURSOR WITH HOLD FOR SELECT
+       DEC_ARLOG         ,
+       CHR_CR_NAME       ,
+       CHR_C_S_I_I_517   ,
+       CHR_MANDAT_ID     ,
+       CHR_ULT_DB_NAME   ,
+       DEC_DAT_OF_SIGN   ,
+       AMT_LIMIT         ,
+       DAT_LAST_DEBIT    ,
+       DAT_DATETIME_INIT
+     FROM CTDDMD10
+     WHERE
+        DEC_CIDB_CUST  = :CTDDMD10.DEC_CIDB_CUST            AND
+        DEC_GROUP_TYPE =  40                                AND
+        DAT_DATETIME_INIT < :CTDDMD10.DAT_DATETIME_INIT     AND
+        CHR_C_S_I_I_517 =
+        CASE WHEN  SUBSTR(:CTDDMD10.CHR_C_S_I_I_517,1,2) = 'GR'
+             THEN :CTDDMD10.CHR_C_S_I_I_517
+             ELSE CHR_C_S_I_I_517
+        END                                                 AND
+        DEC_ARLOG IN (
+        SELECT
+        CASE WHEN COD_EFARM  = '70'
+                   THEN DEC(SUBSTR(NUM_AR_LOGAR,1,8))
+                   ELSE DEC(SUBSTR(NUM_AR_LOGAR,2,8))
+        END
+        FROM            T04CNV97
+        WHERE
+        COD_PELATH     =:CTDDMD10.DEC_CIDB_CUST AND
+        IND_OPEN_CLOSE = 0                      AND
+        IND_INTERNET  = '1'                     AND
+        COD_EMPRESA   = '0012'                  AND
+        COD_EFARM  IN('90','70')
+        )
+     ORDER BY DAT_DATETIME_INIT DESC
+     FETCH FIRST  11 ROWS ONLY
+     WITH UR;
+   /**************************************************************/
+        CA_ANSWER_CODE = 0;
+        CA_ANSWER_DESC = '';
+        CTDDMD10 = '';
+
+        CALL GET_INPUT      ;
+        IF DAT_IN.DEC_FLG = 1  THEN DO; /*1=NEXT*/
+            CALL OPEN_CURSOR1   ;
+            CALL FETCH_ROWS1    ;
+            DO WHILE(^EOC)      ;
+               CALL FETCH_ROWS1 ;
+            END; /*DO WHILE END*/
+            CALL CLOSE_CURSOR1;
+        END;
+        ELSE DO;
+            CALL OPEN_CURSOR2   ;
+            CALL FETCH_ROWS2    ;
+            DO WHILE(^EOC)      ;
+               CALL FETCH_ROWS2 ;
+            END; /*DO WHILE END*/
+            CALL CLOSE_CURSOR2;
+            CALL REV_RESULTS;
+        END;
+
+        EXEC CICS RETURN;
+     /********************************************************
+     ** REV_RESULTS                                         **
+     *********************************************************/
+     REV_RESULTS : PROC ;
+
+     DCL I FIXED(3) INIT(0);
+     DCL J FIXED(3) INIT(0);
+    DCL 1  TBL2(10),
+           4  DEC_ARLOG         PIC '(08)9',
+           4  CHR_CR_NAME       CHAR(0070) ,
+           4  CHR_C_S_I_I_517   CHAR(0035) ,
+           4  CHR_MANDAT_ID     CHAR(0035) ,
+           4  CHR_ULT_DB_NAME   CHAR(0070) ,
+           4  DEC_DAT_OF_SIGN   PIC '(08)9',
+           4  AMT_LIMIT         PIC '(08)9',
+           4  DAT_LAST_DEBIT    CHAR(0010) ;
+
+     CNT = DAT_OUT.NUM_OF_REC ;
+
+     DO I = 1 TO CNT  ;
+        TBL2(CNT-I + 1) = TBL(I), BY NAME;
+     END ;
+
+
+     DO I = 1 TO CNT  ;
+        TBL (I) = TBL2(I), BY NAME;
+     END ;
+
+     END REV_RESULTS ;
+     /********************************************************
+     ** DISPL                                               **
+     *********************************************************/
+     /*DISPL     :PROC ;*/
+
+  /* PUT SKIP LIST('DD_COD_PERSONA   = ',DAT_OUT.DD_COD_PERSONA );*/
+
+
+
+   /* DO CNT = 1 TO DAT_OUT.NUM_OF_REC  ;
+    PUT SKIP LIST('*** NUMBER OF RECORD = ',CNT, '  ***' );
+    PUT SKIP LIST('DEC_ARLOG        = ',TBL.DEC_ARLOG      (CNT) );
+    PUT SKIP LIST('CHR_CR_NAME      = ',TBL.CHR_CR_NAME    (CNT) );
+    PUT SKIP LIST('CHR_C_S_I_I_517  = ',TBL.CHR_C_S_I_I_517(CNT) );
+    PUT SKIP LIST('CHR_MANDAT_ID    = ',TBL.CHR_MANDAT_ID  (CNT) );
+    PUT SKIP LIST('CHR_ULT_DB_NAME  = ',TBL.CHR_ULT_DB_NAME(CNT) );
+    PUT SKIP LIST('DEC_DAT_OF_SIGN  = ',TBL.DEC_DAT_OF_SIGN(CNT) );
+    PUT SKIP LIST('AMT_LIMIT        = ',TBL.AMT_LIMIT      (CNT) );
+
+    END;*/
+    /* END DISPL    ;*/
+     /********************************************************
+     ** GET_INPUT                                           **
+     *********************************************************/
+     GET_INPUT :PROC ;
+     /*
+     PUT SKIP LIST('START APPTDD11 NPK   ' );
+     PUT SKIP LIST('DD_COD_PERSONA   =  ',DAT_IN.DD_COD_PERSONA );
+     PUT SKIP LIST('CHR_C_S_I_I_517  =  ',DAT_IN.CHR_C_S_I_I_517);
+     PUT SKIP LIST('PAGE_END         =  ',DAT_IN.PAGE_END       );
+     PUT SKIP LIST('DEC_FLG          =  ',DAT_IN.DEC_FLG        );
+     */
+         CTDDMD10.CHR_C_S_I_I_517   = DAT_IN.CHR_C_S_I_I_517;
+         CTDDMD10.DEC_CIDB_CUST     = DAT_IN.DD_COD_PERSONA ;
+        IF DAT_IN.DEC_FLG = 1  THEN DO; /*1=NEXT*/
+         CTDDMD10.DAT_DATETIME_INIT = DAT_IN.PAGE_END;
+        END;
+        ELSE DO;
+         CTDDMD10.DAT_DATETIME_INIT = DAT_IN.PAGE_START;
+        END;
+         SAVEPAGE_END  = DAT_IN.PAGE_END;
+
+     END GET_INPUT;
+    /****************************************************************
+    ** OPEN_CURSOR1                                               **
+    *****************************************************************/
+     OPEN_CURSOR1:  PROC;
+
+          EXEC SQL   OPEN CUR_NEXT;
+          IF SQLCODE ^= 0 THEN DO;
+             CA_ANSWER_CODE = 1;
+             CA_ANSWER_DESC =
+            'Ëáèïò Opening Cursor (1) SQLCODE = '!!SQLCODE   ;
+
+            EXEC CICS SYNCPOINT ROLLBACK;
+            EXEC CICS RETURN;
+          END;
+     END OPEN_CURSOR1;
+     /****************************************************************
+     ** OPEN_CURSOR2                                               **
+     *********************************************************/
+     OPEN_CURSOR2:  PROC;
+
+          EXEC SQL   OPEN CUR_PREV;
+          IF SQLCODE ^= 0 THEN DO;
+             CA_ANSWER_CODE = 1;
+             CA_ANSWER_DESC =
+            'Ëáèïò Opening Cursor (2) SQLCODE = '!!SQLCODE   ;
+
+            EXEC CICS SYNCPOINT ROLLBACK;
+            EXEC CICS RETURN;
+          END;
+     END OPEN_CURSOR2;
+    /****************************************************************
+    ** FETCH_ROWS1;                                              **
+    ***************************************************************/
+      FETCH_ROWS1:PROC;
+
+          EXEC SQL FETCH CUR_NEXT INTO
+                 :CTDDMD10.DEC_ARLOG         ,
+                 :CTDDMD10.CHR_CR_NAME       ,
+                 :CTDDMD10.CHR_C_S_I_I_517   ,
+                 :CTDDMD10.CHR_MANDAT_ID     ,
+                 :CTDDMD10.CHR_ULT_DB_NAME   ,
+                 :CTDDMD10.DEC_DAT_OF_SIGN   ,
+                 :CTDDMD10.AMT_LIMIT         ,
+                 :CTDDMD10.DAT_LAST_DEBIT    ,
+                 :CTDDMD10.DAT_DATETIME_INIT ;
+          IF SQLCODE = 100 THEN DO;
+             EOC='1'B;
+             IF CNT = 0 THEN DO;
+                   CA_ANSWER_CODE = 4;
+                   CA_ANSWER_DESC =
+                   'Äåí ÂñÝèçêáí ÅããñáöÝò Ìå ÁõôÜ Ôá êñéôÞñéá (1) ';
+
+
+                   EXEC CICS SYNCPOINT ROLLBACK;
+                   EXEC CICS RETURN;
+             END;
+             IF CNT = 11 THEN DO;
+                 HAS_PREV =   1;
+                 HAS_NEXT =   1;
+                 IF SAVEPAGE_END ='1962-01-31-00.00.00.000000'
+                    THEN DO;
+                    PUT SKIP LIST('1962=  ',DAT_IN.PAGE_END);
+                    HAS_PREV =   0; END;
+             END;
+             ELSE DO;
+                 HAS_PREV =   1;
+                 HAS_NEXT =   0;
+                 IF SAVEPAGE_END ='1962-01-31-00.00.00.000000'
+                    THEN DO;
+                    PUT SKIP LIST('1962=  ',DAT_IN.PAGE_END);
+                    HAS_PREV =   0; END;
+             END;
+          END;
+          ELSE DO;/*b*/
+            IF SQLCODE ^= 0 THEN DO;
+               CA_ANSWER_CODE = 2;
+               CA_ANSWER_DESC =
+               'Error Fetching Cursor (1) SQLCODE = '!!SQLCODE   ;
+
+               EXEC CICS SYNCPOINT ROLLBACK;
+               EXEC CICS RETURN;
+            END;
+            ELSE DO;/*a*/
+               CNT = CNT+1;
+
+               CALL LOAD_DATA1      ;
+            END;
+          END;
+      END FETCH_ROWS1 ;
+    /****************************************************************
+    ** FETCH_ROWS2;                                              **
+    ***************************************************************/
+      FETCH_ROWS2:PROC;
+
+          EXEC SQL FETCH CUR_PREV INTO
+                 :CTDDMD10.DEC_ARLOG         ,
+                 :CTDDMD10.CHR_CR_NAME       ,
+                 :CTDDMD10.CHR_C_S_I_I_517   ,
+                 :CTDDMD10.CHR_MANDAT_ID     ,
+                 :CTDDMD10.CHR_ULT_DB_NAME   ,
+                 :CTDDMD10.DEC_DAT_OF_SIGN   ,
+                 :CTDDMD10.AMT_LIMIT         ,
+                 :CTDDMD10.DAT_LAST_DEBIT    ,
+                 :CTDDMD10.DAT_DATETIME_INIT ;
+          IF SQLCODE = 100 THEN DO;
+
+             EOC='1'B;
+             IF CNT = 0 THEN DO;
+                   CA_ANSWER_CODE = 4;
+                   CA_ANSWER_DESC =
+                   'Äåí ÂñÝèçêáí ÅããñáöÝò Ìå ÁõôÜ Ôá êñéôÞñéá (2) ';
+
+
+                    EXEC CICS SYNCPOINT ROLLBACK;
+                    EXEC CICS RETURN;
+             END;
+             IF CNT = 11 THEN DO;
+                 HAS_PREV =   1;
+                 HAS_NEXT =   1;
+             END;
+             ELSE DO;
+                 HAS_PREV =   0;
+                 HAS_NEXT =   1;
+             END;
+          END;
+          ELSE DO;/*b*/
+            IF SQLCODE ^= 0 THEN DO;
+               CA_ANSWER_CODE = 2;
+               CA_ANSWER_DESC =
+               'Error Fetching Cursor (2) SQLCODE = '!!SQLCODE   ;
+
+               EXEC CICS SYNCPOINT ROLLBACK;
+               EXEC CICS RETURN;
+            END;
+            ELSE DO;/*a*/
+               CNT = CNT+1;
+               CALL LOAD_DATA2      ;
+            END;
+          END;
+      END FETCH_ROWS2 ;
+      /*****************************************************************
+      ** CLOSE_CURSOR1                                              **
+      ****************************************************************/
+       CLOSE_CURSOR1        : PROC;
+        /*CALL DISPL;*/
+
+           EXEC SQL  CLOSE CUR_NEXT;
+           IF SQLCODE ^= 0 THEN DO;
+               CA_ANSWER_CODE = 3;
+               CA_ANSWER_DESC =
+               'Error Closing  Cursor (1) SQLCODE = '!!SQLCODE   ;
+
+               EXEC CICS SYNCPOINT ROLLBACK;
+               EXEC CICS RETURN;
+           END;
+       END CLOSE_CURSOR1;
+      /*--------------------------------------------------------------*/
+      /*****************************************************************
+      ** CLOSE_CURSOR2                                              **
+      ****************************************************************/
+       CLOSE_CURSOR2        : PROC;
+        /*CALL DISPL;*/
+
+           EXEC SQL  CLOSE CUR_PREV;
+           IF SQLCODE ^= 0 THEN DO;
+               CA_ANSWER_CODE = 3;
+               CA_ANSWER_DESC =
+               'Error Closing  Cursor (2) SQLCODE = '!!SQLCODE   ;
+
+               EXEC CICS SYNCPOINT ROLLBACK;
+               EXEC CICS RETURN;
+           END;
+       END CLOSE_CURSOR2;
+      /*--------------------------------------------------------------*/
+       LOAD_DATA1    :PROC ;
+
+           CA_ANSWER_CODE = 0;
+           CA_ANSWER_DESC = '';
+           DAT_OUT.DD_COD_PERSONA = DAT_IN.DD_COD_PERSONA ;
+
+           IF(CNT    = 1) THEN
+              DAT_OUT.PAGE_START  = CTDDMD10.DAT_DATETIME_INIT ;
+
+           IF(CNT    < 11) THEN  DO;
+             DAT_OUT.PAGE_END           =  CTDDMD10.DAT_DATETIME_INIT ;
+             TBL.DEC_ARLOG        (CNT) =  CTDDMD10.DEC_ARLOG         ;
+             TBL.CHR_CR_NAME      (CNT) =  CTDDMD10.CHR_CR_NAME       ;
+             TBL.CHR_C_S_I_I_517  (CNT) =  CTDDMD10.CHR_C_S_I_I_517   ;
+             TBL.CHR_MANDAT_ID    (CNT) =  CTDDMD10.CHR_MANDAT_ID     ;
+             TBL.CHR_ULT_DB_NAME  (CNT) =  CTDDMD10.CHR_ULT_DB_NAME   ;
+             TBL.DEC_DAT_OF_SIGN  (CNT) =  CTDDMD10.DEC_DAT_OF_SIGN   ;
+             TBL.AMT_LIMIT        (CNT) =  CTDDMD10.AMT_LIMIT         ;
+             IF CTDDMD10.DAT_LAST_DEBIT = '01.01.0001' THEN
+                TBL.IS_ACTIVE (CNT) = 0  ;
+             ELSE
+                TBL.IS_ACTIVE (CNT) = 1  ;
+
+             DAT_OUT.NUM_OF_REC   = CNT;
+           END;
+       END LOAD_DATA1 ;
+      /*--------------------------------------------------------------*/
+       LOAD_DATA2    :PROC ;
+
+           CA_ANSWER_CODE = 0;
+           CA_ANSWER_DESC = '';
+           DAT_OUT.DD_COD_PERSONA = DAT_IN.DD_COD_PERSONA ;
+
+
+           IF (CNT    = 1) THEN
+              DAT_OUT.PAGE_END    = CTDDMD10.DAT_DATETIME_INIT ;
+         /*   DAT_OUT.PAGE_START  = CTDDMD10.DAT_DATETIME_INIT ; */
+
+           IF(CNT    < 11) THEN  DO;
+           /*DAT_OUT.PAGE_END    =  CTDDMD10.DAT_DATETIME_INIT ;*/
+             DAT_OUT.PAGE_START         =  CTDDMD10.DAT_DATETIME_INIT ;
+             TBL.DEC_ARLOG        (CNT) =  CTDDMD10.DEC_ARLOG         ;
+             TBL.CHR_CR_NAME      (CNT) =  CTDDMD10.CHR_CR_NAME       ;
+             TBL.CHR_C_S_I_I_517  (CNT) =  CTDDMD10.CHR_C_S_I_I_517   ;
+             TBL.CHR_MANDAT_ID    (CNT) =  CTDDMD10.CHR_MANDAT_ID     ;
+             TBL.CHR_ULT_DB_NAME  (CNT) =  CTDDMD10.CHR_ULT_DB_NAME   ;
+             TBL.DEC_DAT_OF_SIGN  (CNT) =  CTDDMD10.DEC_DAT_OF_SIGN   ;
+             TBL.AMT_LIMIT        (CNT) =  CTDDMD10.AMT_LIMIT         ;
+             IF CTDDMD10.DAT_LAST_DEBIT = '01.01.0001' THEN
+                TBL.IS_ACTIVE (CNT) = 0  ;
+             ELSE
+                TBL.IS_ACTIVE (CNT) = 1  ;
+             DAT_OUT.NUM_OF_REC   = CNT;
+           END;
+       END LOAD_DATA2 ;
+
+
+ END   DD11;
+ /*
+        DEC_FILL               ,
+        CHR_SEND_INST          ,
+        CHR_RECV_INST          ,
+        CHR_SERV_ID            ,
+        CHR_TEST_CODE          ,
+        CHR_FILE_TYPE          ,
+        CHR_FILE_ID            ,
+        DEC_GROUP_TYPE         ,
+        DEC_CREAT_DAT_TIME     ,
+        DEC_INTRB_SETL_DAT     ,
+        CHR_SETTL_METHOD       ,
+        CHR_CLEAR_SYSTEM       ,
+        CHR_INSTRN_AG          ,
+        CHR_INSTRT_AG          ,
+        DEC_RECORD_TYPE        ,
+        DEC_MSG_TYPE           ,
+        CHR_INSTR_ID           ,
+        CHR_TR_ID              ,
+        CHR_SERV_LEVEL         ,
+        CHR_LOCAL_INSTR        ,
+        CHR_SEQ_TYPE           ,
+        CHR_MANDAT_ID          ,
+        DEC_DAT_OF_SIGN        ,
+        CHR_AMEND_IND          ,
+        CHR_O_M_I_511          ,
+        CHR_O_C_S_I_N_512      ,
+        CHR_O_C_S_I_I_513      ,
+        CHR_O_C_S_I_I_514      ,
+        CHR_O_D_A_IBAN_515     ,
+        CHR_O_D_A_PROP_516     ,
+        CHR_C_S_I_I_517        ,
+        CHR_C_S_I_I_T_518      ,
+        CHR_CR_NAME            ,
+        CHR_CR_ADDR_LINE1      ,
+        CHR_CR_ADDR_LINE2      ,
+        CHR_CR_ADDR_CNTRY      ,
+        CHR_ULT_CR_NAME        ,
+        CHR_ULT_CR_ID          ,
+        CHR_DB_NAME            ,
+        CHR_DB_ADDR_LINE1      ,
+        CHR_DB_ADDR_LINE2      ,
+        CHR_DB_ADDR_CNTRY      ,
+        CHR_DB_ID              ,
+        CHR_DB_ACC_IBAN        ,
+        CHR_DB_AG              ,
+        CHR_DB_AG_BR_ID        ,
+        CHR_ULT_DB_NAME        ,
+        CHR_ULT_DB_ID          ,
+        DEC_CIDB_CUST          ,
+        CHR_USER               ,
+        FLG_DIRECTION          ,
+        FLG_STATUS_PROCESS     ,
+        FLG_CANCEL             ,
+        CHR_ERROR_DIAS         ,
+        CHR_ERROR_CBOG         ,
+        CHR_FILE_ID_TODIAS     ,
+        DAT_DATETIME_INIT      ,
+        DAT_DATETIME_PROC      ,
+        DEC_AA                 ,
+        DEC_AA_RM20            ,
+        AMT_LIMIT              ,
+        CHR_TERMID_REFUSAL     ,
+        CHR_TERMID_REFUND      ,
+        CHR_TERMID_AUTHOR      ,
+        CHR_INFORM             ,
+        DEC_DAT_REFUSAL        ,
+        DEC_DAT_REFUND         ,
+        DEC_DAT_AUTHOR         ,
+        DEC_TIME_REFUSAL       ,
+        DEC_TIME_REFUND        ,
+        DEC_TIME_AUTHOR        ,
+        FLG_STATUS_REFUSAL     ,
+        FLG_STATUS_REFUND      ,
+        FLG_STATUS_AUTHOR      ,
+        CHR_VALID              ,
+        DEC_NUM_REFUSAL        ,
+        CHR_OK_REFUSAL         ,
+        CHR_OK_AUTHOR          ,
+        CHR_CODE_BRANCH        ,
+        DEC_ARLOG              ,
+        DAT_LAST_DEBIT         ,
+        DAT_LAST_CREDIT        ,
+        CHR_INTERNET           ,
+        CHR_ERROR_FDR          ,
+        CHR_ERROR_CMF          ,
+        CHR_GENER_FPR          ,
+        CHR_GENER_FDR          ,
+        CHR_GENER_FDO          ,
+        CHR_GENER_FDI          ,
+        CHR_APROVAL
+
+        :CTDDMD10.DEC_FILL               ,
+        :CTDDMD10.CHR_SEND_INST          ,
+        :CTDDMD10.CHR_RECV_INST          ,
+        :CTDDMD10.CHR_SERV_ID            ,
+        :CTDDMD10.CHR_TEST_CODE          ,
+        :CTDDMD10.CHR_FILE_TYPE          ,
+        :CTDDMD10.CHR_FILE_ID            ,
+        :CTDDMD10.DEC_GROUP_TYPE         ,
+        :CTDDMD10.DEC_CREAT_DAT_TIME     ,
+        :CTDDMD10.DEC_INTRB_SETL_DAT     ,
+        :CTDDMD10.CHR_SETTL_METHOD       ,
+        :CTDDMD10.CHR_CLEAR_SYSTEM       ,
+        :CTDDMD10.CHR_INSTRN_AG          ,
+        :CTDDMD10.CHR_INSTRT_AG          ,
+        :CTDDMD10.DEC_RECORD_TYPE        ,
+        :CTDDMD10.DEC_MSG_TYPE           ,
+        :CTDDMD10.CHR_INSTR_ID           ,
+        :CTDDMD10.CHR_TR_ID              ,
+        :CTDDMD10.CHR_SERV_LEVEL         ,
+        :CTDDMD10.CHR_LOCAL_INSTR        ,
+        :CTDDMD10.CHR_SEQ_TYPE           ,
+        :CTDDMD10.CHR_MANDAT_ID          ,
+        :CTDDMD10.DEC_DAT_OF_SIGN        ,
+        :CTDDMD10.CHR_AMEND_IND          ,
+        :CTDDMD10.CHR_O_M_I_511          ,
+        :CTDDMD10.CHR_O_C_S_I_N_512      ,
+        :CTDDMD10.CHR_O_C_S_I_I_513      ,
+        :CTDDMD10.CHR_O_C_S_I_I_514      ,
+        :CTDDMD10.CHR_O_D_A_IBAN_515     ,
+        :CTDDMD10.CHR_O_D_A_PROP_516     ,
+        :CTDDMD10.CHR_C_S_I_I_517        ,
+        :CTDDMD10.CHR_C_S_I_I_T_518      ,
+        :CTDDMD10.CHR_CR_NAME            ,
+        :CTDDMD10.CHR_CR_ADDR_LINE1      ,
+        :CTDDMD10.CHR_CR_ADDR_LINE2      ,
+        :CTDDMD10.CHR_CR_ADDR_CNTRY      ,
+        :CTDDMD10.CHR_ULT_CR_NAME        ,
+        :CTDDMD10.CHR_ULT_CR_ID          ,
+        :CTDDMD10.CHR_DB_NAME            ,
+        :CTDDMD10.CHR_DB_ADDR_LINE1      ,
+        :CTDDMD10.CHR_DB_ADDR_LINE2      ,
+        :CTDDMD10.CHR_DB_ADDR_CNTRY      ,
+        :CTDDMD10.CHR_DB_ID              ,
+        :CTDDMD10.CHR_DB_ACC_IBAN        ,
+        :CTDDMD10.CHR_DB_AG              ,
+        :CTDDMD10.CHR_DB_AG_BR_ID        ,
+        :CTDDMD10.CHR_ULT_DB_NAME        ,
+        :CTDDMD10.CHR_ULT_DB_ID          ,
+        :CTDDMD10.DEC_CIDB_CUST          ,
+        :CTDDMD10.CHR_USER               ,
+        :CTDDMD10.FLG_DIRECTION          ,
+        :CTDDMD10.FLG_STATUS_PROCESS     ,
+        :CTDDMD10.FLG_CANCEL             ,
+        :CTDDMD10.CHR_ERROR_DIAS         ,
+        :CTDDMD10.CHR_ERROR_CBOG         ,
+        :CTDDMD10.CHR_FILE_ID_TODIAS     ,
+        :CTDDMD10.DAT_DATETIME_INIT      ,
+        :CTDDMD10.DAT_DATETIME_PROC      ,
+        :CTDDMD10.DEC_AA                 ,
+        :CTDDMD10.DEC_AA_RM20            ,
+        :CTDDMD10.AMT_LIMIT              ,
+        :CTDDMD10.CHR_TERMID_REFUSAL     ,
+        :CTDDMD10.CHR_TERMID_REFUND      ,
+        :CTDDMD10.CHR_TERMID_AUTHOR      ,
+        :CTDDMD10.CHR_INFORM             ,
+        :CTDDMD10.DEC_DAT_REFUSAL        ,
+        :CTDDMD10.DEC_DAT_REFUND         ,
+        :CTDDMD10.DEC_DAT_AUTHOR         ,
+        :CTDDMD10.DEC_TIME_REFUSAL       ,
+        :CTDDMD10.DEC_TIME_REFUND        ,
+        :CTDDMD10.DEC_TIME_AUTHOR        ,
+        :CTDDMD10.FLG_STATUS_REFUSAL     ,
+        :CTDDMD10.FLG_STATUS_REFUND      ,
+        :CTDDMD10.FLG_STATUS_AUTHOR      ,
+        :CTDDMD10.CHR_VALID              ,
+        :CTDDMD10.DEC_NUM_REFUSAL        ,
+        :CTDDMD10.CHR_OK_REFUSAL         ,
+        :CTDDMD10.CHR_OK_AUTHOR          ,
+        :CTDDMD10.CHR_CODE_BRANCH        ,
+        :CTDDMD10.DEC_ARLOG              ,
+        :CTDDMD10.DAT_LAST_DEBIT         ,
+        :CTDDMD10.DAT_LAST_CREDIT        ,
+        :CTDDMD10.CHR_INTERNET           ,
+        :CTDDMD10.CHR_ERROR_FDR          ,
+        :CTDDMD10.CHR_ERROR_CMF          ,
+        :CTDDMD10.CHR_GENER_FPR          ,
+        :CTDDMD10.CHR_GENER_FDR          ,
+        :CTDDMD10.CHR_GENER_FDO          ,
+        :CTDDMD10.CHR_GENER_FDI          ,
+        :CTDDMD10.CHR_APROVAL
+
+      5 DEC_FILL DEC FIXED(3,0),
+      5 CHR_SEND_INST  CHAR(11),
+      5 CHR_RECV_INST  CHAR(11),
+      5 CHR_SERV_ID  CHAR(4),
+      5 CHR_TEST_CODE  CHAR(1),
+      5 CHR_FILE_TYPE  CHAR(3),
+      5 CHR_FILE_ID  CHAR(8),
+      5 DEC_GROUP_TYPE  DEC FIXED(3,0),
+      5 DEC_CREAT_DAT_TIME  CHAR(14),
+      5 DEC_INTRB_SETL_DAT  CHAR(8),
+      5 CHR_SETTL_METHOD  CHAR(4),
+      5 CHR_CLEAR_SYSTEM  CHAR(35),
+      5 CHR_INSTRN_AG  CHAR(11),
+      5 CHR_INSTRT_AG  CHAR(11),
+      5 DEC_RECORD_TYPE  DEC FIXED(1,0),
+      5 DEC_MSG_TYPE  DEC FIXED(3,0),
+      5 CHR_INSTR_ID  CHAR(35),
+      5 CHR_TR_ID  CHAR(35),
+      5 CHR_SERV_LEVEL  CHAR(4),
+      5 CHR_LOCAL_INSTR  CHAR(35),
+      5 CHR_SEQ_TYPE  CHAR(4),
+      5 CHR_MANDAT_ID  CHAR(35),
+      5 DEC_DAT_OF_SIGN  DEC FIXED(8,0),
+      5 CHR_AMEND_IND  CHAR(1),
+      5 CHR_O_M_I_511  CHAR(35),
+      5 CHR_O_C_S_I_N_512  CHAR(70),
+      5 CHR_O_C_S_I_I_513  CHAR(35),
+      5 CHR_O_C_S_I_I_514  CHAR(4),
+      5 CHR_O_D_A_IBAN_515  CHAR(34),
+      5 CHR_O_D_A_PROP_516  CHAR(5),
+      5 CHR_C_S_I_I_517  CHAR(35),
+      5 CHR_C_S_I_I_T_518  CHAR(4),
+      5 CHR_CR_NAME  CHAR(70),
+      5 CHR_CR_ADDR_LINE1  CHAR(70),
+      5 CHR_CR_ADDR_LINE2  CHAR(70),
+      5 CHR_CR_ADDR_CNTRY  CHAR(2),
+      5 CHR_ULT_CR_NAME  CHAR(70),
+      5 CHR_ULT_CR_ID  CHAR(37),
+      5 CHR_DB_NAME  CHAR(70),
+      5 CHR_DB_ADDR_LINE1  CHAR(70),
+      5 CHR_DB_ADDR_LINE2  CHAR(70),
+      5 CHR_DB_ADDR_CNTRY  CHAR(2),
+      5 CHR_DB_ID  CHAR(37),
+      5 CHR_DB_ACC_IBAN  CHAR(34),
+      5 CHR_DB_AG  CHAR(11),
+      5 CHR_DB_AG_BR_ID  CHAR(35),
+      5 CHR_ULT_DB_NAME  CHAR(70),
+      5 CHR_ULT_DB_ID  CHAR(37),
+      5 DEC_CIDB_CUST  DEC FIXED(9,0),
+      5 CHR_USER CHAR(8),
+      5 FLG_DIRECTION  CHAR(1),
+      5 FLG_STATUS_PROCESS  CHAR(1),
+      5 FLG_CANCEL  CHAR(1),
+      5 CHR_ERROR_DIAS  CHAR(4),
+      5 CHR_ERROR_CBOG  CHAR(4),
+      5 CHR_FILE_ID_TODIAS  CHAR(8),
+      5 DAT_DATETIME_INIT  CHAR(26),
+      5 DAT_DATETIME_PROC  CHAR(26),
+      5 DEC_AA   DEC FIXED(17,0),
+      5 DEC_AA_RM20  DEC FIXED(17,0),
+      5 AMT_LIMIT  DEC FIXED(17,0),
+      5 CHR_TERMID_REFUSAL  CHAR(7),
+      5 CHR_TERMID_REFUND  CHAR(7),
+      5 CHR_TERMID_AUTHOR  CHAR(7),
+      5 CHR_INFORM  CHAR(50),
+      5 DEC_DAT_REFUSAL  CHAR(8),
+      5 DEC_DAT_REFUND  CHAR(8),
+      5 DEC_DAT_AUTHOR  CHAR(8),
+      5 DEC_TIME_REFUSAL  CHAR(6),
+      5 DEC_TIME_REFUND  CHAR(6),
+      5 DEC_TIME_AUTHOR  CHAR(6),
+      5 FLG_STATUS_REFUSAL  CHAR(1),
+      5 FLG_STATUS_REFUND  CHAR(1),
+      5 FLG_STATUS_AUTHOR  CHAR(1),
+      5 CHR_VALID  CHAR(1),
+      5 DEC_NUM_REFUSAL  DEC FIXED(2,0),
+      5 CHR_OK_REFUSAL  CHAR(1),
+      5 CHR_OK_AUTHOR  CHAR(1),
+      5 CHR_CODE_BRANCH  CHAR(4),
+      5 DEC_ARLOG  DEC FIXED(9,0),
+      5 DAT_LAST_DEBIT  CHAR(10),
+      5 DAT_LAST_CREDIT  CHAR(10),
+      5 CHR_INTERNET  CHAR(4),
+      5 CHR_ERROR_FDR  CHAR(4),
+      5 CHR_ERROR_CMF  CHAR(4),
+      5 CHR_GENER_FPR  CHAR(4),
+      5 CHR_GENER_FDR  CHAR(4),
+      5 CHR_GENER_FDO  CHAR(4),
+      5 CHR_GENER_FDI  CHAR(4),
+      5 CHR_APROVAL  CHAR(4);
+
+   SELECT distinct(CHR_C_S_I_I_517)   FROM  TCBOGDB2.CTDDMD10
+   WHERE
+   CHR_C_S_I_I_517 =
+   CASE WHEN  SUBSTR('GR67ZZZ00776',1,2) = 'GG'
+             THEN 'GR67ZZZ00776'
+             ELSE CHR_C_S_I_I_517
+   END  WITH UR;
+
+
+
+   WHERE
+   DEC_CIDB_CUST  =         AND
+   DEC_GROUP_TYPE =  40     AND
+   DEC_ARLOG IN (
+   SELECT
+   CASE WHEN COD_EFARM  = '70'
+              THEN DEC(SUBSTR(NUM_AR_LOGAR,1,8))
+              ELSE DEC(SUBSTR(NUM_AR_LOGAR,2,8))
+   END
+   FROM   DB2PROD.PCBOGDB2.T04CNV97
+   FROM            T04CNV97
+   WHERE
+   COD_PELATH     =31725577     AND
+   IND_OPEN_CLOSE = 0        AND
+   IND_INTERNET  = '1'       AND
+   COD_EMPRESA   = '0012'    AND
+   COD_EFARM  IN('90','70')
+   )
+   WITH UR;
+   */
+

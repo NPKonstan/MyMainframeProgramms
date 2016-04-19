@@ -1,0 +1,862 @@
+ /* PROCESS A,GOSTMT,NEST,OPT(TIME),AG,MI('+'),S,X,OF,MAP,INCLUDE;    */
+    /*--------  P R O G R A M  D K 3 5 2        --------*/
+    /*                   Y2000                          */
+    /*  dIABAZEI THN DATA BASE  KATAhErExN              */
+    /*  KAI dHMIOYPcEI TAINIA TAM20 cIA TOKOYr          */
+    /*  KATAhErExN                                      */
+    /*  TRANSLATE  GREEK CHARACTERS  Ã                  */
+    /*                    TEkEYTAIA  AkkAcH : 13.10.94  */
+    /*  Y2000 IOAREA,HM/NIEr          r.A.  : 29.10.98  */
+    /*--------------------------------------------------*/
+    /*-npk changes for enterprise pli 22-05-2008 -------*/
+    /*--------------------------------------------------*/
+    /*--------------------------------------------------*/
+
+ /* ApO TO DKTAM20S. APXEIO TAM20 dIA EKTOKIrMO YpEP THr TPApEZAr    */
+ /* EpIXEIPHrExN                                                     */
+
+ DLITPLI: PROCEDURE(PCBIO,PCBPTRK)OPTIONS(MAIN);
+ /*****       VSE/MVS TRANSLATION PROCESSED BY MVS-MS       *****/
+ /*****          SATURDAY  96/05/11  AT  22.02.01           *****/
+ /*** PL/1 OPTIMIZER EXECUTION TIME OPTIONS ***/
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+ /*** MVS-MS DATE SIMULATION VARIABLES ***/
+ DCL CZX3VDAT CHAR(6); FETCH CZXDATEP;
+ DCL CZXDATEP ENTRY OPTIONS(INTER,ASM) ;
+ /***            END OF MVS-MS INSERT            ***/
+
+    /*------------------------------------------*/
+    /*  d H k x r E I r     A P X E I x N       */
+    /*------------------------------------------*/
+
+    DCL TAPE FILE RECORD OUTPUT ENV(                     FB
+                 RECSIZE(76)                             );
+
+    DCL PRINTER FILE RECORD OUTPUT ENV(                    FB
+             RECSIZE(133)            CTLASA) ;
+
+    DCL THREE STATIC FIXED BINARY(31) INIT(3);
+    DCL FUNGN CHAR(4) INIT('GN  ') ;
+    DCL PCBPTRK  POINTER;               /*DEPOSITS-PCB POINTER */
+    DCL KFIOROOT POINTER;
+    DCL KFIOSADD POINTER;
+
+    DCL 1 PCBK BASED(PCBPTRK) ,
+         2 PCBDBDNM       CHAR(8),
+           2 FA             CHAR(2),
+           2 PCBSC          CHAR(2),
+           2 PCBPROPT       CHAR(4),
+           2 FB FIXED       BIN(31),
+           2 PCBSEGNM       CHAR(8),
+           2 PCBLFBK        FIXED BIN(31) ,
+           2 PC             FIXED BIN(31) ,
+           2 PCBFBK         CHAR(32)        ;
+
+ /* DCL   IOAREA  CHAR(320) INIT(' ') ;*//* IO AREA KOINH */
+    DCL   IOAREA  CHAR(450) INIT(' ') ;  /* IO AREA KOINH */ /* Y2000 */
+ % INCLUDE  KSDBMAP  ;
+          DCL       KSRTRAP     BIT (8)    BASED(ADDR(KSRKATMA));
+
+         DCL 1  RECORD,              /* RECORD  D/B ME RECSIZE = 76  */
+                2   ARLOG      FIXED(9) ,
+                2   TRAPEZA    PIC'9'   ,
+                2   KATMA      FIXED(3) ,
+                2   EPAGELMA   CHAR(2)  ,
+                2   POSON      FIXED(13,2),
+                2   HMEROMHNIA FIXED(7) ,
+                2   KATHO      FIXED(7),
+                2   HMTS       FIXED(7),
+                2   HMTA       FIXED(7),
+                2   DEH        CHAR(1),
+                2   KATEP      CHAR(1),
+                2   FN         CHAR(1),
+                2   KATEPKYP   CHAR(1),
+                2   KYPR1      PIC'99',
+                2   FILLER     CHAR(6),
+                2   ONOMA      CHAR(31);
+  DCL  1   T20ARLGR               BASED(ADDR(ARLOG)),
+        2  T20BLOG0               BIT  (36)         ,
+        2  T20BLOG1               BIT  (04)         ;
+  DCL  1   T20KATMR               BASED(ADDR(KATMA)),
+        2  T20BKTM1               BIT  (12)         ,
+        2  T20BKTM2               BIT  (04)         ;
+  DCL  1   T20HMNIR               BASED(ADDR(HMEROMHNIA)),
+        2  T20BHMN0               BIT  (28)              ,
+        2  T20BHMN1               BIT  (04)              ;
+  DCL  1   T20KATLR               BASED(ADDR(KATHO)),
+        2  T20BKTL0               BIT  (28)         ,
+        2  T20BKTL1               BIT  (04)         ;
+  DCL  1   T20HMTSR               BASED(ADDR(HMTS)),
+        2  T20BHMT0               BIT  (28)        ,
+        2  T20BHMT1               BIT  (04)        ;
+  DCL  1   T20HMTAR               BASED(ADDR(HMTA)),
+        2  T20BHMA0               BIT  (28)        ,
+        2  T20BHMA1               BIT  (04)        ;
+
+  % INCLUDE   DAYATNS;
+
+          DCL  CHARMERA  CHAR(6) INIT(' ') ;
+          DCL   PICMERA  PIC'999999' BASED(ADDR(CHARMERA));
+
+          DCL 1  IOACHECK BASED(ADDR(IOAREA)),
+                2 FNM1          CHAR(13),
+                2 DUMMYRECORD   BIT(24) ,
+                2 SAFETYRECORD  BIT(24) ;
+
+          DCL 1 LINE431,
+               2 CC431 CHAR(24) INIT ('-*** k/rMOI TOY (431)='),
+               2 A431  PIC'ZZ.ZZ9BB' INIT(0) ,
+               2 S431  PIC'ZZZ.ZZZ.ZZ9V,99-' INIT(0),
+               2 CC388 CHAR(24) INIT ('**** k/rMOI THr (KYp)='),
+               2 A388  PIC'ZZ.ZZ9BB' INIT(0) ,
+               2 S388  PIC'ZZZ.ZZZ.ZZ9V,99-' INIT(0),
+               2 CC30  CHAR(39) INIT(' ')      ;
+
+         DCL  LINE  CHAR(133) ;
+         DCL 1 LINESYM,
+               2  CEN          CHAR(20) INIT(' ')       ,
+               2  LITERA       CHAR(32) INIT(' ')       ,
+               2  METRHTHS     PIC'ZZ.ZZZ.ZZ9BB' INIT(0),
+               2  CEN1         CHAR(4) INIT('dPX.')     ,
+               2  ATHRHSTHS    PIC'ZZZ.ZZZ.ZZZ.ZZ9V,99' INIT(0),
+               2  CEN2         CHAR(47) INIT(' ') ;
+ /*------------------------------------------------------------------*/
+   DCL    WSDTINP   PIC'99.99.9999'      INIT(0);    /* Y2000 */
+   DCL    WSDTOUT   PIC'99.99.9999'      INIT(0);    /* Y2000 */
+   DCL    WSTMINP   PIC'99.99.99.999'  INIT(0);
+   DCL    WSTMOUT   PIC'99.99.99.999'  INIT(0);
+   DCL    PRIORITY  BUILTIN ;
+   /****  DATE SIMULATION DEFINED FUNCTION  ****/
+   DATE: PROC IRREDUCIBLE RETURNS(CHAR(6)) ;
+         CALL CZXDATEP          ( CZX3VDAT) ;
+         RETURN (CZX3VDAT) ;
+         END DATE ;
+   /****        END OF MVS-MS INSERT        ****/
+   DCL    TIME      BUILTIN ;
+   DCL    SUBSTR    BUILTIN ;
+   DCL    PLITDLI   EXTERNAL ENTRY ;
+   DCL    S431N     FIXED(15,2)        INIT(0);
+   DCL    S388N     FIXED(15,2)        INIT(0);
+      DCL CLONT CHAR(133) INIT('1    k/rMOr       K/MA    CHECKS
+                                             DK352 - Y2000');
+  /*  DCL (TXREWSPRIN,TPISTWPRIN) FIXED (11,2) INIT(0)      02.01.90 */
+      DCL (TXREWSPRIN,TPISTWPRIN) FIXED (15,2) INIT(0);
+      DCL  METRMOVPRIN PIC'ZZZ.ZZ9' INIT(0);
+      DCL  1 CHLINE,
+            2 CRA1    CHAR (5) INIT (' '),
+            2 LATER   PIC  '99999999' INIT(0),
+            2 CRA2    CHAR (5) INIT(' '),
+            2 KMO     PIC  '999BBBBBBB'   INIT(0),
+            2 ARIS    PIC  'ZZ9'   INIT(0),
+            2 CRA3    CHAR (102) INIT(' ');
+ /*------------------------------------------------------------------*/
+        DCL 1 NOPBOOOK,
+                       2 KENPBO   CHAR(11) INIT(' '),
+                       2 SMOS     PIC'99999999'   INIT(0) ,
+                       2 KENPBMNX CHAR(6) INIT(' ') ,
+                       2 TOPOS    PIC'999' INIT(0) ,
+                       2 LLLJK    CHAR(10) INIT(' '),
+                       2 PASBOOK  PIC'ZZ9' INIT(0) ,
+                       2 KENPB03  CHAR(92) INIT(' ') ;
+ /*------------------------------------------------------------------*/
+     DCL (METRTAM,METRKAT) FIXED(7)  INIT(0);
+        DCL  DODOART PIC'ZZ.ZZ9' INIT(0);
+        DCL  DODOLEK PIC'ZZ.ZZ9' INIT(0);
+        DCL  DODOMHD PIC'ZZ.ZZ9' INIT(0);
+         DCL NOMDIE CHAR(66) INIT(0) ;
+     DCL (ATH1TAM,ATH1KAT) FIXED(15,2) INIT(0) ;
+     DCL (ATHRTAM,ATHRKAT) FIXED(15,2) INIT(0) ;
+   DCL    WSKATMA   FIXED(05,0) INIT(0);
+   DCL 1  WSKATR1   BASED(ADDR(WSKATMA)),
+        2 WSFIL1    BIT(04)             ,
+        2 WSBTRP    BIT(04)             ,
+        2 WSKTM     FIXED(03,0)         ;
+ /*------------------------------------------------------------------*/
+     DCL (MET1TAM,MET1KAT) FIXED(7) INIT (0);
+ /*********************************************************************/
+
+         DCL (METMOV,METMOVT,METMOVK) FIXED(7) INIT(0) ;
+         DCL (METREC,METRECT,METRECK) FIXED(7) INIT(0) ;
+         DCL (METRNF,METRNFT,METRNFK) FIXED(5) INIT(0) ;
+         DCL 1 LINE1,
+                     2 L1 CHAR (20) INIT('1')    ,
+                     2 L2 CHAR (60) INIT((60)'*') ,
+                     2 L3 CHAR (53) INIT(' ')       ;
+         DCL 1 LINE2,
+                     2 L4 CHAR(20) INIT('0')              ,
+                     2 L5 CHAR(20) INIT('* TAMIEYTHPION') ,
+                     2 L6 CHAR(15) INIT('* ANEcNxrhHrAN='),
+                     2 L7 PIC 'ZZZZZZ9'                   ,
+                     2 L8 CHAR(71) INIT('  MOVEMENTS      *');
+         DCL 1 LINE3,
+                     2 L9 CHAR(20) INIT(' ')              ,
+                     2 L10 CHAR(20) INIT('* TAMIEYTHPION'),
+                     2 L11 CHAR(15) INIT('* ENEcPAuHrAN ='),
+                     2 L12 PIC'ZZZZZZ9'                       ,
+                     2 L13 CHAR(71) INIT('  RECORDS        *');
+         DCL 1 LINE4,
+                  2   L14 CHAR(20) INIT(' ') ,
+                  2   L15 CHAR(36) INIT('* MH EYPEhENTEr EIr DATABASE k/
+ rMOI') ,
+                  2   L16 CHAR(15) INIT('TAMIEYTHPIOY'),
+                  2   L17 PIC 'ZZZZZZ9' ,
+                  2   L18 CHAR(55) INIT(' * ') ;
+         DCL  LINEX   CHAR(133) INIT((100)'-');
+         DCL  SEFARM  PIC '9' INIT(1);
+         DCL  SCLO    PIC'9' INIT(0);
+         DCL  ARBLOK  PIC'ZZ.ZZ9'  INIT(0);
+
+ DCL (METRKA,METRTR,METRKA1,METRTR1) PIC'ZZZ.ZZ9' INIT(0);
+     DCL 1 LINETREX,
+                    2 LTRII      CHAR(60) INIT('-'),
+                    2 LTRELIT    CHAR(24) INIT('(k/rMOI TPEXOYMENOI ='),
+                    2 LMETREX    PIC'ZZZZ.ZZ9' INIT(0),
+                    2 LTRAAI     CHAR(7)  INIT('  dPX.:') ,
+                    2 LATHTREX   PIC'ZZZZ.ZZZ.ZZZ.ZZ9V,99-' INIT(0) ,
+                    2 LTRBBI     CHAR(14) INIT(' ') ;
+     DCL   LINEGSYN              CHAR(133) ;
+     DCL 1 LINEGRYN              BASED(ADDR(LINEGSYN))                ,
+                    2 LGSSKIP    CHAR(01)                    INIT('0'),
+                    2 LGSKAQO    PIC'ZZZZZZ-'                INIT(0)  ,
+                    2 LGSLG1     PIC'ZZZ.ZZZ.ZZZ-'           INIT(0)  ,
+                    2 LGSPS1     PIC'Z.ZZZ.ZZZ.ZZZ.ZZZV,ZZ-' INIT(0)  ,
+                    2 LGSLG2     PIC'ZZZ.ZZZ.ZZZ-'           INIT(0)  ,
+                    2 LGSPS2     PIC'Z.ZZZ.ZZZ.ZZZ.ZZZV,ZZ-' INIT(0)  ,
+                    2 LGSLG3     PIC'ZZZ.ZZZ.ZZZ-'           INIT(0)  ,
+                    2 LGSPS3     PIC'Z.ZZZ.ZZZ.ZZZ.ZZZV,ZZ-' INIT(0)  ,
+                    2 LGSFIL     CHAR(23)                    INIT(' ');
+     DCL   LM5060                PIC'ZZZZ.ZZ9' INIT(0);
+     DCL   LM5068                PIC'ZZZZ.ZZ9' INIT(0);
+     DCL   LM5078                PIC'ZZZZ.ZZ9' INIT(0);
+     DCL   LM5080                PIC'ZZZZ.ZZ9' INIT(0);
+     DCL   LM5090                PIC'ZZZZ.ZZ9' INIT(0);
+     DCL   LM5100                PIC'ZZZZ.ZZ9' INIT(0);
+     DCL   LM5114                PIC'ZZZZ.ZZ9' INIT(0);
+     DCL   LM5115                PIC'ZZZZ.ZZ9' INIT(0);
+     DCL   LM5116                PIC'ZZZZ.ZZ9' INIT(0);
+     DCL   LM5117                PIC'ZZZZ.ZZ9' INIT(0);
+     DCL   LM5120                PIC'ZZZZ.ZZ9' INIT(0);
+     DCL   LM5121                PIC'ZZZZ.ZZ9' INIT(0);
+     DCL   LM5122                PIC'ZZZZ.ZZ9' INIT(0);
+     DCL   LM5150                PIC'ZZZZ.ZZ9' INIT(0);
+     DCL   LMSYNO                PIC'ZZZZ.ZZ9' INIT(0);
+     DCL   LA5060                PIC'ZZZZ.ZZZ.ZZZ.ZZ9V,99-' INIT(0);
+     DCL   LA5068                PIC'ZZZZ.ZZZ.ZZZ.ZZ9V,99-' INIT(0);
+     DCL   LA5078                PIC'ZZZZ.ZZZ.ZZZ.ZZ9V,99-' INIT(0);
+     DCL   LA5080                PIC'ZZZZ.ZZZ.ZZZ.ZZ9V,99-' INIT(0);
+     DCL   LA5090                PIC'ZZZZ.ZZZ.ZZZ.ZZ9V,99-' INIT(0);
+     DCL   LA5100                PIC'ZZZZ.ZZZ.ZZZ.ZZ9V,99-' INIT(0);
+     DCL   LA5114                PIC'ZZZZ.ZZZ.ZZZ.ZZ9V,99-' INIT(0);
+     DCL   LA5115                PIC'ZZZZ.ZZZ.ZZZ.ZZ9V,99-' INIT(0);
+     DCL   LA5116                PIC'ZZZZ.ZZZ.ZZZ.ZZ9V,99-' INIT(0);
+     DCL   LA5117                PIC'ZZZZ.ZZZ.ZZZ.ZZ9V,99-' INIT(0);
+     DCL   LA5120                PIC'ZZZZ.ZZZ.ZZZ.ZZ9V,99-' INIT(0);
+     DCL   LA5121                PIC'ZZZZ.ZZZ.ZZZ.ZZ9V,99-' INIT(0);
+     DCL   LA5122                PIC'ZZZZ.ZZZ.ZZZ.ZZ9V,99-' INIT(0);
+     DCL   LA5150                PIC'ZZZZ.ZZZ.ZZZ.ZZ9V,99-' INIT(0);
+     DCL   LASYNO                PIC'ZZZZ.ZZZ.ZZZ.ZZ9V,99-' INIT(0);
+
+     /* pkHhOr KAI pOrA ANA KAhOkIKO KAI TPApEZA   */
+
+  DCL      IIADD        FIXED(05)     INIT(0) ;
+  DCL      IISER        FIXED(05)     INIT(0) ;
+  DCL      SSTLG        FIXED(09,0)   INIT(0) ;
+  DCL      SSTPS        FIXED(15,2)   INIT(0) ;
+  DCL      SSKLG        FIXED(09,0)   INIT(0) ;
+  DCL      SSKPS        FIXED(15,2)   INIT(0) ;
+  DCL      WWKAQOL      FIXED(05)     INIT(98989);
+  DCL      ORIOKAQ      FIXED(05)     INIT(14); /* SIZE PKAQOL */
+  DCL      PKAQOL(14)   FIXED(05)     INIT(5060,5068,5078,5080,5090,
+                                           5100,5114,5115,5116,5117,
+                                           5120,5121,5122,5150);
+  DCL 1    PINKEMP(14)              ,
+       2   KEMPLOG      FIXED(09,0) ,
+       2   KEMPPOS      FIXED(15,2) ;
+  DCL 1    PINKPIR(14)              ,
+       2   KPIRLOG      FIXED(09,0) ,
+       2   KPIRPOS      FIXED(15,2) ;
+  DCL 1    PINKATT(14)              ,
+       2   KATTLOG      FIXED(09,0) ,
+       2   KATTPOS      FIXED(15,2) ;
+  DCL 1    PINTEMP                  ,
+       2   TEMPLOG      FIXED(09,0) ,
+       2   TEMPPOS      FIXED(15,2) ;
+  DCL 1    PINTPIR                  ,
+       2   TPIRLOG      FIXED(09,0) ,
+       2   TPIRPOS      FIXED(15,2) ;
+  DCL 1    PINTATT                  ,
+       2   TATTLOG      FIXED(09,0) ,
+       2   TATTPOS      FIXED(15,2) ;
+
+   DCL 1  NEWKATOL  PIC'(6)9'   INIT(0)   ;
+   DCL 1  NEWKATOR  BASED(ADDR(NEWKATOL)) ,
+        2 NEWKAT1      PIC '(04)9'        ,
+        2 NEWKAT2      PIC '(02)9'        ;
+
+ /*-------------------------------------------------------------------*/
+            CHARMERA =DATE  ;
+     /*
+        *****/
+            PINKEMP = '' ;
+            PINKPIR = '' ;
+            PINKATT = '' ;
+            PINTEMP = '' ;
+            PINTPIR = '' ;
+            PINTATT = '' ;
+    /*                              r.A.  29.10.98
+   LINE='1 * KATArTArIr k/rMxN ME ANx TxN 20 NOPASSBOOK EccPAuxN *';
+            SUBSTR(LINE,72,2)  = SUBSTR(CHARMERA,5,2) ;
+            SUBSTR(LINE,75,2)  = SUBSTR(CHARMERA,3,2) ;
+        */
+      /*    SUBSTR(LINE,78,2)  = SUBSTR(CHARMERA,1,2) ;    */
+      /*
+            SUBSTR(LINE,80,2)  = SUBSTR(CHARMERA,1,2) ;
+         SUBSTR(LINE,78,2) = SUBSTR(DAYA6R8(PICMERA),1,2);*/ /* Y2000 */
+      /*
+            WRITE FILE(PRINTER) FROM(LINE);
+            LINE='0          AP.k/rMOY    KAT/MA  APIhMOr EccPAuxN ' ;
+            WRITE FILE(PRINTER) FROM(LINE);
+            LINE='           ---------    ------  ----------------   ';
+            WRITE FILE(PRINTER) FROM(LINE);
+        */
+            WRITE FILE(PRINTER) FROM(CLONT);
+            OPEN FILE(TAPE) ;
+   WSDTINP  = DAYA6S8(DATE) ;
+   WSTMINP  = TIME ;
+   KFIOROOT = ADDR(IOAREA) ;
+   KFIOSADD = ADDR(IOAREA) ;
+ /*-------------------------------------------------------------------*/
+ /***                   EpEnEPcArIA KATAhErExN                      ***/
+ /**-----------------------------------------------------------------**/
+   READKAT:
+      RECORD = '' ;
+     /*     HMEROMHNIA=PICMERA    ;             */
+            HMEROMHNIA=DAYA6F7(PICMERA)    ;    /* Y2000 */
+      CALL PLITDLI(THREE,FUNGN,PCBK,IOAREA) ;
+      IF   PCBK.PCBSC ='GK' !
+           PCBK.PCBSC ='GA' !
+           PCBK.PCBSC ='GB' !
+           PCBK.PCBSC ='  ' THEN;
+      ELSE DO;
+           LINE='1 ';
+           WRITE FILE(PRINTER) FROM(LINE);
+           LINE='0********** kAhOr ANAcNxrExr EIr D/B ********* ';
+           WRITE FILE(PRINTER) FROM(LINE);
+           LINE='-                              PCBSC.KATAhErExN='  ;
+           SUBSTR(LINE,48,2) = PCBK.PCBSC ;
+           WRITE FILE(PRINTER) FROM(LINE);
+           CALL PLIDUMP('TFHCB') ;
+           STOP;
+      END;
+      IF   PCBK.PCBSC ='GB'   THEN
+           GOTO  EKTYPWS;
+      IF PCBK.PCBSEGNM = 'KROOTSEG' THEN GOTO SYNEXO;
+      IF PCBK.PCBSEGNM ^='KCHKBSEG' THEN GOTO READKAT;
+      ARIS = ARIS+1 ;
+      GOTO READKAT;
+  SYNEXO:
+      IF  ARIS > 50   THEN
+          WRITE FILE(PRINTER) FROM(CHLINE);
+      LATER= KSRARLOG;
+      KMO=KSRKATMA;
+      ARIS=0;
+      IF DUMMYRECORD='000000000000000000000000'B
+                                  THEN GOTO EKTYPWS;
+      IF SAFETYRECORD='000000000000000000000000'B
+                                  THEN GOTO READKAT;
+      IF KSRARLOG    = 999999999  THEN GOTO EKTYPWS ;
+      METRKAT  = METRKAT + 1 ;
+      ATHRKAT  = ATHRKAT + KSRDYPOL + KSREKKRE ;
+      IF  KSRKATMA =431   THEN DO ;
+          S431N  = S431N + KSRDYPOL + KSREKKRE ;
+          A431   = A431  + 1 ;
+      END ;
+      IF  KSRKATMA>=453 & KSRKATMA<=459   THEN DO ;
+          S388N  = S388N + KSRDYPOL + KSREKKRE ;
+          A388   = A388  + 1 ;
+      END ;
+      ARLOG    = KSRARLOG ;
+      WSKATMA  = KSRKATMA ;
+      TRAPEZA = 0;
+      IF  WSBTRP = '0000'B   THEN ;
+      ELSE
+          IF  WSBTRP = '0010'B   THEN
+              TRAPEZA = 2;
+          ELSE
+              IF  WSBTRP = '0011'B   THEN
+                  TRAPEZA = 3;
+              ELSE   DO;
+                  LINE = '0****** AkkH TPApEZA:' !! WSKATMA;
+                  WRITE  FILE(PRINTER)  FROM(LINE);
+              END;
+      KATMA = WSKTM;
+      EPAGELMA = KSRKWDEP ;
+
+   NEWKAT1  = KSRKATHO ;
+   NEWKAT2  = 99 ;
+   IF  KSRKATHO=5060 ! KSRKATHO=5080 ! KSRKATHO=5150   THEN DO ;
+       IF  KSRFN = 'u' THEN DO ;
+           NEWKAT2  = 01 ;
+           GOTO  CONT ;
+       END ;
+       IF  KSRKWDEP <= '34'   THEN DO ;
+           NEWKAT2  = 02 ;
+           GOTO  CONT ;
+       END ;
+       IF  KSRKWDEP >= '90' & KSRKWDEP <= '99'   THEN DO ;
+           NEWKAT2  = 02 ;
+           GOTO  CONT ;
+       END ;
+       IF  KSRKWDEP >= '82' & KSRKWDEP <= '84'   THEN DO ;
+           NEWKAT2  = 02 ;
+           GOTO  CONT ;
+       END ;
+       IF  KSRKWDEP >= '39' & KSRKWDEP <= '44'   THEN DO ;
+           NEWKAT2  = 02 ;
+           GOTO  CONT ;
+       END ;
+       IF  KSRKWDEP >= '45' & KSRKWDEP <= '81'   THEN DO ;
+           NEWKAT2  = 03 ;
+           GOTO  CONT ;
+       END ;
+       IF  KSRKWDEP >= '35' & KSRKWDEP <= '38'   THEN DO ;
+           NEWKAT2  = 04 ;
+           GOTO  CONT ;
+       END ;
+       IF  KSRKWDEP >= '85' & KSRKWDEP <= '86'   THEN DO ;
+           NEWKAT2  = 05 ;
+           GOTO  CONT ;
+       END ;
+       IF  KSRKWDEP >= '88' & KSRKWDEP <= '89'   THEN DO ;
+           NEWKAT2  = 06 ;
+           GOTO  CONT ;
+       END ;
+       IF  KSRKWDEP  = '87'   THEN DO ;
+           NEWKAT2  = 07 ;
+           GOTO  CONT ;
+       END ;
+       GOTO  CONT ;
+   END ;
+
+   IF  KSRKATHO=5068 ! KSRKATHO=5078 ! KSRKATHO=5300   THEN DO ;
+       NEWKAT2  = 01 ;
+       GOTO  CONT ;
+   END ;
+   IF  KSRKATHO=5090   THEN DO ;
+       IF  KSRKWDEP >= '85' & KSRKWDEP <= '86'   THEN DO ;
+           NEWKAT2  = 05 ;
+           GOTO  CONT ;
+       END ;
+       IF  KSRKWDEP >= '88' & KSRKWDEP <= '89'   THEN DO ;
+           NEWKAT2  = 06 ;
+           GOTO  CONT ;
+       END ;
+       GOTO  CONT ;
+   END ;
+
+   IF  KSRKATHO=5100   THEN DO ;
+       IF  KSRFN = 'u' THEN DO ;
+           NEWKAT2  = 01 ;
+           GOTO  CONT ;
+       END ;
+       IF  KSRKWDEP <= '34'   THEN DO ;
+           NEWKAT2  = 02 ;
+           GOTO  CONT ;
+       END ;
+       IF  KSRKWDEP >= '90' & KSRKWDEP <= '99'   THEN DO ;
+           NEWKAT2  = 02 ;
+           GOTO  CONT ;
+       END ;
+       IF  KSRKWDEP >= '82' & KSRKWDEP <= '84'   THEN DO ;
+           NEWKAT2  = 02 ;
+           GOTO  CONT ;
+       END ;
+       IF  KSRKWDEP >= '39' & KSRKWDEP <= '44'   THEN DO ;
+           NEWKAT2  = 02 ;
+           GOTO  CONT ;
+       END ;
+       GOTO  CONT ;
+   END ;
+
+   IF  KSRKATHO=5114 ! KSRKATHO=5115 ! KSRKATHO=5116 !
+       KSRKATHO=5117                                   THEN DO ;
+       NEWKAT2  = 01 ;
+       GOTO  CONT ;
+   END ;
+
+   IF  KSRKATHO=5120 ! KSRKATHO=5121   THEN DO ;
+       IF  KSRFN = 'u' THEN DO ;
+           NEWKAT2  = 01 ;
+           GOTO  CONT ;
+       END ;
+       IF  KSRKWDEP <= '34'   THEN DO ;
+           NEWKAT2  = 02 ;
+           GOTO  CONT ;
+       END ;
+       IF  KSRKWDEP >= '90' & KSRKWDEP <= '99'   THEN DO ;
+           NEWKAT2  = 02 ;
+           GOTO  CONT ;
+       END ;
+       IF  KSRKWDEP >= '82' & KSRKWDEP <= '84'   THEN DO ;
+           NEWKAT2  = 02 ;
+           GOTO  CONT ;
+       END ;
+       IF  KSRKWDEP >= '39' & KSRKWDEP <= '44'   THEN DO ;
+           NEWKAT2  = 02 ;
+           GOTO  CONT ;
+       END ;
+       IF  KSRKWDEP >= '45' & KSRKWDEP <= '81'   THEN DO ;
+           NEWKAT2  = 03 ;
+           GOTO  CONT ;
+       END ;
+       IF  KSRKWDEP >= '35' & KSRKWDEP <= '38'   THEN DO ;
+           NEWKAT2  = 04 ;
+           GOTO  CONT ;
+       END ;
+       GOTO  CONT ;
+   END ;
+
+ CONT :
+      KATHO = NEWKATOL ;
+
+      IF  KSRAKYR = '1'  THEN HMTA=KSRHMTA;
+      ELSE HMTA = 0;
+      IF  KSRARLOG >= 82131442   THEN
+          HMTA = KSRHMAN ;
+      ELSE
+          HMTA = 0 ;
+      DEH=KSRDEH;
+      IF  KSRKATEP = '1'  THEN
+          KATEP = '*' ;
+      ELSE
+          KATEP = ' ' ;
+      IF  KSRKATMA >= 453 & KSRKATMA <= 459   THEN
+          KATEP = ' ' ;
+      FN = KSRFN ;
+      HMTS=KSRHMTS;
+      POSON = KSRDYPOL + KSREKKRE ;
+      IF  KSRKATMA >= 453 & KSRKATMA <= 459   THEN DO ;
+          KATEPKYP = KSRKATEP ;
+          KYPR1    = KSRKYPR1 ;
+      END ;
+      ONOMA = KSRONOMA ;
+      IF  KSRKATHO=5060 THEN DO;   LM5060=LM5060+1;
+                                   LMSYNO=LMSYNO+1;
+                                   LASYNO=LASYNO+POSON;
+                                   LA5060=LA5060+POSON;     END;
+      IF  KSRKATHO=5068 THEN DO;   LM5068=LM5068+1;
+                                   LMSYNO=LMSYNO+1;
+                                   LASYNO=LASYNO+POSON;
+                                   LA5068=LA5068+POSON;     END;
+      IF  KSRKATHO=5078 THEN DO;   LM5078=LM5078+1;
+                                   LMSYNO=LMSYNO+1;
+                                   LASYNO=LASYNO+POSON;
+                                   LA5078=LA5078+POSON;     END;
+      IF  KSRKATHO=5080 THEN DO;   LM5080=LM5080+1;
+                                   LMSYNO=LMSYNO+1;
+                                   LASYNO=LASYNO+POSON;
+                                   LA5080=LA5080+POSON;     END;
+      IF  KSRKATHO=5090 THEN DO;   LM5090=LM5090+1;
+                                   LMSYNO=LMSYNO+1;
+                                   LASYNO=LASYNO+POSON;
+                                   LA5090=LA5090+POSON;     END;
+      IF  KSRKATHO=5100 THEN DO;   LM5100=LM5100+1;
+                                   LMSYNO=LMSYNO+1;
+                                   LASYNO=LASYNO+POSON;
+                                   LA5100=LA5100+POSON;     END;
+      IF  KSRKATHO=5114 THEN DO;   LM5114=LM5114+1;
+                                   LMSYNO=LMSYNO+1;
+                                   LASYNO=LASYNO+POSON;
+                                   LA5114=LA5114+POSON;     END;
+      IF  KSRKATHO=5115 THEN DO;   LM5115=LM5115+1;
+                                   LMSYNO=LMSYNO+1;
+                                   LASYNO=LASYNO+POSON;
+                                   LA5115=LA5115+POSON;     END;
+      IF  KSRKATHO=5116 THEN DO;   LM5116=LM5116+1;
+                                   LMSYNO=LMSYNO+1;
+                                   LASYNO=LASYNO+POSON;
+                                   LA5116=LA5116+POSON;     END;
+      IF  KSRKATHO=5117 THEN DO;   LM5117=LM5117+1;
+                                   LMSYNO=LMSYNO+1;
+                                   LASYNO=LASYNO+POSON;
+                                   LA5117=LA5117+POSON;     END;
+      IF  KSRKATHO=5120 THEN DO;   LM5120=LM5120+1;
+                                   LMSYNO=LMSYNO+1;
+                                   LASYNO=LASYNO+POSON;
+                                   LA5120=LA5120+POSON;     END;
+      IF  KSRKATHO=5121 THEN DO;   LM5121=LM5121+1;
+                                   LMSYNO=LMSYNO+1;
+                                   LASYNO=LASYNO+POSON;
+                                   LA5121=LA5121+POSON;     END;
+      IF  KSRKATHO=5122 THEN DO;   LM5122=LM5122+1;
+                                   LMSYNO=LMSYNO+1;
+                                   LASYNO=LASYNO+POSON;
+                                   LA5122=LA5122+POSON;     END;
+      IF  KSRKATHO=5150 THEN DO;   LM5150=LM5150+1;
+                                   LMSYNO=LMSYNO+1;
+                                   LASYNO=LASYNO+POSON;
+                                   LA5150=LA5150+POSON;     END;
+      IF  KSRKATHO ^= WWKAQOL   THEN DO ;
+          WWKAQOL = KSRKATHO ;
+          DO  IISER = 1 TO ORIOKAQ ;
+              IF  WWKAQOL = PKAQOL(IISER)   THEN DO ;
+                  IIADD = IISER ;
+                  IISER = 999   ;
+              END ;
+          END ;
+          IF  IISER = 999   THEN DO ;
+              LINEGSYN = ' ***** kOcAPIArMOr='!!KSRARLOG!!
+                         ',KAhOkIKO EKTOr pINAKA='!!WWKAQOL ;
+              WRITE FILE(PRINTER) FROM(LINEGSYN) ;
+              IIADD = 1 ;
+          END ;
+      END ;
+      IF  KSRTRAP = '00000000'B   THEN DO ;
+          KEMPLOG(IIADD) = KEMPLOG(IIADD) + 1 ;
+          KEMPPOS(IIADD) = KEMPPOS(IIADD) + POSON ;
+      END ;
+      IF  KSRTRAP = '00000010'B   THEN DO ;
+          KPIRLOG(IIADD) = KPIRLOG(IIADD) + 1 ;
+          KPIRPOS(IIADD) = KPIRPOS(IIADD) + POSON ;
+      END ;
+      IF  KSRTRAP = '00000011'B   THEN DO ;
+          KATTLOG(IIADD) = KATTLOG(IIADD) + 1 ;
+          KATTPOS(IIADD) = KATTPOS(IIADD) + POSON ;
+      END ;
+      T20BLOG1 = '1111'B;
+      T20BKTM2 = '1111'B;
+      T20BHMN1 = '1111'B;
+      T20BKTL1 = '1111'B;
+      T20BHMT1 = '1111'B;
+      T20BHMA1 = '1111'B;
+
+      WRITE FILE(TAPE) FROM(RECORD);
+      MET1KAT = MET1KAT +1;
+      ATH1KAT = ATH1KAT +POSON ;
+
+      GOTO READKAT;
+
+ /*---------------------------------------------------------------  */
+ /*      EKTYpxrIr cPAMMxN rYMuxNIAr                                 */
+ /*------------------------------------------------------------------*/
+     EKTYPWS:   ;
+        CLOSE FILE(TAPE);
+        LINE='1  ';
+        WRITE FILE(PRINTER) FROM(LINE) ;
+        LINE='0  ';
+        SUBSTR(LINE,21,81)= (81)'*' ;
+   /*   SUBSTR(LINE,51,31)='  TPBTAM -20  ******';      */
+        SUBSTR(LINE,51,33)='  TPBTAM -20  ******';       /* Y2000 */
+        SUBSTR(LINE,72,2) =SUBSTR(CHARMERA,5,2) ;
+        SUBSTR(LINE,75,2) = SUBSTR(CHARMERA,3,2) ;
+   /*   SUBSTR(LINE,78,2) =SUBSTR(CHARMERA,1,2) ;      */
+        SUBSTR(LINE,80,2) =SUBSTR(CHARMERA,1,2) ;           /* Y2000 */
+        SUBSTR(LINE,78,2) = SUBSTR(DAYA6R8(PICMERA),1,2); /* Y2000 */
+        WRITE FILE(PRINTER) FROM (LINE);
+        LINE='  '; SUBSTR(LINE,21,1)='*';
+        SUBSTR(LINE,101,1)='*';
+        WRITE FILE(PRINTER) FROM(LINE);
+        LITERA='* ANAcNxrhENTA RECORDS TAM/PIOY:';
+        METRHTHS = METRTAM;
+        ATHRHSTHS=ATHRTAM;
+        CEN2 =' *******      *' ;
+        WRITE FILE(PRINTER) FROM(LINESYM);
+        SUBSTR(LINE,94,1) = '*';
+        WRITE FILE(PRINTER) FROM(LINE) ;
+        LITERA='* ANAcNxrhENTA RECORDS KAT/rExN:';
+        METRHTHS = METRKAT;
+        ATHRHSTHS = ATHRKAT;
+        CEN2=' ****  *      *';
+        WRITE FILE(PRINTER) FROM(LINESYM);
+        SUBSTR(LINE,91,1) ='*';
+        WRITE FILE(PRINTER) FROM(LINE) ;
+        SUBSTR(LINE,23,33) =(33)'-' ;
+                            WRITE FILE(PRINTER) FROM(LINE) ;
+        SUBSTR(LINE,23,33)=(33)' ';
+                            WRITE FILE(PRINTER) FROM(LINE) ;
+        LITERA='* EccPAuENTA RECORDS KATAhErExN:';
+        METRHTHS           =MET1KAT;
+        ATHRHSTHS = ATH1KAT;
+                            WRITE FILE(PRINTER) FROM(LINESYM);
+        LITERA='* EccPAuENTA RECORDS  TAM/PIOY :';
+        METRHTHS            = MET1TAM;
+        ATHRHSTHS = ATH1TAM;
+        CEN2 =' *******      *';
+                            WRITE FILE(PRINTER) FROM(LINESYM);
+        SUBSTR(LINE,22,70) = (70)' ';
+        SUBSTR(LINE,56,31) =(31)'-';
+        SUBSTR(LINE,94,1) = ' ';
+                            WRITE FILE(PRINTER) FROM(LINE);
+        LITERA='**  rYNOkON EccPAuENTxN RECORDS:';
+        METRHTHS= MET1TAM + MET1KAT;
+        ATHRHSTHS=ATH1KAT + ATH1TAM;
+        CEN2 ='              *     ';
+                            WRITE FILE(PRINTER) FROM(LINESYM);
+        SUBSTR(LINE,56,41)= (41)' ';
+                            WRITE FILE(PRINTER) FROM(LINE) ;
+        SUBSTR(LINE,21,81) =(81)'*' ;
+                            WRITE FILE(PRINTER) FROM(LINE) ;
+        SUBSTR(LINE,60,25) ='    ANAkYrH   KATAhErExN' ;
+                            WRITE FILE(PRINTER) FROM(LINE) ;
+        LTRELIT='kOcAPIArMOI 5060 :      ';
+        LMETREX=LM5060;   LATHTREX=LA5060;
+        WRITE FILE(PRINTER) FROM(LINETREX) ;
+        LTRELIT='kOcAPIArMOI 5068 :      ';   LTRII= ' ';
+        LMETREX=LM5068;   LATHTREX=LA5068;
+        WRITE FILE(PRINTER) FROM(LINETREX) ;
+        LTRELIT='kOcAPIArMOI 5078 :      ';
+        LMETREX=LM5078;   LATHTREX=LA5078;
+        WRITE FILE(PRINTER) FROM(LINETREX) ;
+        LTRELIT='kOcAPIArMOI 5080 :      ';
+        LMETREX=LM5080;   LATHTREX=LA5080;
+        WRITE FILE(PRINTER) FROM(LINETREX) ;
+        LTRELIT='kOcAPIArMOI 5090 :      ';
+        LMETREX=LM5090;   LATHTREX=LA5090;
+        WRITE FILE(PRINTER) FROM(LINETREX) ;
+        LTRELIT='kOcAPIArMOI 5100 :      ';
+        LMETREX=LM5100;   LATHTREX=LA5100;
+        WRITE FILE(PRINTER) FROM(LINETREX) ;
+        LTRELIT='kOcAPIArMOI 5114 :      ';
+        LMETREX=LM5114;   LATHTREX=LA5114;
+        WRITE FILE(PRINTER) FROM(LINETREX) ;
+        LTRELIT='kOcAPIArMOI 5115 :      ';
+        LMETREX=LM5115;   LATHTREX=LA5115;
+        WRITE FILE(PRINTER) FROM(LINETREX) ;
+        LTRELIT='kOcAPIArMOI 5116 :      ';
+        LMETREX=LM5116;   LATHTREX=LA5116;
+        WRITE FILE(PRINTER) FROM(LINETREX) ;
+        LTRELIT='kOcAPIArMOI 5117 :      ';
+        LMETREX=LM5117;   LATHTREX=LA5117;
+        WRITE FILE(PRINTER) FROM(LINETREX) ;
+        LTRELIT='kOcAPIArMOI 5120 :      ';
+        LMETREX=LM5120;   LATHTREX=LA5120;
+        WRITE FILE(PRINTER) FROM(LINETREX) ;
+        LTRELIT='kOcAPIArMOI 5121 :      ';
+        LMETREX=LM5121;   LATHTREX=LA5121;
+        WRITE FILE(PRINTER) FROM(LINETREX) ;
+        LTRELIT='kOcAPIArMOI 5122 :      ';
+        LMETREX=LM5122;   LATHTREX=LA5122;
+        WRITE FILE(PRINTER) FROM(LINETREX) ;
+        LTRELIT='kOcAPIArMOI 5150 :      ';
+        LMETREX=LM5150;   LATHTREX=LA5150;
+        WRITE FILE(PRINTER) FROM(LINETREX) ;
+        LTRELIT=' **  r Y N O k A :      ';    LTRII='-';
+        LMETREX=LMSYNO;   LATHTREX=LASYNO;
+        WRITE FILE(PRINTER) FROM(LINETREX) ;
+
+        LINEGSYN = '0KAhOkIKO'!!'       EMpOPIKH   TPApEZA     '!!
+                    '          TPApEZA   pEIPAIxr  '!!
+                    '          TPApEZA   ATTIKHr   ' ;
+        WRITE FILE(PRINTER) FROM(LINEGSYN) ;
+        LINEGRYN = '' ;
+        WRITE FILE(PRINTER) FROM(LINEGSYN) ;
+        LGSKAQO  =  5300 ;
+        LGSLG1   =  TEMPLOG ;
+        LGSPS1   =  TEMPPOS ;
+        LGSLG2   =  TPIRLOG ;
+        LGSPS2   =  TPIRPOS ;
+        LGSLG3   =  TATTLOG ;
+        LGSPS3   =  TATTPOS ;
+        SSTLG    =  TEMPLOG + TPIRLOG + TATTLOG ;
+        SSTPS    =  TEMPPOS + TPIRPOS + TATTPOS ;
+        WRITE FILE(PRINTER) FROM(LINEGSYN) ;
+        LINEGRYN = '' ;
+        WRITE FILE(PRINTER) FROM(LINEGSYN) ;
+        DO  IISER = 1  TO  ORIOKAQ ;
+            LGSKAQO = PKAQOL (IISER) ;
+            LGSLG1  = KEMPLOG(IISER) ;
+            LGSPS1  = KEMPPOS(IISER) ;
+            LGSLG2  = KPIRLOG(IISER) ;
+            LGSPS2  = KPIRPOS(IISER) ;
+            LGSLG3  = KATTLOG(IISER) ;
+            LGSPS3  = KATTPOS(IISER) ;
+            SSKLG   = SSKLG          +
+                      KEMPLOG(IISER) + KPIRLOG(IISER) + KATTLOG(IISER);
+            SSKPS   = SSKPS          +
+                      KEMPPOS(IISER) + KPIRPOS(IISER) + KATTPOS(IISER);
+            WRITE FILE(PRINTER) FROM(LINEGSYN) ;
+        END ;
+        IF  SSTLG ^= METRTAM   THEN DO ;
+            LINEGSYN = ' ****** pPOrOXH dIAuOPA rTO pkHhOr kOcAPIArMxN'
+                       !!' TAMIEYTHPIOY,SSTLG='!!SSTLG ;
+            WRITE FILE(PRINTER) FROM(LINEGSYN) ;
+        END ;
+        IF  SSTPS ^= ATHRTAM   THEN DO ;
+            LINEGSYN = ' ****** pPOrOXH dIAuOPA rTO pOrON  kOcAPIArMxN'
+                       !!' TAMIEYTHPIOY,SSTPS='!!SSTPS ;
+            WRITE FILE(PRINTER) FROM(LINEGSYN) ;
+        END ;
+        IF  SSKLG ^= METRKAT   THEN DO ;
+            LINEGSYN = ' ****** pPOrOXH dIAuOPA rTO pkHhOr kOcAPIArMxN'
+                       !!' KATAhErExN  ,SSKLG='!!SSKLG ;
+            WRITE FILE(PRINTER) FROM(LINEGSYN) ;
+        END ;
+        IF  SSKPS ^= ATHRKAT   THEN DO ;
+            LINEGSYN = ' ****** pPOrOXH dIAuOPA rTO pOrON  kOcAPIArMxN'
+                       !!' KATAhErExN  ,SSKPS='!!SSKPS ;
+            WRITE FILE(PRINTER) FROM(LINEGSYN) ;
+        END ;
+
+ TELOS:
+       SUBSTR(L2,20,15)=' * TPBTAM 10 * ';
+         WRITE FILE(PRINTER) FROM(LINE1) ;
+       SUBSTR(L2,20,15)='***************';
+         L7  = METMOVT ;
+         L12 = METRECT ;
+         L17 = METRNFT ;
+         WRITE FILE(PRINTER) FROM(LINE2) ;
+         WRITE FILE(PRINTER) FROM(LINE3) ;
+         WRITE FILE(PRINTER) FROM(LINE4) ;
+         L1  = '-' ;
+         WRITE FILE(PRINTER) FROM(LINE1) ;
+                                        WRITE FILE(PRINTER) FROM(LINEX);
+         WRITE FILE(PRINTER) FROM(LINE1) ;
+         L5  ='* KATAhErEIr' ;
+         L10 = '* KATAhErEIr' ;
+         L16 =  ' KATAhErExN' ;
+         L7  = METMOVK ;
+         L12 = METRECK ;
+         L17 = METRNFK ;
+ SUBSTR(L8,21,50)='(TPEXOYMENOI='!!METRTR!!', KAT.OwExr='!!METRKA!!' )';
+ SUBSTR(L13,21,50)='(TPEXOYMENOI='!!METRTR1!!', KAT.OwExr='!!METRKA1!!'
+  )' ;
+         WRITE FILE(PRINTER) FROM(LINE2) ;
+         WRITE FILE(PRINTER) FROM(LINE3) ;
+         WRITE FILE(PRINTER) FROM(LINE4) ;
+         WRITE FILE(PRINTER) FROM(LINE1) ;
+         WRITE FILE(PRINTER) FROM(LINEX) ;
+         WRITE FILE(PRINTER) FROM(LINE1) ;
+         L7  = METMOV ;
+         L12 = METREC ;
+         L17 = METRNF ;
+         L5  = '* r Y N O k O N     '    ;
+         L16 =' rYNOkON       ' ;
+         L10 = '*     _ ,, _        '   ;
+         WRITE FILE(PRINTER) FROM(LINE2) ;
+         WRITE FILE(PRINTER) FROM(LINE3) ;
+         WRITE FILE(PRINTER) FROM(LINE4) ;
+         WRITE FILE(PRINTER) FROM(LINE1) ;
+         DODOLEK=DODOART- DODOMHD;
+ LINE='0 ******* RECORDS APXEIOY EKd0rExr ANTIcPAuxN ='!!DODOART!!' - '!
+ !DODOMHD!!' = '!!DODOLEK ;
+        WRITE FILE(PRINTER) FROM(LINE) ;
+ LINE='-                                            **********'  ;
+        WRITE FILE(PRINTER) FROM(LINE) ;
+        S431 = S431N ;
+        S388 = S388N ;
+        WRITE FILE(PRINTER) FROM(LINE431) ;
+        LINE='- ENEcPAuHrAN,EIr DISK BLOCKED RECORD'!!ARBLOK ;
+        WRITE  FILE(PRINTER) FROM(LINE) ;
+    LINE = '-  ***************'; WRITE FILE(PRINTER) FROM(LINE);
+    LINE ='                   EpEnEPcArhEIrAN MOVEMENTS AkkxN HMEPOMHNIx
+ N ='!!METRMOVPRIN ;
+    WRITE FILE(PRINTER) FROM(LINE);
+    WSDTOUT = DAYA6S8(DATE);
+    WSTMOUT = TIME;
+    LINE='-* TO RUN APXIrE THN '!!WSDTINP!!' rTIr '!!WSTMINP!!
+         ' KAI TEkEIxrE THN '!!WSDTOUT!!' rTIr '!!WSTMOUT;
+    WRITE  FILE(PRINTER)   FROM(LINE);
+ /*--------------------------------------------*/
+    CLOSE FILE(TAPE) ;
+ END;
+

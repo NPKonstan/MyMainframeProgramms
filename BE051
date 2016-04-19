@@ -1,0 +1,392 @@
+ /* PROCESS A,GOSTMT,NEST,OPT(TIME),AG,MI('+'),MAP,M,OF,NIS;          */
+
+ /*********************** BE051   *************************************/
+ /*                                                                   */
+ /*  TO pPOcPAMMA  BE051   dIABAZEI TO dIKO MAr APXEIO ApOPPIwExN     */
+ /*    KAI TO METATPEpEI rTHN MOPuH cIA TON dIA                       */
+ /*  c.APXEIO ApOPPIwExN-pkHPxTPIEr pPOr dIAr-CPD012F00  LRECL=90     */
+ /*                                                                   */
+ /*  AUTHOR : TSOMLEKTZOGLOY XARIS                                    */
+ /*********************************************************************/
+ /*NPK 12-06-2007                                                     */
+ /*Αλλαγή:Μόνο άν γραφτεί Record type-3 Γράφουμε και Record Type-7    */
+ /*********************************************************************/
+
+ MANT: PROC OPTIONS(MAIN);
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+ DCL CZX3VDAT CHAR(6); FETCH CZXDATEP;
+ DCL CZXDATEP ENTRY OPTIONS(INTER,ASM) ;
+ DCL TAPE1  FILE RECORD INPUT  SEQUENTIAL ENV( FB RECSIZE(130));
+ DCL EPIT   FILE RECORD OUTPUT ENV( FB RECSIZE(90) );
+ DCL LIST1  FILE RECORD OUTPUT ENV( FB RECSIZE(133) CTLASA);
+
+
+ /***** pEPIcPAuH  TxN  INPUT  RECORDS *******************************/
+ DCL 1  RECOUT_ALL       CHAR(90)      INIT(' ');
+
+ /*****  RECORD FILE HEADER RECORD TPApEZAr   */
+ DCL 1  RECOUT1 BASED(ADDR(RECOUT_ALL)),
+      2  RECOUT1_EGG      CHAR(1)        INIT(' '),
+      2  RECOUT1_TRAP     CHAR(3)        INIT(' '),
+      2  RECOUT1_DATE_AG  CHAR(8)        INIT(' '),
+      2  RECOUT1_DATE_S   CHAR(8)        INIT(' '),
+      2  RECOUT1_FILLER   CHAR(70)       INIT(' ');
+
+ /*****  RECORD GROUP HEADER RECORD  */
+ DCL 1  RECOUT3 BASED(ADDR(RECOUT_ALL)),
+      2  RECOUT3_EGG      CHAR(1)        INIT(' '),
+      2  RECOUT3_TRAP     CHAR(3)        INIT(' '),
+      2  RECOUT3_NOM      CHAR(3)        INIT(' '),
+      2  RECOUT3_FILLER   CHAR(83)       INIT(' ');
+
+ /*****  RECORD DETAIL       RECORD OPcANIrMOY */
+ DCL 1  RECOUT5 BASED(ADDR(RECOUT_ALL)),
+      2  RECOUT5_EGG      CHAR(1)        INIT(' '),
+      2  RECOUT5_IBAN2    CHAR(27)       INIT(' '),
+      2  RECOUT5_CODELINE CHAR(4)        INIT(' '),
+      2  RECOUT5_AREPIT   CHAR(9)        INIT(' '),
+      2  RECOUT5_POSO     PIC'(9)9V99'   INIT(0),
+      2  RECOUT5_HMSYN    CHAR(8)        INIT(' '), /*HHMMEEEE      */
+      2  RECOUT5_HMEKD    CHAR(8)        INIT(' '), /*HHMMEEEE      */
+      2  RECOUT5_KATMA_A  CHAR(4)        INIT(' '),
+      2  RECOUT5_DIAS     CHAR(7)        INIT(' '),
+      2  RECOUT5_KOD      CHAR(1)        INIT(' '), /* = 1 , 2      */
+      2  RECOUT5_APOR     CHAR(2)        INIT(' '),
+      2  RECOUT5_TAYTOT   CHAR(8)        INIT(' ');
+
+ /***** RECORD GROUP TRAILER RECORD */
+ DCL 1  RECOUT7 BASED(ADDR(RECOUT_ALL)),
+      2  RECOUT7_EGG      CHAR(1)        INIT(' '),
+      2  RECOUT7_AA       PIC'(6)9'      INIT(0),
+      2  RECOUT7_AMT      PIC'(12)9V99'  INIT(0),
+      2  RECOUT7_FILLER   CHAR(69)       INIT(' ');
+
+ /***** RECORD TRAILER       RECORD TPApEZAr   */
+ DCL 1  RECOUT9 BASED(ADDR(RECOUT_ALL)),
+      2  RECOUT9_EGG      CHAR(1)        INIT(' '),
+      2  RECOUT9_AA       PIC'(6)9'      INIT(0),
+      2  RECOUT9_AMT      PIC'(12)9V99'  INIT(0),
+      2  RECOUT9_FILLER   CHAR(69)       INIT(' ');
+
+ /*************  EpITAcEr  TPApEZxN  *********************************/
+ %INCLUDE DIASCHK;
+
+ DCL    FLAG_HEADER       PIC'9' INIT(0);
+ DCL    COUNT_AM          PIC'99999' INIT(0);
+ DCL    COUNT_INP         FIXED(7)   INIT(0);
+ DCL    COUNT_OUT         FIXED(7)   INIT(0);
+ DCL    COUNT_1           FIXED(7)   INIT(0);
+ DCL    COUNT_2           FIXED(7)   INIT(0);
+ DCL    COUNT_3           FIXED(7)   INIT(0);
+ DCL    COUNT_4           FIXED(7)   INIT(0);
+ DCL    COUNT_44          FIXED(7)   INIT(0);
+ DCL    AMT_44            PIC'(13)9V99' INIT(0);
+ DCL    D_AMT             PIC 'ZZ.ZZZ.ZZZ.ZZ9V,99';
+ DCL    COUNT_5           FIXED(7)   INIT(0);
+ DCL    COUNT_6           FIXED(7)   INIT(0);
+ DCL    COUNT_7           FIXED(7)   INIT(0);
+ DCL    COUNT_9           FIXED(7)   INIT(0);
+ DCL    COUNT_ERR         FIXED(7)   INIT(0);
+ DCL    VALEUR_ERR        FIXED(7)   INIT(0);
+ DCL    KEEP_DATE         CHAR(8)    INIT(' ');
+ DCL    KEEP_TRAP         CHAR(3)    INIT(' ');
+ DCL    KEEP_TRAP1        CHAR(3)    INIT(' ');
+ DCL    KEEP_DATE_AG      CHAR(8)    INIT(' ');
+ DCL    KEEP_DATE_S       CHAR(8)    INIT(' ');
+ DCL    KEEP_NOMISMA      CHAR(3)    INIT('   ');
+ DCL    WEIDOS            PIC'9999'  INIT(0);
+ DCL    CEIDOS            CHAR(4)    INIT(' ');
+ DCL    II                PIC '99'   INIT(0);  /* INDEX ARRAY */
+
+ DCL    SYS_TIME          CHAR(9)    INIT(' ');
+ DCL    SYS_DATE          CHAR(6)    INIT(' ');
+ DCL    WSYS_DATE         PIC '999999' BASED(ADDR(SYS_DATE));
+ DCL    W_DATE            PIC '999999';
+
+ DCL    BASED  BUILTIN;
+ DCL    SUBSTR BUILTIN;
+ DCL    VERIFY BUILTIN;
+ DCL    PRIORITY BUILTIN;
+ DCL    ADDR   BUILTIN;
+ DCL    TIME   BUILTIN;
+ DATE: PROC IRREDUCIBLE RETURNS(CHAR(6)) ;
+       CALL CZXDATEP          ( CZX3VDAT) ;
+       RETURN (CZX3VDAT) ;
+       END DATE ;
+
+ DCL  1 LINE,
+         2 L1            CHAR(1),
+         2 L2            CHAR(132);
+
+ /*NPK Μόνο αν υπάρχει rec 3 θα γράφω rec7*/
+ /*NPK 11-06-2007                         */
+ /*FLAG RECORD TYPE 3 IS FOUND VALUE=1    */
+ DCL FOUND_REC3 FIXED(1) INIT(0);
+
+     SYS_DATE = DATE;
+     SYS_TIME = TIME;
+     OPEN FILE(LIST1);
+     OPEN FILE(TAPE1);
+     OPEN FILE(EPIT);
+     ON ENDFILE(TAPE1) BEGIN;
+        GOTO TELOS;
+     END;
+ R1:
+     READ FILE(TAPE1) INTO(READREC);
+     COUNT_INP = COUNT_INP + 1;
+
+     IF SUBSTR(READREC,1,1) = '1' THEN DO;
+        COUNT_1 = COUNT_1 + 1;
+        RECOUT1  = '';
+        RECOUT1_EGG     = '1';
+        RECOUT1_TRAP    = SUBSTR(READREC,2,3);
+        RECOUT1_DATE_AG = BATCDATE;
+        RECOUT1_DATE_S  = BATNDATE;
+        KEEP_TRAP1      = SUBSTR(READREC,2,3);
+        KEEP_DATE_AG    = BATCDATE;
+        KEEP_DATE_S     = BATNDATE; /* PALIA = NEXTDATE */
+        WRITE FILE(EPIT) FROM(RECOUT1);
+        COUNT_OUT = COUNT_OUT + 1;
+        L1 = '0';
+        D_AMT = RECOUT9_AMT;
+        L2 = 'HEADER TPApEZ:'!!RECOUT1_TRAP!!' '!!
+             RECOUT1_DATE_AG!!' '!!RECOUT1_DATE_S;
+        WRITE FILE(LIST1) FROM(LINE);
+        CALL HEAD;
+        GO TO R1;
+     END;
+
+     IF SUBSTR(READREC,1,1) = '4' THEN DO;
+        COUNT_4 = COUNT_4 + 1;
+        IF COUNT_44 = 0 THEN DO;
+           KEEP_NOMISMA = CURRENCY;
+           KEEP_TRAP       = BUYBANK;
+           RECOUT3  = '';
+           RECOUT3_EGG     = '3';
+           FOUND_REC3 =1;/*NPK Μόνο αν υπάρχει rec 3 θα γράφω rec7*/
+                         /*NPK 11-06-2007                         */
+           RECOUT3_TRAP    = BUYBANK;
+           RECOUT3_NOM     = CURRENCY;
+           WRITE FILE(EPIT) FROM(RECOUT3);
+           COUNT_OUT = COUNT_OUT + 1;
+           L2 = '3 GROUP HEADER RECORD CURRENCY:'!!KEEP_NOMISMA!!' '
+                !!BUYBANK!!' ';
+              WRITE FILE(LIST1) FROM(LINE);
+        END;
+ /*     IF ( KEEP_TRAP ^= BUYBANK ) !
+           ( KEEP_NOMISMA ^= CURRENCY ) THEN DO; OLD */
+        IF (
+           ( KEEP_TRAP ^= BUYBANK ) !
+           ( KEEP_NOMISMA ^= CURRENCY ) &
+           ( FOUND_REC3    = 1        ) ) THEN DO;
+           FOUND_REC3    = 0 ;/*RESET FLAG NPK 12-06-2007*/
+           RECOUT7  = '';
+           RECOUT7_EGG     = '7';
+           RECOUT7_AA      = COUNT_44; /* TOTCHEQS;*/
+           RECOUT7_AMT     = AMT_44;   /* TOTAMOUN;*/
+           WRITE FILE(EPIT) FROM(RECOUT7);
+           COUNT_OUT = COUNT_OUT + 1;
+           L1 = '0';
+           L2 = '7 GROUP TRAILER RECORD CURRENCY:'!!KEEP_NOMISMA!!' '
+               !!COUNT_44  !! ' '!!AMT_44;
+           WRITE FILE(LIST1) FROM(LINE);
+
+           COUNT_44    = 0;
+           AMT_44      = 0;
+           RECOUT3  = '';
+           RECOUT3_EGG     = '3';
+           FOUND_REC3 =1;/*NPK Μόνο αν υπάρχει rec 3 θα γράφω rec7*/
+                         /*NPK 11-06-2007                         */
+           RECOUT3_TRAP    = BUYBANK;
+           RECOUT3_NOM     = CURRENCY;
+           KEEP_TRAP       = BUYBANK;
+           KEEP_NOMISMA    = CURRENCY;
+           WRITE FILE(EPIT) FROM(RECOUT3);
+           COUNT_OUT = COUNT_OUT + 1;
+           L2 = '3 GROUP HEADER RECORD CURRENCY:'!!KEEP_NOMISMA!!' '
+                !!BUYBANK!!' ';
+              WRITE FILE(LIST1) FROM(LINE);
+        END;
+        COUNT_44 = COUNT_44 + 1;
+        RECOUT5 = '';
+        RECOUT5_EGG      = '5';
+        RECOUT5_IBAN2    = IBAN2;
+        RECOUT5_CODELINE = CODELINE;
+        RECOUT5_AREPIT   = CHEQNO;
+        RECOUT5_POSO     = CHEQPOSO;
+        AMT_44 = AMT_44 + CHEQPOSO;
+        RECOUT5_HMSYN    = HMERAG;
+        RECOUT5_HMEKD    = HMEREKD;
+        RECOUT5_KATMA_A  = BUYBRANC;
+        RECOUT5_DIAS     = DIASREF;
+        RECOUT5_KOD      = SUBSTR(PLACE,1,1);
+        RECOUT5_APOR     = TYXHEPIT;
+        RECOUT5_TAYTOT   = TRANSID;
+        WRITE FILE(EPIT) FROM(RECOUT5);
+        COUNT_OUT = COUNT_OUT + 1;
+        GO TO R1;
+     END;
+     IF SUBSTR(READREC,1,1) = '5' THEN DO;
+        COUNT_5 = COUNT_5 + 1;
+        GO TO R1;
+     END;
+
+
+          IF SUBSTR(READREC,1,1) = '9'  THEN DO;
+            /*MONO AN YPARXEI 3 GRAFOUME 7 RECORD NPK*/
+            IF (FOUND_REC3   = 1 ) THEN DO;
+               FOUND_REC3    = 0 ;/*RESET FLAG NPK 12-06-2007*/
+               RECOUT7  = '';
+               RECOUT7_EGG     = '7';
+               RECOUT7_AA      = COUNT_44; /* TOTCHEQS;*/
+               RECOUT7_AMT     = AMT_44;   /* TOTAMOUN;*/
+               WRITE FILE(EPIT) FROM(RECOUT7);
+               COUNT_OUT = COUNT_OUT + 1;
+               L1 = '0';
+               L2 = '7 GROUP TRAILER RECORD CURRENCY:'
+               !!KEEP_NOMISMA!!' '
+                   !!COUNT_44  !! ' '!!AMT_44;
+               WRITE FILE(LIST1) FROM(LINE);
+            END;/*END FOUND_REC3*/
+        COUNT_9 = COUNT_9 + 1;
+        RECOUT9  = '';
+        RECOUT9_EGG     = '9';
+        RECOUT9_AA      = TOTCHEQS;
+        RECOUT9_AMT     = TOTAMOUN;
+        WRITE FILE(EPIT) FROM(RECOUT9);
+        COUNT_OUT = COUNT_OUT + 1;
+        L1 = '0';
+        D_AMT = RECOUT9_AMT;
+        L2 = 'TRAILER TPApEZ:'!!RECOUT9_AA !!' pOrO:'!!D_AMT;
+        WRITE FILE(LIST1) FROM(LINE);
+        GO TO R1;
+     END;
+
+     COUNT_ERR = COUNT_ERR + 1;
+     GOTO R1;
+
+     NORUN: PROC;
+     IF SUBSTR(READREC,1,1) = '5' THEN DO; /* 5=TRAILER STO PALIO ARX */
+        COUNT_5 = COUNT_5 + 1;
+       /*MONO AN YPARXEI 3 GRAFOUME 7 RECORD NPK*/
+       IF (FOUND_REC3   = 1 ) THEN DO;
+          FOUND_REC3    = 0 ;/*RESET FLAG NPK 12-06-2007*/
+          RECOUT7  = '';
+          RECOUT7_EGG     = '7';
+          RECOUT7_AA      = TOTCHEQS;
+          RECOUT7_AMT     = TOTAMOUN;
+          WRITE FILE(EPIT) FROM(RECOUT7);
+          COUNT_OUT = COUNT_OUT + 1;
+        END;/*END FOUND_REC3 = 1 NPK*/
+        FLAG_HEADER = 0;
+        IF KEEP_TRAP ^= BANKCOD3 THEN DO;
+           L1 = '0';
+           L2 = 'dEN rYMuxNEI H TPApEZA AcOPAr DETAIL ME TRAILER '!!
+                KEEP_TRAP !! ' '!!BANKCOD3;
+           WRITE FILE(LIST1) FROM(LINE);
+           COUNT_ERR = COUNT_ERR + 1;
+        END;
+        IF COUNT_44  ^= TOTCHEQS THEN DO;
+           L1 = '0';
+           L2 = 'dEN rYMuxNEI RECORDS ANAkYTIKA       ME TRAILER '!!
+                COUNT_44  !! ' '!!TOTCHEQS;
+           WRITE FILE(LIST1) FROM(LINE);
+           COUNT_ERR = COUNT_ERR + 1;
+        END;
+        IF AMT_44  ^= TOTAMOUN THEN DO;
+           L1 = '0';
+           L2 = 'dEN rYMuxNEI pOrO    ANAkYTIKA       ME TRAILER '!!
+                AMT_44  !! ' '!!TOTAMOUN;
+           WRITE FILE(LIST1) FROM(LINE);
+           COUNT_ERR = COUNT_ERR + 1;
+        END;
+        COUNT_44    = 0;
+        AMT_44      = 0;
+        GO TO R1;
+     END;
+     END NORUN;
+ /*********************************************************************/
+ HEAD: PROC;
+     L1 = '1';
+     L2 = (10)' '!!'DIASCHEQUE METATPOpH APX.ApOPPIwExN CPD'!!
+             KEEP_TRAP1!!'F0';
+     WRITE FILE(LIST1) FROM(LINE);
+     L1 = '0';
+     L2 = (30)' '!!'==============================================';
+     WRITE FILE(LIST1) FROM(LINE);
+ END HEAD;
+
+ TELOS:;
+     L1 = '1';
+     L2 = 'INPUT   rYNOkO  '!!COUNT_INP;
+     WRITE FILE(LIST1) FROM(LINE);
+     L1 = '0';
+     L2 = 'INPUT 1 rYNOkO  '!!COUNT_1;
+     WRITE FILE(LIST1) FROM(LINE);
+     L2 = 'INPUT 2 rYNOkO  '!!COUNT_2;
+     WRITE FILE(LIST1) FROM(LINE);
+     L2 = 'INPUT 3 rYNOkO  '!!COUNT_3;
+     WRITE FILE(LIST1) FROM(LINE);
+     L2 = 'INPUT 4 rYNOkO  '!!COUNT_4;
+     WRITE FILE(LIST1) FROM(LINE);
+     L2 = 'INPUT 5 rYNOkO  '!!COUNT_5;
+     WRITE FILE(LIST1) FROM(LINE);
+     L2 = 'INPUT 6 rYNOkO  '!!COUNT_6;
+     WRITE FILE(LIST1) FROM(LINE);
+     L2 = 'INPUT 9 rYNOkO  '!!COUNT_9;
+     WRITE FILE(LIST1) FROM(LINE);
+
+     L1 = '0';
+     L2 = (132)'=';
+     WRITE FILE(LIST1) FROM(LINE);
+     L1 = '0';
+     L2 = (5)' '!!' rYMuxNIA '!!
+                  'DIASCHEQUE METATPOpH APX.ApOPPIwExN CPD'!!
+                  KEEP_TRAP1!!'F0 pkHPxTPIEr pPOr dIAr THN '!!
+                  SUBSTR(SYS_DATE,5,2)!!'/'!!SUBSTR(SYS_DATE,3,2)!!'/'
+                !!SUBSTR(SYS_DATE,1,2)!!' '!!SUBSTR(SYS_TIME,1,2)!!
+                  ':'!!SUBSTR(SYS_TIME,3,2)!!':'!!SUBSTR(SYS_TIME,5,2);
+     WRITE FILE(LIST1) FROM(LINE);
+     L1 = '0';
+     L2 = (132)'=';
+     WRITE FILE(LIST1) FROM(LINE);
+     L2 = 'INPUT   rYNOkO  '!!COUNT_INP;
+     WRITE FILE(LIST1) FROM(LINE);
+     L2 = 'RECORDS OUTPUT  '!!COUNT_OUT;
+     WRITE FILE(LIST1) FROM(LINE);
+     L2 = 'TPApEZA        :'!!KEEP_TRAP1;
+     WRITE FILE(LIST1) FROM(LINE);
+     L2 = 'HMEPOM. AcOPAr :'!!KEEP_DATE_AG;
+     WRITE FILE(LIST1) FROM(LINE);
+     L2 = 'HMEPOM. 2 rYMu.:'!!KEEP_DATE_S;
+     WRITE FILE(LIST1) FROM(LINE);
+     L2 = 'pkHhOr EpITAcxN '!!TOTCHEQS;
+     WRITE FILE(LIST1) FROM(LINE);
+     D_AMT = TOTAMOUN;
+     L2 = 'pOrO   EpITAcxN '!!D_AMT;
+     WRITE FILE(LIST1) FROM(LINE);
+     L2 = 'E R R O R S     '!!COUNT_ERR;
+     WRITE FILE(LIST1) FROM(LINE);
+     IF COUNT_ERR > 0 THEN DO;
+        L2 = (132)'*';
+        WRITE FILE(LIST1) FROM(LINE);
+        L2 = 'NA MHN ApOrTAkEI    TO APXEIO'!!
+             'KANTE EkEcXO TxN APXEIxN     ';
+        WRITE FILE(LIST1) FROM(LINE);
+        L2 = (132)'*';
+        WRITE FILE(LIST1) FROM(LINE);
+     END;
+
+     L2 = 'E R R O R S     '!!COUNT_ERR;
+     WRITE FILE(LIST1) FROM(LINE);
+
+
+  L1 = '0';
+  L2 = 'TEkOr pPOcPAMMATOr *********** ';
+  WRITE FILE(LIST1) FROM(LINE);
+
+  CLOSE FILE(TAPE1) ;
+  CLOSE FILE(LIST1) ;
+  CLOSE FILE(EPIT) ;
+ END MANT;
+

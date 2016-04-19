@@ -1,0 +1,632 @@
+%PROCESS XOPTS(DLI);/*NPK CHANGES FOR ENTERPRISE PLI 21-05-2007*/
+ /* PROCESS A,GOSTMT,ESD,MAP,NEST,OPT(TIME),AG,MI('$'),S,X,OF,INCLUDE;*/
+ DKKTCNVM : PROCEDURE OPTIONS(MAIN);
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+ /*******************************************************************/
+ /* йамеи MATCHING летану T04CNV97 KAI IMS йатахесеым.              */
+ /* KANEI екецвоус упаяйтотгтас коц/слым йаи ста дуо сустглата,     */
+ /* йаи екецвеи емдеинг коцаяиаслоу, гл/миа амоицлатос, йатастгла   */
+ /* баццекгс йоукгс, иOYLIOS    2003                                */
+ /*******************************************************************/
+
+ % INCLUDE DAYATNS;
+
+ /***************************************************/
+ /* цяаллоцяажгсг басгс            йатахесеым       */
+ /***************************************************/
+ % INCLUDE  KSDBMAP ;
+
+ /***************************************************/
+ /* цяаллоцяажгсг пимайа сумдесгс пекатг-коц/слоу   */
+ /***************************************************/
+ EXEC SQL INCLUDE T04CNV97;
+ EXEC SQL INCLUDE SQLCA;
+
+ /************************************/
+ /* пяосдиояислос, пеяицяажг аявеиым */
+ /************************************/
+ DCL  PRINT    FILE RECORD SEQUENTIAL OUTPUT
+      ENV(FB RECSIZE(133) CTLASA);
+
+ DCL  LOG4    FILE RECORD SEQUENTIAL OUTPUT ENV(FB RECSIZE(130));
+ DCL  LOG41   FILE RECORD SEQUENTIAL OUTPUT ENV(FB RECSIZE(130));
+ DCL  LOG42   FILE RECORD SEQUENTIAL OUTPUT ENV(FB RECSIZE(130));
+ DCL  LOG43   FILE RECORD SEQUENTIAL OUTPUT ENV(FB RECSIZE(130));
+ DCL  LOG5    FILE RECORD SEQUENTIAL OUTPUT ENV(FB RECSIZE(130));
+ DCL  LOG51   FILE RECORD SEQUENTIAL OUTPUT ENV(FB RECSIZE(130));
+ DCL  LOG52   FILE RECORD SEQUENTIAL OUTPUT ENV(FB RECSIZE(130));
+ DCL  LOG53   FILE RECORD SEQUENTIAL OUTPUT ENV(FB RECSIZE(130));
+ DCL  LOG54   FILE RECORD SEQUENTIAL OUTPUT ENV(FB RECSIZE(130));
+ DCL  LOG55   FILE RECORD SEQUENTIAL OUTPUT ENV(FB RECSIZE(130));
+ DCL  LOG61   FILE RECORD SEQUENTIAL OUTPUT ENV(FB RECSIZE(130));
+ DCL  LOG611  FILE RECORD SEQUENTIAL OUTPUT ENV(FB RECSIZE(130));
+ DCL  LOG62   FILE RECORD SEQUENTIAL OUTPUT ENV(FB RECSIZE(130));
+ DCL  LOG621  FILE RECORD SEQUENTIAL OUTPUT ENV(FB RECSIZE(130));
+ DCL  LOG63   FILE RECORD SEQUENTIAL OUTPUT ENV(FB RECSIZE(130));
+ DCL  LOG63A  FILE RECORD SEQUENTIAL OUTPUT ENV(FB RECSIZE(130));
+ DCL  LOG631  FILE RECORD SEQUENTIAL OUTPUT ENV(FB RECSIZE(130));
+ DCL  LOG64   FILE RECORD SEQUENTIAL OUTPUT ENV(FB RECSIZE(130));
+ DCL  LOG641  FILE RECORD SEQUENTIAL OUTPUT ENV(FB RECSIZE(130));
+
+ DCL  LINE            CHAR (133)   INIT(' ');
+
+ DCL  1 LNX  BASED(ADDR(LINE)),
+      2  CTLCHR         CHAR(1)      INIT(' '),
+      2  LEKTIKO        CHAR(60)     INIT(' '),
+      2  ARITHMOS       CHAR(20)     INIT(' '),
+      2  FILLME         CHAR(52)     INIT(' ');
+
+ DCL  1 LNX1 BASED(ADDR(LINE)),
+        2  CTLCHR1      CHAR(1)      INIT(' '),
+        2  GRAMMH       CHAR(132)    INIT(' ');
+
+ DCL  LOGLINE         CHAR (130)   INIT(' ');
+
+ /***************************************************/
+ DCL  SUBSTR  BUILTIN;
+ DCL  NULL    BUILTIN;
+ DCL  ADDR    BUILTIN;
+ DCL  INDEX   BUILTIN;
+ /***************************************************/
+ DCL  (KFIOROOT, KFIOSADD) PTR INIT(NULL);
+ DCL  WRKAREA            CHAR(450);
+ /***************************************************/
+ /* пяосдиояислос CURSOR */
+ /***************************************************/
+  EXEC SQL
+        DECLARE CNV97_CURS CURSOR FOR
+             SELECT
+                    COD_EFARM,
+                    NUM_AR_LOGAR,
+                    COD_PELATH,
+                    IND_TYP_PELATH,
+                    IND_OPEN_CLOSE,
+                    COD_KATMA,
+                    FEC_HMNIA_OPEN
+             FROM T04CNV97
+             WHERE
+                   COD_EFARM = '70'
+                   AND SUBSTR(NUM_AR_LOGAR,17,2) = '01'
+                   AND COD_KATMA NOT IN ('0453','0454','0455',
+                           '0456','0457','0458','0459','0870','0871',
+                           '0872','0873','0874','0875','0876','0877',
+                           '0878','0879','0880','0881','0882','0883',
+                           '0885','0886','0887','0890','0891','0892',
+                           '0895','0896','0897','0898','0899')
+                   AND SUBSTR(COD_KATMA,3,2) NOT BETWEEN '65' AND '69'
+             ORDER BY COD_EFARM, NUM_AR_LOGAR
+             WITH UR;
+ /***************************************************/
+   DCL  SINPKAT           PIC '(9)Z9'  INIT(0);
+   DCL  SINPEMP           PIC '(9)Z9'  INIT(0);
+   DCL  SINPCNV           PIC '(9)Z9'  INIT(0);
+   DCL  SKATIGN           PIC '(9)Z9'  INIT(0);
+   DCL  KLEIS_CNT         PIC '(9)Z9'  INIT(0);
+   DCL  SAFETY_CNT        PIC '(9)Z9'  INIT(0);
+   DCL  MIKRO_CNT         PIC '(9)Z9'  INIT(0);
+   DCL  ATTIKH_CNT        PIC '(9)Z9'  INIT(0);
+   DCL  CYPRUS_CNT        PIC '(9)Z9'  INIT(0);
+   DCL  SCNVIGN           PIC '(9)Z9'  INIT(0);
+   DCL  CLOSE_CNT         PIC '(9)Z9'  INIT(0);
+   DCL  SOK               PIC '(9)Z9'  INIT(0);
+   DCL  KSRKATMA_BIN0_CNT PIC '(9)Z9'  INIT(0);
+   DCL  KSRAKYR_BIN0_CNT  PIC '(9)Z9'  INIT(0);
+   DCL  KSRHMAN_BIN0_CNT  PIC '(9)Z9'  INIT(0);
+   DCL  BAD_IND_OPEN_CLOSE PIC '(9)Z9'  INIT(0);
+   DCL  BAD_IND_TYP_PELATH PIC '(9)Z9'  INIT(0);
+   DCL  DIFF_KATMA_CNT     PIC '(9)Z9'  INIT(0);
+   DCL  DIFF_HMAN_CNT      PIC '(9)Z9'  INIT(0);
+   DCL  DIFF_AKYR_CNT      PIC '(9)Z9'  INIT(0);
+   DCL  DIFF_TYPPEL_CNT    PIC '(9)Z9'  INIT(0);
+   DCL  AFTER_LAST_IMS     PIC '(9)Z9'  INIT(0);
+   DCL  CYPR_CNV97_CNT     PIC '(9)Z9'  INIT(0);
+   DCL  ATT_CNV97_CNT      PIC '(9)Z9'  INIT(0);
+   DCL  OTHERS_CNV97_CNT   PIC '(9)Z9'  INIT(0);
+   DCL  OTHERS_IMS_CNT     PIC '(9)Z9'  INIT(0);
+ /***************************************************/
+
+   DCL 1  KATKEY    CHAR(08)    INIT(' ') ;
+   DCL 1  KATKEYR   BASED(ADDR(KATKEY)),
+        2 KARLOG    PIC '(08)9'        ;
+
+   DCL LAST_IMS_ARLOG   PIC '(08)9'  INIT(0);
+
+   DCL  BITKLOG  BASED(ADDR(KSRKLOG)) BIT(8);
+   DCL  BITKATMA BASED(ADDR(KSRKATMA)) BIT(40);
+   DCL  BITHMAN  BASED(ADDR(KSRHMAN)) BIT(56);
+
+   DCL 1  CNVKEY    CHAR(08)    INIT(' ') ;
+
+
+   DCL    ZERO      FIXED(9,0) INIT(0)  ;
+   DCL    SWREAD    FIXED(9,0) INIT(0)  ;
+   DCL    SWEQUAL   FIXED(9,0) INIT(0)  ;
+   DCL    SWEOFCNV  FIXED(9,0) INIT(0);
+   DCL    SWEOFKAT  FIXED(9,0) INIT(0);
+
+   DCL  WS_HMAN_R8     PIC '(8)9'     INIT(0);
+   DCL  WS_HMAN_SA     CHAR(10)       INIT('');
+   DCL  KSRAKYR_BIN0   PIC '99'       INIT(0);
+   DCL  WS_KATMA       PIC '(4)9'     INIT(0);
+   DCL  WS_KATMA_CHR   CHAR(4)        INIT('');
+   DCL  KSRKATMA_PIC   PIC '(5)9'     INIT(0);
+   DCL  WS_HMAN_R7     PIC '(7)9'     INIT(0);
+   DCL  WS_HMAN_R7_FIX DEC FIXED(7,0) INIT(0);
+   DCL  KSRHMAN_PIC    PIC '(8)9'     INIT(0);
+   DCL  GO_KLEIS       BIT(1)         INIT('1'B);
+   DCL  GO_TYPPEL      BIT(1)         INIT('1'B);
+
+   DCL  COD_PELATH_PIC  PIC'(9)9'    INIT(0);
+
+ /******************* M A I N ****************************************/
+   KFIOROOT = ADDR(WRKAREA);
+   KFIOSADD = ADDR(WRKAREA);
+
+   OPEN  FILE(PRINT);
+   OPEN  FILE(LOG4),FILE(LOG41),FILE(LOG42),FILE(LOG43),FILE(LOG5),
+         FILE(LOG51),FILE(LOG52),FILE(LOG53),FILE(LOG54),FILE(LOG55),
+         FILE(LOG61),FILE(LOG611),FILE(LOG62),FILE(LOG621),FILE(LOG63),
+         FILE(LOG63A),FILE(LOG631),FILE(LOG64),FILE(LOG641);
+
+   EXEC SQL
+      OPEN CNV97_CURS;
+
+   IF SQLCODE ^= 0  THEN BEGIN;
+            CTLCHR1 = ' ';
+            GRAMMH='ERROR IN OPENING CNV97_CURS = '!!SQLCODE;
+            WRITE FILE(PRINT) FROM(LINE);
+            GOTO TELOS1;
+   END;
+
+   CTLCHR1 = ' ';
+   GRAMMH='***************************************************';
+   WRITE FILE(PRINT) FROM(LINE);
+   CTLCHR1 = ' ';
+   GRAMMH='пяоця. DKKTCNVM - MATCHING T04CNV97 ME IMS йат/сеым';
+   WRITE FILE(PRINT) FROM(LINE);
+   CTLCHR1 = ' ';
+   GRAMMH='***************************************************';
+   WRITE FILE(PRINT) FROM(LINE);
+
+ /*****/
+ RDCNV :
+ /*****/
+   EXEC SQL FETCH CNV97_CURS
+              INTO  :T04CNV97.COD_EFARM,
+                    :T04CNV97.NUM_AR_LOGAR,
+                    :T04CNV97.COD_PELATH,
+                    :T04CNV97.IND_TYP_PELATH,
+                    :T04CNV97.IND_OPEN_CLOSE,
+                    :T04CNV97.COD_KATMA,
+                    :T04CNV97.FEC_HMNIA_OPEN;
+
+   IF SQLCODE = 100 THEN SWEOFCNV = 1;
+   ELSE IF SQLCODE ^= 0 THEN DO;
+               CTLCHR1 = ' ';
+               GRAMMH  = 'ERROR IN FETCH CNV97= '!!SQLCODE!!
+                         ' коцслос= '!!T04CNV97.NUM_AR_LOGAR;
+               WRITE FILE(PRINT) FROM(LINE);
+               GOTO TELOS;
+         END;
+
+   IF  SWEOFCNV = 1   THEN DO;
+       CNVKEY   = (08)'9' ;
+   END;
+   ELSE DO;
+       SINPCNV = SINPCNV + 1;
+       CNVKEY  = SUBSTR(NUM_AR_LOGAR,1,8);
+   END;
+
+   IF  SWREAD = 1   THEN DO ;
+       SWREAD = 0 ;
+       GOTO  SYGR ;
+   END ;
+
+ /*****/
+ RDKAT :
+ /*****/
+   EXEC DLI
+           GN USING PCB(3)
+           SEGMENT (KROOTSEG)
+           INTO (WRKAREA);
+
+   IF DIBSTAT = 'GB' THEN DO;
+        CTLCHR1 = ' ';
+        GRAMMH='======================';
+        WRITE FILE(PRINT) FROM(LINE);
+        CTLCHR1 = ' ';
+        GRAMMH='текос IMS йатахесеым';
+        WRITE FILE(PRINT) FROM(LINE);
+        CTLCHR1 = ' ';
+        GRAMMH='======================';
+        WRITE FILE(PRINT) FROM(LINE);
+
+        SWEOFKAT = 1;
+
+   END;
+
+   IF DIBSTAT ^= ' ' THEN DO;
+        CTLCHR1 = ' ';
+        GRAMMH='=======================================';
+        WRITE FILE(PRINT) FROM(LINE);
+        CTLCHR1 = ' ';
+        GRAMMH='кахос пяоспекасгс стгм IMS йатахесеым';
+        WRITE FILE(PRINT) FROM(LINE);
+        CTLCHR1 = ' ';
+        GRAMMH='=======================================';
+        WRITE FILE(PRINT) FROM(LINE);
+
+        GOTO TELOS;
+   END;
+
+   IF DIBSEGM ^= 'KROOTSEG' THEN GOTO RDKAT;
+
+   IF  SWEOFKAT = 1   THEN DO;
+       KATKEY   = (08)'9' ;
+   END;
+   ELSE DO;
+       IF KSRARLOG = 999999999 THEN KATKEY   = (08)'9' ;
+       ELSE DO;
+              SINPKAT = SINPKAT + 1;
+              IF KSRKATMA > 1000 THEN DO;
+                    ATTIKH_CNT = ATTIKH_CNT + 1;
+                    GOTO RDKAT;
+              END;
+              ELSE IF (KSRKATMA >= 453 & KSRKATMA <= 459) THEN DO;
+                          CYPRUS_CNT = CYPRUS_CNT + 1;
+                          GOTO RDKAT;
+                   END;
+                   ELSE IF BITKLOG = '0'B THEN DO;
+                               SAFETY_CNT = SAFETY_CNT + 1;
+                               GOTO RDKAT;
+                        END;
+                        ELSE DO;
+                              SINPEMP = SINPEMP + 1;
+                              KARLOG  = KSRARLOG   ;
+                              LAST_IMS_ARLOG = KSRARLOG;
+                             END;
+            END;
+   END;
+
+ /****/
+ SYGR :
+ /****/
+   IF  CNVKEY  >  KATKEY   THEN DO ;
+       IF  SWEQUAL = 1   THEN DO ;
+           SWEQUAL = 0;
+           GOTO  RDKAT ;
+       END ;
+       ELSE DO;
+           SKATIGN = SKATIGN + 1 ;
+           LOGLINE =
+            'коц/слос IMS йат/сеым дивыс амтистоивисг стом T04CNV97, '!!
+            'KATKEY='!!KATKEY!!'<'!!'CNVKEY='!!CNVKEY;
+           WRITE FILE (LOG4) FROM (LOGLINE);
+
+           IF KSRAKYR = '1' THEN DO;
+                KLEIS_CNT = KLEIS_CNT + 1;
+                LOGLINE ='йкеистос коц/слос йат/сеым (IMS), '!!
+                         'KATKEY= '!!KATKEY!!' (CNVKEY='!!CNVKEY!!')'!!
+                         ', KSRAKYR='!!KSRAKYR;
+                WRITE FILE (LOG41) FROM (LOGLINE);
+           END;
+           ELSE IF KSRTYPOL = '2' THEN DO;
+                     MIKRO_CNT = MIKRO_CNT + 1;
+                     LOGLINE ='коц/слос лийяоупокоипым йат/сеым'!!
+                              ' (IMS), KATKEY= '!!KATKEY!!
+                         ' (CNVKEY='!!CNVKEY!!')'!!
+                         ', KSRTYPOL='!!KSRTYPOL;
+                     WRITE FILE (LOG42) FROM (LOGLINE);
+                END;
+                ELSE DO;
+                       OTHERS_IMS_CNT = OTHERS_IMS_CNT + 1;
+                       LOGLINE ='коц/слос йат/сеым (коипои) (IMS), '!!
+                                'KATKEY= '!!KATKEY!!
+                                ' (CNVKEY='!!CNVKEY!!')'!!
+                                ', KSRAKYR='!!KSRAKYR!!
+                                ', KSRTYPOL='!!KSRTYPOL;
+                       WRITE FILE (LOG43) FROM (LOGLINE);
+                END;
+
+           GOTO  RDKAT ;
+       END ;
+   END ;
+
+   IF  CNVKEY  <  KATKEY   THEN DO ;
+       SCNVIGN = SCNVIGN + 1 ;
+       SWREAD  = 1 ;
+       LOGLINE = 'коц/слос T04CNV97 дивыс амтистоивисг стис йат/сеис,'!!
+                 'CNVKEY=' !!CNVKEY!!'<'!!'KATKEY='!!KATKEY;
+       WRITE FILE (LOG5) FROM (LOGLINE);
+
+       IF KATKEY = (08)'9' THEN DO;
+             AFTER_LAST_IMS = AFTER_LAST_IMS + 1;
+             LOGLINE = 'меоамоивхеис коц/слос йат/сеым (CNV97), '!!
+                       'CNVKEY=' !!CNVKEY!!', (KATKEY='!!KATKEY!!')';
+             WRITE FILE (LOG51) FROM (LOGLINE);
+       END;
+       ELSE
+         IF IND_OPEN_CLOSE ^= 0 THEN DO;
+                 CLOSE_CNT = CLOSE_CNT + 1;
+                 LOGLINE = 'лг емеяцос коц/слос йат/сеым (CNV97), '!!
+                           'CNVKEY=' !!CNVKEY!!', (KATKEY='!!KATKEY!!
+                           '), IND_OPEN_CLOSE='!!IND_OPEN_CLOSE;
+                 WRITE FILE (LOG52) FROM (LOGLINE);
+         END;
+         ELSE
+           IF (COD_KATMA > '0452' & COD_KATMA < '0460') THEN DO;
+                CYPR_CNV97_CNT = CYPR_CNV97_CNT + 1;
+                LOGLINE = 'коц/слос йат/сеым йупяоу (CNV97), '!!
+                          'CNVKEY=' !!CNVKEY!!', (KATKEY='!!KATKEY!!
+                          '), COD_KATMA='!!COD_KATMA;
+                WRITE FILE (LOG53) FROM (LOGLINE);
+           END;
+           ELSE
+             IF ((SUBSTR(COD_KATMA,3,2) > '64' &
+                  SUBSTR(COD_KATMA,3,2) < '70') !
+                 (COD_KATMA > '0869' & COD_KATMA < '0884') !
+                 (COD_KATMA > '0884' & COD_KATMA < '0888') !
+                 (COD_KATMA > '0889' & COD_KATMA < '0893') !
+                 (COD_KATMA > '0894' & COD_KATMA < '0900')) THEN DO;
+                        ATT_CNV97_CNT = ATT_CNV97_CNT + 1;
+                        LOGLINE = 'коц/слос йат/сеым аттийгс (CNV97),'!!
+                                  ' CNVKEY=' !!CNVKEY!!', (KATKEY='!!
+                                  KATKEY!!'), COD_KATMA='!!COD_KATMA;
+                        WRITE FILE (LOG54) FROM (LOGLINE);
+             END;
+             ELSE DO;
+                     OTHERS_CNV97_CNT = OTHERS_CNV97_CNT + 1;
+                     LOGLINE = 'коц/слос йат/сеым (коипои) (CNV97)'!!
+                               ', CNVKEY= ' !! CNVKEY!!
+                               ', (KATKEY='!!KATKEY!!')'!!
+                               ', IND_OPEN_CLOSE='!!IND_OPEN_CLOSE!!
+                               ', COD_KATMA='!!COD_KATMA;
+                     WRITE FILE (LOG55) FROM (LOGLINE);
+                  END;
+
+       GOTO  RDCNV ;
+   END ;
+
+   /* CNVKEY = KATKEY */
+
+   IF  KATKEY = (08)'9'   THEN DO ;
+       GOTO  TELOS ;
+   END ;
+
+   SOK = SOK + 1 ;
+   SWEQUAL = 1;
+   SWREAD  = 1;
+
+   IF BITKATMA = '0'B THEN DO;
+           LOGLINE ='BINARY ZEROES сто KSRKATMA, '!!
+                    'CNVKEY='!!CNVKEY!!
+                    ', KATKEY='!!KATKEY;
+            WRITE FILE (LOG61) FROM (LOGLINE);
+            KSRKATMA_BIN0_CNT = KSRKATMA_BIN0_CNT + 1;
+   END;
+   ELSE DO;
+          WS_KATMA = KSRKATMA;
+          WS_KATMA_CHR = WS_KATMA;
+          IF WS_KATMA_CHR ^= COD_KATMA THEN DO;
+              KSRKATMA_PIC = KSRKATMA;
+              LOGLINE= 'диажояетийо йат/ла, CNVKEY='!!CNVKEY!!
+                       ', KATKEY='!!KATKEY!!
+                       ', COD_KATMA= '!!COD_KATMA!!
+                       ', KSRKATMA= '!!KSRKATMA_PIC;
+              WRITE FILE (LOG611) FROM (LOGLINE);
+              DIFF_KATMA_CNT = DIFF_KATMA_CNT + 1;
+          END;
+        END;
+
+   IF BITHMAN  = '0'B THEN DO;
+            LOGLINE ='BINARY ZEROES сто KSRHMAN, '!!
+                     'CNVKEY='!!CNVKEY!!
+                     ', KATKEY='!!KATKEY;
+            WRITE FILE (LOG62) FROM (LOGLINE);
+            KSRHMAN_BIN0_CNT = KSRHMAN_BIN0_CNT + 1;
+   END;
+   ELSE DO;
+          WS_HMAN_R8 = DAYSAR8(FEC_HMNIA_OPEN);
+          WS_HMAN_R7 = DAYR8R7(WS_HMAN_R8);
+          WS_HMAN_R7_FIX = WS_HMAN_R7;
+          IF KSRHMAN ^= WS_HMAN_R7_FIX THEN DO;
+              KSRHMAN_PIC = KSRHMAN;
+              LOGLINE= 'диажояетийг гл/миа амоицлатос, CNVKEY='!!
+                       CNVKEY!!', KATKEY='!!KATKEY!!
+                       ', FEC_HMNIA_OPEN= '!!FEC_HMNIA_OPEN!!
+                       ', KSRHMAN= '!!KSRHMAN_PIC;
+              WRITE FILE (LOG621) FROM (LOGLINE);
+              DIFF_HMAN_CNT = DIFF_HMAN_CNT + 1;
+          END;
+        END;
+
+   IF KSRAKYR = ' ' THEN DO;    /* X'00'B */
+           LOGLINE ='BINARY ZEROES сто KSRAKYR, '!!
+                    ', CNVKEY='!!CNVKEY!!
+                    ', KATKEY='!!KATKEY;
+            WRITE FILE (LOG63) FROM (LOGLINE);
+            KSRAKYR_BIN0_CNT = KSRAKYR_BIN0_CNT + 1;
+            GO_KLEIS = '0'B;
+   END;
+   IF (IND_OPEN_CLOSE ^= 0 & IND_OPEN_CLOSE ^= 1 &
+       IND_OPEN_CLOSE ^= 9 & IND_OPEN_CLOSE ^= 8) THEN DO;
+            LOGLINE= 'лг аподейтес тилес сто IND_OPEN_CLOSE, '!!
+                     'CNVKEY='!!CNVKEY!!
+                     ', KATKEY='!!KATKEY!!
+                     ', IND_OPEN_CLOSE='!!IND_OPEN_CLOSE;
+            WRITE FILE (LOG63A) FROM (LOGLINE);
+            BAD_IND_OPEN_CLOSE = BAD_IND_OPEN_CLOSE + 1;
+            GO_KLEIS = '0'B;
+   END;
+   IF GO_KLEIS THEN DO;
+        IF (KSRAKYR = '0' & IND_OPEN_CLOSE ^= 0) !
+           (KSRAKYR ^= '0' & IND_OPEN_CLOSE = 0) THEN DO;
+              LOGLINE= 'диажояетийг емдеинг йкеисхемтос, '!!
+                       'CNVKEY='!!CNVKEY!!
+                       ', KATKEY='!!KATKEY!!
+                       ', IND_OPEN_CLOSE= '!!IND_OPEN_CLOSE!!
+                       ', KSRAKYR ='!!KSRAKYR;
+              WRITE FILE (LOG631) FROM (LOGLINE);
+              DIFF_AKYR_CNT = DIFF_AKYR_CNT + 1;
+        END;
+   END;
+
+   IF (IND_TYP_PELATH ^= 0 & IND_TYP_PELATH ^= 1 &
+       IND_TYP_PELATH ^= 2) THEN DO;
+            LOGLINE= 'лг аподейтес тилес сто IND_TYP_PELATH, '!!
+                     'CNVKEY='!!CNVKEY!!', KATKEY='!!KATKEY!!
+                     ', IND_TYP_PELATH='!!IND_TYP_PELATH;
+            WRITE FILE (LOG64) FROM (LOGLINE);
+            BAD_IND_TYP_PELATH = BAD_IND_TYP_PELATH + 1;
+            GO_TYPPEL = '0'B;
+   END;
+   IF GO_TYPPEL THEN DO;
+      IF (IND_TYP_PELATH = 0 & KSRFN ^= 'u') !
+         (IND_TYP_PELATH ^= 0 & KSRFN ^= 'N') THEN DO;
+              COD_PELATH_PIC = T04CNV97.COD_PELATH;
+              LOGLINE= 'диажояетийос тупос пекатг, '!!
+                       'CNVKEY='!!CNVKEY!!
+                       ', KATKEY='!!KATKEY!!
+                       ', IND_TYP_PELATH='!!IND_TYP_PELATH!!
+                       ', KSRFN ='!!KSRFN!!
+                       ', COD_PELATH='!!COD_PELATH_PIC;
+              WRITE FILE (LOG641) FROM (LOGLINE);
+              DIFF_TYPPEL_CNT = DIFF_TYPPEL_CNT + 1;
+      END;
+   END;
+
+   GO_KLEIS = '1'B;
+   GO_TYPPEL= '1'B;
+
+
+   GOTO  RDCNV ;
+
+ /******************************************************************/
+
+ TELOS:
+   CTLCHR1 = ' ';
+   GRAMMH='1 амацмысхемтес коц/слои IMS йатахесеым                    ='
+          !!SINPKAT;
+   WRITE FILE(PRINT) FROM(LINE);
+   CTLCHR1 = ' ';
+   GRAMMH='  1.1 коц/слои аттийгс IMS йат/сеым (ацмооумтаи)           ='
+          !!ATTIKH_CNT;
+   WRITE FILE(PRINT) FROM(LINE);
+   CTLCHR1 = ' ';
+   GRAMMH='  1.2 коц/слои йупяоу  IMS йат/сеым (ацмооумтаи)           ='
+          !!CYPRUS_CNT;
+   WRITE FILE(PRINT) FROM(LINE);
+   CTLCHR1 = ' ';
+   GRAMMH='  1.3 SAFETY коц/слои  IMS йат/сеым (ацмооумтаи)           ='
+          !!SAFETY_CNT;
+   WRITE FILE(PRINT) FROM(LINE);
+   CTLCHR1 = ' ';
+   GRAMMH='2 коц/слои елпояийгс IMS йатахесеым                        ='
+          !!SINPEMP;
+   WRITE FILE(PRINT) FROM(LINE);
+   CTLCHR1 = ' ';
+   GRAMMH='  2.1 текеутаиос коц/слос стгм IMS йат/сеым                ='
+          !!LAST_IMS_ARLOG;
+   WRITE FILE(PRINT) FROM(LINE);
+   CTLCHR1 = ' ';
+   GRAMMH='3 амацмысхемтес коц/слои T04CNV97 (йуяиои дийаиоувои)      ='
+          !!SINPCNV;
+   WRITE FILE(PRINT) FROM(LINE);
+   CTLCHR1 = ' ';
+   GRAMMH='4 коц/слои IMS йат/сеым дивыс амтистоивисг стом T04CNV97   ='
+          !!SKATIGN;
+   WRITE FILE(PRINT) FROM(LINE);
+   CTLCHR1 = ' ';
+   GRAMMH='  4.1 йкеистои коц/слои йат/сеым (KSRAKYR:1)               ='
+          !!KLEIS_CNT;
+   WRITE FILE(PRINT) FROM(LINE);
+   CTLCHR1 = ' ';
+   GRAMMH='  4.2 лийяошпокоипA IMS йат/сеым (KSRTYPOL:2)              ='
+          !!MIKRO_CNT;
+   WRITE FILE(PRINT) FROM(LINE);
+   CTLCHR1 = ' ';
+   GRAMMH='  4.3 коц/слои IMS йат/сеым (коипои)                       ='
+          !!OTHERS_IMS_CNT;
+   WRITE FILE(PRINT) FROM(LINE);
+   CTLCHR1 = ' ';
+   GRAMMH='5 коц/слои T04CNV97 дивыс амтистоивисг стгм IMS йат/сеым   ='
+          !!SCNVIGN;
+   WRITE FILE(PRINT) FROM(LINE);
+   CTLCHR1 = ' ';
+   GRAMMH='  5.1 коц/слои T04CNV97 лета то текос тгс IMS йат/сеым     ='
+          !!AFTER_LAST_IMS;
+   WRITE FILE(PRINT) FROM(LINE);
+   CTLCHR1 = ' ';
+   GRAMMH='  5.2 лг емеяцои коц/слои йат/сеым стом T04CNV97           ='
+          !!CLOSE_CNT;
+   WRITE FILE(PRINT) FROM(LINE);
+   CTLCHR1 = ' ';
+   GRAMMH='  5.3 коц/слои T04CNV97 йупяоу                             ='
+          !!CYPR_CNV97_CNT;
+   WRITE FILE(PRINT) FROM(LINE);
+   CTLCHR1 = ' ';
+   GRAMMH='  5.4 коц/слои T04CNV97 аттийгс                            ='
+          !!ATT_CNV97_CNT;
+   WRITE FILE(PRINT) FROM(LINE);
+   CTLCHR1 = ' ';
+   GRAMMH='  5.5 коц/слои T04CNV97 (коипои)                           ='
+          !!OTHERS_CNV97_CNT;
+   WRITE FILE(PRINT) FROM(LINE);
+   CTLCHR1 = ' ';
+   GRAMMH='6 коц/слои ле пкгяг амтистоивисг                           ='
+          !!SOK;
+   WRITE FILE(PRINT) FROM(LINE);
+   CTLCHR1 = ' ';
+   GRAMMH='  6.1 коц/слои ле IMS ле BINARY 0 сто KSRKATMA             ='
+          !!KSRKATMA_BIN0_CNT;
+   WRITE FILE(PRINT) FROM(LINE);
+   CTLCHR1 = ' ';
+   GRAMMH='    6.1.1 коц/слои ле KSRKATMA ^= COD_KATMA                ='
+          !!DIFF_KATMA_CNT;
+   WRITE FILE(PRINT) FROM(LINE);
+   CTLCHR1 = ' ';
+   GRAMMH='  6.2 коц/слои ле IMS ле BINARY 0 сто KSRHMAN              ='
+          !!KSRHMAN_BIN0_CNT;
+   WRITE FILE(PRINT) FROM(LINE);
+   CTLCHR1 = ' ';
+   GRAMMH='    6.2.1 коц/слои ле KSRHMAN ^= FEC_HMNIA_OPEN            ='
+          !!DIFF_HMAN_CNT;
+   WRITE FILE(PRINT) FROM(LINE);
+   CTLCHR1 = ' ';
+   GRAMMH='  6.3 коц/слои ле IMS ле BINARY 0 сто KSRAKYR              ='
+          !!KSRAKYR_BIN0_CNT;
+   WRITE FILE(PRINT) FROM(LINE);
+   CTLCHR1 = ' ';
+   GRAMMH='  6.3 коц/слои CNV97 ле кахос IND_OPEN_CLOSE               ='
+          !!BAD_IND_OPEN_CLOSE;
+   WRITE FILE(PRINT) FROM(LINE);
+   CTLCHR1 = ' ';
+   GRAMMH='    6.3.1 коц/слои ле KSRAKYR ^= IND_OPEN_CLOSE            ='
+          !!DIFF_AKYR_CNT;
+   WRITE FILE(PRINT) FROM(LINE);
+   CTLCHR1 = ' ';
+   GRAMMH='  6.4 коц/слои CNV97 ле кахос IND_TYP_PELATH (^= 0,1,2)    ='
+          !!BAD_IND_TYP_PELATH;
+   WRITE FILE(PRINT) FROM(LINE);
+   CTLCHR1 = ' ';
+   GRAMMH='    6.4.1 коц/слои ле KSRFN ^= IND_TYP_PELATH              ='
+          !!DIFF_TYPPEL_CNT;
+   WRITE FILE(PRINT) FROM(LINE);
+
+   EXEC SQL
+      CLOSE CNV97_CURS;
+
+   IF SQLCODE ^= 0  THEN BEGIN;
+            CTLCHR1 = ' ';
+            GRAMMH='ERROR IN CLOSING CNV97_CURS = '!!SQLCODE;
+            WRITE FILE(PRINT) FROM(LINE);
+   END;
+
+ TELOS1:
+   CLOSE FILE(PRINT);
+   CLOSE FILE(LOG4),FILE(LOG41),FILE(LOG42),FILE(LOG43),FILE(LOG5),
+         FILE(LOG51),FILE(LOG52),FILE(LOG53),FILE(LOG54),FILE(LOG55),
+         FILE(LOG61),FILE(LOG611),FILE(LOG62),FILE(LOG621),FILE(LOG63),
+         FILE(LOG63A),FILE(LOG631),FILE(LOG64),FILE(LOG641);
+ END  DKKTCNVM;
+

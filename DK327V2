@@ -1,0 +1,344 @@
+ DLITPLI: PROC(PCBIO,PCBPTR)OPTIONS(MAIN);
+ /******************************************************/
+ /*                 DK327V2                            */
+ /* INPUT:DB йатахесеым                                */
+ /* оUTPUT:OFFLINE йатахесеым 670 бYTES                */
+ /******************************************************/
+
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+ DCL PLITDLI EXTERNAL ENTRY ;
+ DCL CZX3VDAT CHAR(6); FETCH CZXDATEP;
+ DCL CZXDATEP ENTRY OPTIONS(INTER,ASM) ;
+
+ DCL NTAPE   FILE RECORD OUTPUT ENV( FB RECSIZE(670) ) ;
+ DCL PRINT   FILE RECORD OUTPUT ENV( FB RECSIZE  (133) CTLASA) ;
+
+ DCL THREE STATIC FIXED BINARY(31) INIT(3) ;
+ DCL PCBPTR POINTER ;        /* PCB POINTER */
+ DCL PCBIO  POINTER ;
+ DCL KFIOROOT POINTER ;
+ DCL KFIOSADD POINTER ;
+     /**********************************************************/
+     /*          P C B  FOR DEPOSITS DATA BASE                 */
+     /**********************************************************/
+     DCL 1 PCB BASED(PCBPTR) ,
+                 2 PCBDBDNM  CHAR(8) ,
+                 2 FA            CHAR(2) ,
+                    2 PCBSC     CHAR(2) ,
+                 2 PCBPROPT  CHAR(4) ,
+                 2 FB FIXED BIN (31) ,
+                 2 PCBSEGNM  CHAR(8) ,
+                 2 PCBLFBK FIXED BIN(31) ,
+                 2 FC      FIXED BIN(31) ,
+                 2 PCBFBK  CHAR(32)  ;
+     /***********************************************************/
+ %INCLUDE  KSDBMAP  ;
+
+  DCL IOAREA CHAR(400) ;
+
+  DCL SUBSTR     BUILTIN;
+  DCL TRANSLATE  BUILTIN;
+  DCL ADDR       BUILTIN;
+  DCL PRIORITY   BUILTIN    ;
+
+ /****  DATE SIMULATION DEFINED FUNCTION  ****/
+   DATE: PROC IRREDUCIBLE RETURNS(CHAR(6)) ;
+     CALL CZXDATEP          ( CZX3VDAT) ;
+     RETURN (CZX3VDAT) ;
+     END DATE ;
+ /****        END OF MVS-MS INSERT        ****/
+
+  DCL DBINP FIXED(7,0) INIT(0) ;  /* DATA BASE INPUT     */
+  DCL DBOUT FIXED(7,0) INIT(0) ;  /* DATA BASE OUTPUT    */
+  DCL BIT_LOG BASED(ADDR(KSRARLOG)) BIT(8);
+  DCL 1 BIT_HMAN BASED(ADDR(KSRHMAN)),
+        2 FLIP1   CHAR(3),
+        2 FLIP2   BIT(4),
+        2 PROSHMO BIT(4);
+
+  DCL FUNCTION CHAR(4) INIT('GN  ') ;
+ %SKIP;
+ /**********************************************************************
+ *** VARIABLED DATA ROOT SEGMENT ***  RECORD DESCRIPTION             ***
+ **********************************************************************/
+     DCL 1 MKSROOTS ,
+         2 MKSRARLOG FIXED DEC(9,0) , /* ACCOUNT NUMBER               */
+         2 MKSRKATMA FIXED DEC(5,0) ,/* BANK & BRANCH CODE            */
+         2 MKSRKATHO FIXED DEC(5,0) ,/* G/A CODE                      */
+         2 MKSRFN    CHAR(1) ,       /* PERSON INDICATOR
+                                     ('d') = PHYSICAL PERSON
+                                             ('N') = LEGAL PERSON     */
+         2 MKSRKLOG  FIXED DEC(1,0) ,/* INDICATION-TYPE OF ACCOUNT
+                                        ('0') = NOT JOINT ACCOUNT
+                                       ('1') = JOINT ACCOUNT          */
+         2 MKSRKLOGA FIXED DEC(1,0) ,/* NUMBER OF BENFICIARIES        */
+         2 MKSROROI  CHAR(1) ,       /* CONDITIONS OF THE ACCOUNT
+                                       ('0') = NO SPECIAL CONDITIONS
+                                       ('1') = SPECIAL CONDITIONS     */
+         2 MKSRONOMA CHAR(31) ,      /* FOR PHYSICAL PERSONS F.CHRIST
+                                       FOR LEGAL PERSONS/SHORT VERSION
+                                       FREE FORMAT                    */
+         2 MKSRDIEYT ,               /* ADDRESS                       */
+         3 MKSRODOS CHAR(20) ,       /* STREET & NUMBER               */
+         3 MKSRPOLIS CHAR(15),       /*DISTRICT-CITY OR CITY-ZIP CODE*/
+         2 MKSRKWDEP CHAR(2) ,       /* PROFESSION CODE               */
+         2 MKSRARTAY CHAR(7) ,       /* IDENT.CARD NUMBER ANNNNNN     */
+         2 MKSRAPAN  CHAR(1) ,       /* INDICATION FOR LEGALIZATION
+                                        ]'0') = INDICATION OFF
+                                        ('1') = NO EXTENSION OF LEGAL.
+                                                WITHRDAWAL NOT PERMIT.
+                                        ('2') = LEGALIZATION FORCED   */
+         2 MKSRKATEP CHAR(1) ,       /* CATEGORY OF INTEREST DATE     */
+         2 MKSRHMAN FIXED DEC(7,0) , /* DATE ACCOUNT OPENED           */
+         2 MKSRHMTA FIXED DEC(7,0) , /* DATE OF LAST MODIFICATION     */
+         2 MKSRHMLHN FIXED DEC(7,0) ,/* DATE-EXPIRATION OF LEGALIZATIO*/
+         2 MKSRPEREC CHAR(1) ;       /* INDICATION FOR PERIODICAL     */
+ %SKIP;
+
+        DCL 1 IREC BASED (ADDR(MKSROOTS)),
+             2 IARLOG    FIXED(9) INIT(0),
+             2 IKATMA    FIXED(5) INIT(0),
+             2 IKATHO    FIXED(5) INIT(0),
+             2 ISRFN     CHAR(01) INIT(' '),
+             2 IKLOG     FIXED(1) INIT(0),
+             2 IKLOGA    FIXED(1) INIT(0),
+             2 IOROI     CHAR(01) INIT(' '),
+             2 IONOMA    CHAR(31) INIT(' '),
+             2 IODOS     CHAR(20) INIT(' '),
+             2 IPOLIS    CHAR(15) INIT(' '),
+             2 IKWDEP    CHAR(02) INIT(' '),
+             2 IARTAY    CHAR(07) INIT(' '),
+             2 IAPAN     CHAR(01) INIT(' '),
+             2 IKATEP    CHAR(01) INIT(' '),
+             2 IHMAN     FIXED(7) INIT(0),
+             2 IHMTA     FIXED(7) INIT(0),
+             2 IHMLHN    FIXED(7) INIT(0),
+             2 IPEREC    CHAR(01) INIT(' ');
+
+         DCL LINE CHAR(133) INIT(' ') ;
+        DCL 1 NREC,                      /*PERIOXH EGRAFHS OFF-LINE*/
+             2 NBANK     PIC'9'    INIT(0),
+             2 NKATH     PIC'9999' INIT(0),
+             2 NTRKAT    PIC'9999' INIT(0),
+             2 NARFYL    CHAR(04) INIT(' '),
+             2 NARLOG    PIC'(6)9' INIT(0),
+             2 NNEWLOG   PIC'(8)9' INIT(0),
+             2 NKOIN2    CHAR(02) INIT(' '),
+             2 NKOIN3    CHAR(01) INIT(' '),
+             2 NDIAKR    CHAR(02) INIT(' '),
+             2 NONOMA1   CHAR(64) INIT(' '),
+             2 NONOMA2   CHAR(64) INIT(' '),
+             2 NONOMA3   CHAR(64) INIT(' '),
+             2 NLATIN1   CHAR(01) INIT(' '),
+             2 NONMHTR   CHAR(10) INIT(' '),
+             2 NLATIN2   CHAR(01) INIT(' '),
+             2 NANAKAT  CHAR(192) INIT(' '),
+             2 NLATIN3   CHAR(01) INIT(' '),
+             2 NSYNTM    CHAR(30) INIT(' '),
+             2 NLATIN4   CHAR(01) INIT(' '),
+             2 NHMGEN    CHAR(08) INIT(' '),
+             2 NTOPGEN   CHAR(20) INIT(' '),
+             2 NLATIN5   CHAR(01) INIT(' '),
+             2 NETOSEKD  CHAR(04) INIT(' '),
+             2 NARTAYT   CHAR(08) INIT(' '),
+             2 NARSYST   CHAR(06) INIT(' '),
+             2 NKWDEPAG  CHAR(02) INIT(' '),
+             2 NXWRA     CHAR(15) INIT(' '),
+             2 NPOLH     CHAR(15) INIT(' '),
+             2 NODOS     CHAR(20) INIT(' '),
+             2 NLATIN6   CHAR(01) INIT(' '),
+             2 NXWRANT   CHAR(15) INIT(' '),
+             2 NPOLANT   CHAR(15) INIT(' '),
+             2 NODOANT   CHAR(20) INIT(' '),
+             2 NLATIN7   CHAR(01) INIT(' '),
+             2 NEIDOROI  CHAR(01) INIT(' '),
+             2 NAPANT    CHAR(01) INIT(' '),
+             2 NLHXNOM,
+               3 LHXNOHH CHAR(02) INIT(' '),
+               3 LHXNOMM CHAR(02) INIT(' '),
+               3 LHXNO   CHAR(02) INIT('19'),
+               3 LHXNOEE CHAR(02) INIT(' '),
+             2 NEPITOK   CHAR(04) INIT(' '),
+             2 NHMANLOG,
+               3 HMANLHH CHAR(02) INIT(' '),
+               3 HMANLMM CHAR(02) INIT(' '),
+               3 HMANL   CHAR(02) INIT('19'),
+               3 HMANLEE CHAR(02) INIT(' '),
+             2 NCIFNR    CHAR(08) INIT(' '),
+             2 NTAYT1    BIT(28)  INIT('0'B),
+             2 NTAYT2    BIT(04)  INIT('1100'B),
+             2 NHMAPOGR,
+               3 HMAPOHH CHAR(02) INIT(' '),
+               3 HMAPOMM CHAR(02) INIT(' '),
+               3 HMAPOEE CHAR(02) INIT(' '),
+             2 NENDDIOR  CHAR(01) INIT(' '),
+             2 NLATH     BIT(24)  INIT('0'B),
+             2 FIL1      CHAR(15) INIT(' ');
+
+        DCL (A,B,C)  FIXED(11)   INIT(0) ;
+        DCL  WARLOG  FIXED(9)    INIT(0);
+        DCL  EGR     PIC'999999' ;
+        DCL  KOINPIC PIC'9'      ;
+        DCL  HMPIC   PIC'999999' ;
+        DCL  1 TRKAT   BASED(ADDR(NTRKAT)),
+              2 TR   PIC'9',
+              2 KAT  PIC'999';
+        DCL  1 RHMPIC  BASED(ADDR(HMPIC)),
+              2 REE  PIC'99',
+              2 RMM  PIC'99',
+              2 RHH  PIC'99';
+        DCL  1 RYEARMONTH BASED(ADDR(HMPIC)),
+              2 RYM  PIC'9999',
+              2 RDAY PIC'99';
+        DCL  FYL     PIC'99';              /* uYkAnH ETOYr  DATE    */
+        DCL  PINII   CHAR(24) INIT('abcdefghijklmnopqrstuvwx');
+        DCL  PINIII  CHAR(24) INIT('ABcdEZHhIKkMNnOpPrTYuXwx');
+ /*********************************************************************/
+  /*  M A I N    P R O C E S S    O F    T H E    P R O G R A M  */
+ /*********************************************************************/
+
+  OPEN  FILE(NTAPE);
+
+  KFIOROOT = ADDR(IOAREA) ;
+  KFIOSADD = ADDR(IOAREA) ;
+  GETDB:  CALL PLITDLI(THREE,FUNCTION,PCB,IOAREA) ;
+         IF  PCBSC  ='GB' THEN DO;
+             GOTO TELOS;
+         END;
+         IF  PCBSC ^='  ' & PCBSC ^= 'GK' &  PCBSC ^= 'GA' THEN DO;
+             GOTO TELOS;
+         END;
+
+       DBINP=DBINP+1 ;
+
+       IF BIT_LOG = '00000000'B THEN DO;
+          GOTO GETDB;
+       END;
+
+       IF PCBSEGNM ^= 'KROOTSEG' THEN DO;
+          GOTO GETDB;
+       END;
+       IF KSRARLOG = 999999999 THEN DO;
+          GOTO TELOS;
+       END;
+
+       IF PROSHMO= '0000'B THEN DO;   /* SAFETY EXEI MONO LOG & KATMA*/
+          GOTO GETDB;                /* KAI OLA TA ALLA BINARY ZEROS*/
+       END;
+
+     SUBSTR(LINE,1,1)=' ';
+     SUBSTR(LINE,2,132)='диабасе :' !! KSRARLOG!!' '!!KSRHMAN!!' '
+                         !!KSRKATMA!!' '!!KSRONOMA;
+     WRITE FILE(PRINT) FROM(LINE) ;
+
+         MKSROOTS   = '';
+         MKSRARLOG  = KSRARLOG ;
+         MKSRKATMA  = KSRKATMA ;
+         MKSRKATHO  = KSRKATHO ;
+         MKSRFN     = KSRFN    ;
+         MKSRKLOG   = KSRKLOG  ;
+         MKSRKLOGA  = KSRKLOGA ;
+         MKSROROI   = KSROROI  ;
+         MKSRONOMA  = KSRONOMA ;
+         MKSRODOS   = KSRODOS ;
+         MKSRPOLIS  = KSRPOLIS ;
+         MKSRKWDEP  = KSRKWDEP ;
+         MKSRARTAY  = KSRARTAY ;
+         MKSRAPAN   = KSRAPAN ;
+         MKSRKATEP  = KSRKATEP ;
+         MKSRHMAN   = KSRHMAN  ;
+         MKSRHMTA   = KSRHMTA  ;
+         MKSRHMLHN  = KSRHMLHN ;
+         MKSRPEREC  = KSRPEREC ;
+
+       /*NPK  WRITE FILE(TAPEOUT) FROM (MKSROOTS) ;NPK*/
+         DBOUT=DBOUT+1 ;
+
+         CALL WRITE_670;    /*NPK*/
+
+         GOTO GETDB ;
+
+ WRITE_670 :PROC ;    /*NPK*/
+
+       NREC = '';
+       IF ISRFN = 'N' THEN DO;  NKOIN2='00';
+                                NKOIN3='0' ;  GOTO SYNEX;
+       END;
+       IF ISRFN = 'u' THEN DO;
+         IF IKLOG = 0   THEN DO;
+                   IF IKLOGA = 0 ! IKLOGA = 1 THEN DO;
+                                NKOIN2='00';
+                                NKOIN3='1' ;
+                                GOTO SYNEX;
+                   END;
+         END;
+         IF IKLOG = 0   THEN DO;  NKOIN2='10';  KOINPIC=IKLOGA;
+                                  NKOIN3=KOINPIC;
+         END;
+         IF IKLOG = 1   THEN DO;  NKOIN2='01';  KOINPIC=IKLOGA;
+                                  NKOIN3=KOINPIC;
+         END;
+         GOTO SYNEX;
+       END;
+       LINE =' '!!IARLOG!!' kAhOr u ╧ N pPOrxpO   ISRFN:'!!ISRFN!!
+             ' H METABOkH AcNOHhHKE';
+          WRITE FILE(PRINT) FROM(LINE) ;   RETURN ;
+ SYNEX:
+       IF ISRFN = 'N' THEN DO;  NDIAKR='03';  /* O.E.TYXAIO NOM.pPOr.*/
+                                NLATIN1,NLATIN4='7';      END;
+                      ELSE DO;  NDIAKR='01';
+                                NLATIN1,NLATIN4='5';      END;
+       NKATH      = IKATHO;
+       NTRKAT     = IKATMA;
+       NBANK      = TR;
+       NNEWLOG    = IARLOG;
+       NONOMA1    = TRANSLATE(IONOMA,PINII,PINIII);
+       NSYNTM     = IONOMA;
+       NARTAYT    = IARTAY;
+       NKWDEPAG   = IKWDEP;
+       NXWRA,NXWRANT= 'EkkAr';
+       NPOLH,NPOLANT= IPOLIS;
+       NODOS,NODOANT= IODOS ;
+       NEIDOROI   = IOROI ;
+       NAPANT     = IPEREC;
+       HMPIC      = IHMLHN;
+       LHXNOHH= RHH;    LHXNOMM= RMM;    LHXNOEE= REE;
+       IF FYL > 89   THEN LHXNO  = '19';
+                     ELSE LHXNO  = '20';
+       IF RHH = 0    THEN LHXNO  = '00';
+       HMPIC  = IHMAN ;
+       HMANLHH= RHH;    HMANLMM= RMM;    HMANLEE= REE;
+       IF FYL > 89   THEN HMANL  = '19';
+                     ELSE HMANL  = '20';
+       HMPIC  = IHMTA;
+       HMAPOHH= RHH;    HMAPOMM= RMM;    HMAPOEE= REE;
+       NENDDIOR='1';
+
+ WR:
+       WRITE  FILE(NTAPE) FROM(NREC);
+       NREC = '';
+
+ END WRITE_670;
+
+ TELOS:
+
+     LINE ='1 **   дHMIOYPцIA коц/лым OFF-LINE апо коц/лоус '
+           !!'     * DK327V2 * '!!'DATE: '!!DATE;
+     WRITE FILE(PRINT) FROM(LINE) ;
+     LINE ='    диабасе ';
+     WRITE FILE(PRINT) FROM(LINE) ;
+     LINE ='    cIA MERGE ME THN MHNIAIA OFF-LINE   ';
+     WRITE FILE(PRINT) FROM(LINE) ;
+     HMPIC=DATE;      FYL = REE;
+
+     SUBSTR(LINE,1,1) = '1' ;
+     WRITE FILE(PRINT) FROM(LINE) ;
+     SUBSTR(LINE,1,1)=' ';
+     SUBSTR(LINE,2,132)='диабасе :   ' !! DBINP ;
+     WRITE FILE(PRINT) FROM(LINE) ;
+     SUBSTR(LINE,2,132)='ецяаье  :   ' !! DBOUT ;
+     WRITE FILE(PRINT) FROM(LINE) ;
+
+     CLOSE  FILE(NTAPE) ;
+ END DLITPLI;
+

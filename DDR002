@@ -1,0 +1,63 @@
+*PROCESS LIMITS (FIXEDDEC(15,31));
+ /*********************************************************************/
+ /* Αυτή η ρουτίνα ελέγχει Κωδικό Αναφοράς Ανάθεσης                   */
+ /* Κωδικοποίηση Προτύπου #1                                          */
+ /* Input Mandate Identification =Κωδικόs Αναφοράς Ανάθεσης CHAR(35)  */
+ /*                                                                   */
+ /* ΚΑΙ ΕΠΙΣΤΡΕΦΕΙ 0 ΑΝ ΕΙΝΑΙ VALID KAI 1 ΑΝ ΕΙΝΑΙ ΛΑΘΟΣ              */
+ /*********************************************************************/
+ /* Η.2.1 Κωδικοποίηση Προτύπου #1                                    */
+ /*********************************************************************/
+ /* 1-15  Κωδικός Καταναλωτή 15n                                      */
+ /* 16-18 Κωδικός Οργανισμού 3n                                       */
+ /* 19    Τρόπος Πληρωμών 1n                                          */
+ /* 20    Ψηφίο Ελέγχου 1n                                            */
+ /*                                                                   */
+ /*********************************************************************/
+ /* ΝΠΚ 10-06-2009                                                    */
+ /*********************************************************************/
+ DDR002 : PROC(MANDATE_ID)
+           OPTIONS(FETCHABLE)  RETURNS( FIXED (1));
+ DCL MANDATE_ID    CHAR(35) ;
+ DCL RC  FIXED (1);
+ DCL 1 MANDATE_IDXX BASED(ADDR(MANDATE_ID)),
+       2 KATANALOTIS             PIC'(15)9',
+       2 ORGANISMOS              PIC'(03)9',
+       2 TROPOS                  PIC'(01)9',
+       2 CD                      PIC'(01)9';
+ DCL MYCD PIC'(02)9' INIT(0);
+ DCL MD    (19) PIC'9' BASED(ADDR(MANDATE_ID));
+
+ DCL  I FIXED(3) INIT(0);
+ DCL  J FIXED(3) INIT(0);
+ DCL  BIG    PIC'(31)9';
+ DCL ADDR   BUILTIN ;
+ DCL ONCODE BUILTIN ;
+
+    ON ERROR BEGIN;
+        ON ERROR SYSTEM;
+    END;
+
+ /*                                                                  */
+ /*                                                                  */
+   J = 20;BIG = 0;
+   DO I=1 TO 19      ;
+      BIG = BIG + MD(I)*J ;
+      J = J - 1 ;
+   END;/*DO END*/
+   /*                                   */
+
+
+ BIG=MOD(BIG,11);
+ /*PUT SKIP LIST('BIG = ',BIG);*/
+ IF BIG = 0 THEN MYCD = 1;
+ IF BIG = 1 THEN MYCD = 0;
+ IF ( BIG > 1)  THEN MYCD = 11 - BIG;
+
+ IF MYCD = CD THEN RC=0;
+ ELSE              RC=1;
+ /*PUT SKIP LIST('MYCD= ',MYCD);*/
+
+ RETURN (RC);
+ END  DDR002           ;
+

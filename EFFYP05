@@ -1,0 +1,220 @@
+ EFFYP05: PROCEDURE OPTIONS(MAIN);
+ /********************************************************************/
+ /* –—œ√—¡ÃÃ¡ PLI KAI DB2                                            */
+ /********************************************************************/
+ /*           PROGRAM NAME: EFFYP05    LOAD MODULE: EFFYP05          */
+ /********************************************************************/
+ /* Input :                                                          */
+ /*      AÒ˜ÂﬂÔ                                                      */
+ /*  Output:                                                         */
+ /*                                                                  */
+ /* ”‚ﬁÌÂÈ ·Ô ÙÔÌ ﬂÌ·Í· CTEFFYP                                    */
+ /*                                                                  */
+ /********************************************************************/
+ /* 18-07-2011                                                       */
+ /********************************************************************/
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+ DCL PRT FILE     SEQUENTIAL OUTPUT ENV(FB RECSIZE(133) CTLASA);
+ DCL LINE                CHAR (133);
+ DCL 1   LNX                 BASED(ADDR(LINE)),
+      2  CTLCHR              CHAR(1)      INIT('1'),
+      2  GRAMH               CHAR(132)    INIT(' ');
+
+ DCL 1   ERLINE              ,
+      2  ERLIN1       CHAR(1)      INIT('1'),
+      2  ERLIN2       CHAR(132)    INIT(' ');
+  DCL 1 CTL_CARD,                                                       00310000
+        2 CTL_CHAR           CHAR ( 01 ), /* C                   */     00320000
+        2 CTL_AM             CHAR(15)    ,/*                     */     00330000
+        2 CTL_CHAR1          CHAR ( 01 ), /*                     */     00340000
+        2 CTL_DATE           CHAR(10)    ,/*                     */     00350000
+        2 CTL_FILLER         CHAR ( 53 );                               00460000
+
+ DCL     WS_MSG              CHAR (132);
+ /********************************************************************/
+ /*œÕœÃ¡  ¡… –≈—…√—¡÷π INPUT                  */
+ /********************************************************************/
+ DCL READER   FILE RECORD INPUT  ENV(FB RECSIZE(80));
+ /********************************************************************/
+ /***************************/
+ /*DB2 DECLARATIONS         */
+ /***************************/
+ EXEC SQL INCLUDE CTEFFYP;
+ EXEC SQL INCLUDE SQLCA;                                                01510500
+
+ DCL ZEROES     PIC'9999999999' ;
+ /********************************************************************/
+ DCL  LIMIT             FIXED (5)  INIT (1000);
+ DCL  COUNT_NEW         FIXED (15) INIT (0000);
+ DCL  COUNT             FIXED (15) INIT (0000);
+ DCL  DB2_RECS FIXED(15) INIT(0);
+ DCL  CNT                    PIC   'Z.ZZZ.ZZZ' INIT(0);
+ DCL  MYPROC CHAR(40);
+ DCL  MYMSG CHAR(132);
+ DCL  MYLINE   PIC  '99999';
+ DCL  RC       BIT(1) INIT('1'B);
+
+ DCL     WS_LAST_DATE      CHAR(10) INIT('');
+ DCL     MY_DATETIME       PIC '9999.99.99B9999';
+         MY_DATETIME =     SUBSTR(DATETIME(),1,12) ;
+ DCL     MY_DATE             PIC '(7)9' INIT(0);
+ DCL 1   MY_DATEX            BASED(ADDR(MY_DATE)),
+      2  MY_CENTURY         CHAR(01),
+      2  MY_YEAR            CHAR(02),
+      2  MY_MONTH           PIC '99',
+      2  MY_DAY             CHAR(02);
+
+ DCL   MY_FILE    PIC '999999B99';
+
+   DCL POS FIXED(15) INIT(0);
+  /**                                                   *****/
+   DCL 1 WW_DATE_WRK,
+        2   WS_DD_WRK PIC '(2)9',
+        2   F1                  CHAR(1)              INIT('.'),
+        2   WS_MM_WRK PIC '(2)9',
+        2   F2                  CHAR(1)              INIT('.'),
+        2   WS_YY_WRK PIC '(4)9';
+  /** LAST WORKING DATE OF A GIVEN MONTH ********************/
+   DCL WS_DATE_WRK CHAR(10) BASED(ADDR(WW_DATE_WRK));
+
+  /** LAST WORKING DATE OF A GIVEN MONTH IN 7 CHARS FORMAT **/
+ /* A YYMMDD A=1-->2000 A=0-->1900  */
+  DCL MYDATE      PIC'(7)9' BASED(ADDR(PIC_MYDATE));
+  DCL 1 PIC_MYDATE  ,
+             2 PFF  PIC'9' ,
+             2 PYY  PIC'99',
+             2 PMM  PIC'99',
+             2 PDD  PIC'99';
+ /*ÃﬁÌ·Ú ≈ÙÔÚ ¡Ì·ˆÔÒ‹Ú -”ıÌﬁË˘Ú Ô ÒÔÁ„Ô˝ÏÂÌÔÚ ÏﬁÌ·Ú ÙÔı ÏﬁÌ· ÒÔﬁÚ*/
+ DCL   WS_MNTH       FIXED DEC(2,0)   INIT(0);
+ DCL   WS_YEAR       FIXED DEC(5,0)   INIT(0);
+ DCL TODAYX      CHAR(8);
+     TODAYX =  SUBSTR(DATETIME(),1,8) ;
+ DCL  1 SYSDATE  BASED(ADDR(TODAYX)),
+             2 SYSYYYY  CHAR(4),
+             2 SYSMM    CHAR(2),
+             2 SYSDD    CHAR(2);
+ DCL  1 PICDATE  BASED(ADDR(SYSDATE)),
+             2 PICYY  PIC'(4)9',
+             2 PICMM  PIC'(2)9',
+             2 PICDD  PIC'(2)9';
+ /****************************************/
+ /*Variables For Contolling Test-Printing*/
+ /****************************************/
+  DCL TEST_COUNT FIXED(3) INIT(0);
+  DCL TEST_LIMIT FIXED(3) INIT(10);
+
+ DCL  SUBSTR       BUILTIN;
+ DCL  DATE         BUILTIN;
+ DCL  TRANSLATE    BUILTIN;
+ DCL  ADDR         BUILTIN;
+ DCL  ABS          BUILTIN;
+ DCL  DIVIDE       BUILTIN;
+ DCL  ROUND        BUILTIN;
+ DCL  DATETIME     BUILTIN;
+ DCL  FILEDDWORD   BUILTIN;
+ DCL  VERIFY       BUILTIN;
+ DCL  VALIDDATE    BUILTIN;
+                                                                        01510400
+      ON ENDFILE(READER)
+      BEGIN ;
+            GO TO TELOS;
+      END;
+
+    /*----------------------------------------------------------*/
+    /*                    MAIN  PROGRAM                         */
+    /*----------------------------------------------------------*/
+    OPEN FILE(PRT) ;
+    READ  FILE ( READER  ) INTO ( CTL_CARD );                           02880000
+    CALL UPD_CTEFFYP ;
+    GO TO TELOS;
+
+    UPD_CTEFFYP: proc;
+      PUT SKIP LIST('NPK EFFYP05 CTL_AM   = ',CTL_AM);
+      PUT SKIP LIST('NPK EFFYP05 CTL_DATE = ',CTL_DATE);
+
+      CTEFFYP.DAT_KATAGRAFIS = '01.01.1901';
+      CTEFFYP.CHR_USER = ' ';
+      CTEFFYP.CHR_TERM = ' ';
+      CTEFFYP.CHR_STATUS_PROCESS = '9';
+      EXEC SQL
+           UPDATE CTEFFYP
+      SET
+            DAT_KATAGRAFIS     = :CTEFFYP.DAT_KATAGRAFIS,
+            DAT_DATETIME_PROC  = CURRENT TIMESTAMP,
+            CHR_USER           = :CTEFFYP.CHR_USER,
+            CHR_TERM           = :CTEFFYP.CHR_TERM,
+            CHR_STATUS_PROCESS = :CTEFFYP.CHR_STATUS_PROCESS
+         WHERE
+              CHR_AM_DIAS =             :CTL_AM  AND
+              DATE(DAT_DATETIME_PROC) = :CTL_DATE;
+
+        IF SQLCODE = 0 THEN DO;                                         07765605
+           put skip list("-----> OKDELETE_CTEFFYP  ");                  07765709
+        END;                                                            07766209
+        ELSE DO;
+        IF SQLCODE = 100 THEN DO;                                       07766309
+           put skip list("-----> NO DATA FOR UPDATE ");                 07765709
+        END;
+        ELSE DO;
+           put skip list("*******> NOTOKUPDATE_CTEFFYP ");              07766409
+           MYMSG  = "À¡»œ” ”‘O UPDATE CTDDMD10"!!                       07766809
+                  " SQLCODE = "!! CHAR(SQLCODE);                        07766905
+           CALL ERROR(MYPROC,MYLINE,MYMSG);                             07767105
+        END;                                                            07767205
+        END;                                                            07767205
+   END  UPD_CTEFFYP;
+ /**************************************************************
+ *  ERROR                           START                      *
+ **************************************************************/
+ ERROR        :PROC (PRC,LINE,MSG  ) ;
+    DCL MSG      CHAR  (132)  ;
+    DCL LINE     PIC '99999'  ;
+    DCL PRC      CHAR (40)   ;
+    DCL WS_BOOM   FIXED(1) INIT(1);
+    DCL WS_ZERO   FIXED(1) INIT(0);
+
+       ERLIN1='1';
+       ERLIN2='***************************************************';
+       WRITE FILE(PRT) FROM(ERLINE);
+       ERLIN1='0';
+       ERLIN2=' * EFFYP05  «Ã≈—¡ —œ«”         = '!!DATE ();
+       WRITE FILE(PRT) FROM(ERLINE);
+       ERLIN1=' ';
+
+       ERLIN2='–—œ¬À«Ã¡ ”‘œ –—œ√—¡ÃÃ¡ EFFYP05 Tœ –—œ√—¡ÃÃ¡ »¡ ” ¡”≈…';
+       WRITE FILE(PRT) FROM(ERLINE);
+       ERLIN2='‘œ –—œ¬À«Ã¡ –¡—œ’”…¡”‘« ≈ ”‘HN PROCEDURE : '!!PRC;
+       WRITE FILE(PRT) FROM(ERLINE);
+       ERLIN2='”‘«Õ √—¡ÃÃ« ‘œ’  Ÿƒ… ¡  : '!!LINE;
+       WRITE FILE(PRT) FROM(ERLINE);
+       ERLIN2=MSG;
+       WRITE FILE(PRT) FROM(ERLINE);
+       ERLIN2='***************************************************';
+       WRITE FILE(PRT) FROM(ERLINE);
+       WS_BOOM = WS_BOOM /  WS_ZERO  ; /*JUST CRASH*/
+   END ERROR        ;
+  /**************************************************************
+  *  ERROR                           END                        *
+  **************************************************************/
+ TELOS:
+   CTLCHR = '1';
+   GRAMH =' *”˝ÌÔÎ· –ÒÔ„Ò‹ÏÏ·ÙÔÚ EFFYP05 *';
+   WRITE FILE(PRT) FROM(LINE);
+   CTLCHR = ' ';
+   GRAMH =
+  ' *************************************************************** ' ;
+   WRITE FILE(PRT) FROM(LINE);
+   GRAMH =' *«Ï›Ò·  ·ﬂ ŸÒ· —ÔﬁÚ :  '!!MY_DATETIME;
+   WRITE FILE(PRT) FROM(LINE);
+   GRAMH =
+  ' *************************************************************** ' ;
+   WRITE FILE(PRT) FROM(LINE);
+   CNT = SQLCA.SQLERRD(3);
+   GRAMH = " ƒ…¡√—¡÷« ¡Õ ¡–œ ‘œÕ CTEFFYP = "!!CNT!!' '!!
+           " ≈√√—¡÷≈” ";
+   WRITE FILE(PRT) FROM(LINE);
+   CLOSE FILE(READER);
+   CLOSE FILE(PRT);
+  END  EFFYP05;
+

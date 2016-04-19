@@ -1,0 +1,329 @@
+ /* PROCESS A,GOSTMT,ESD,MAP,NEST,OPT(TIME),AG,MI(' '),S,X,OF,INCLUDE;*/
+ /* DK314Z-AkkAcEr pPOHc.YpOkOIpOY STATEMENT (KSRPRYP) D/B KATAh-AKM */
+ /*   Ã    TRANSLATE   GRREK CHARACTERS                              */
+
+ DK314Z: PROCEDURE(PCBIO,PCBDPTR)OPTIONS(MAIN);
+ /*****       VSE/MVS TRANSLATION PROCESSED BY MVS-MS       *****/
+ /*****          SATURDAY  96/05/11  AT  21.46.26           *****/
+ /*** PL/1 OPTIMIZER EXECUTION TIME OPTIONS ***/
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+ /*** MVS-MS DATE SIMULATION VARIABLES ***/
+ DCL CZX3VDAT CHAR(6); FETCH CZXDATEP;
+ DCL CZXDATEP ENTRY OPTIONS(INTER,ASM) ;
+ /***            END OF MVS-MS INSERT            ***/
+
+   DCL PCBDPTR   POINTER;   /*POINTER cIA TO PCB THr DISK  DATA BASE */
+   DCL KFIOROOT  POINTER;   /*POINTER cIA THN I-O AREA THr DATA BASE */
+   DCL KFIOSADD  POINTER;   /*POINTER cIA THN I-O AREA THr DATA BASE */
+
+   DCL   AFAIRF  FILE  RECORD   INPUT ENV(
+                 FB    RECSIZE(080)             );
+   DCL   PRINTF  FILE  RECORD  OUTPUT ENV(
+                 FB    RECSIZE(133)               CTLASA);
+
+   DCL     AFAIRR    CHAR(080) INIT(' '); /* RECORD APXEIOY AFAIRF   */
+   DCL 1   AFAIRS    BASED(ADDR(AFAIRR)),
+        2  AFTYPOS   CHAR(02)      , /* KxdIKOr RECORD               */
+        2  AFKENO1   CHAR(01)      ,
+        2  AFARLOG   PIC'(08)9'    , /* APIhMOr kOcAPIArMOY          */
+        2  AFKENO2   CHAR(01)      ,
+        2  AFPRYP    PIC'(11)9V99' , /* NEO pOrO cIA KSRPRYP         */
+        2  AFKENO3   CHAR(01)      ,
+        2  AFSIGN    CHAR(01)      , /* pPOrHMO                      */
+        2  AFKENO    CHAR(53)      ; /*npk 22-05-2007 for enter-pli*/
+
+   DCL    PRINTR      CHAR(133) INIT(' '); /* RECORD APXEIOY PRINTF  */
+
+   DCL    SINPAFR   FIXED(15,0) INIT(00); /* RECORDS TAINIAr         */
+   DCL    SINPERR   FIXED(15,0) INIT(00); /* RECORDS TAINIAr ME kAhH */
+   DCL    SENHMER   FIXED(15,0) INIT(00); /* ROOT SEGMENTS ME AkkAcH */
+   DCL    METRSEL   FIXED(15,0) INIT(65); /* cPAMMEr ANA rEkIdA      */
+
+   DCL   SWEOFAF   FIXED(9,0) INIT(0);   /* =1 TEkOr APXEIOY TAINIAr */
+   DCL   WSREPL    FIXED(9,0) INIT(10000000);
+   DCL   WWARLOG   PIC'(08)9' INIT(0) ;
+
+   DCL    WSDTINP   PIC'9999.99.99'      INIT(0);
+   DCL    WSDTOUT   PIC'9999.99.99'      INIT(0);
+   DCL    WSTMINP   PIC'99.99.99.999'  INIT(0);
+   DCL    WSTMOUT   PIC'99.99.99.999'  INIT(0);
+
+   DCL   PRIORITY BUILTIN;
+   /****  DATE SIMULATION DEFINED FUNCTION  ****/
+   DATE: PROC IRREDUCIBLE RETURNS(CHAR(6)) ;
+         CALL CZXDATEP          ( CZX3VDAT) ;
+         RETURN (CZX3VDAT) ;
+         END DATE ;
+   /****        END OF MVS-MS INSERT        ****/
+   DCL   TIME    BUILTIN;
+   DCL   MOD     BUILTIN;
+   DCL   ADDR    BUILTIN;
+   DCL   VERIFY  BUILTIN;
+
+ DCL  ZERO  STATIC  FIXED BINARY(31) INIT(0);
+ DCL  THREE STATIC  FIXED BINARY(31) INIT(3);
+ DCL  FOUR  STATIC  FIXED BINARY(31) INIT(4);
+ DCL  FIVE  STATIC  FIXED BINARY(31) INIT(5);
+ DCL  FUGHN         CHAR(4)          INIT('GHN ');
+ DCL  FUGN          CHAR(4)          INIT('GN  ');
+ DCL  FUINS         CHAR(4)          INIT('ISRT');
+ DCL  FUGHU         CHAR(4)          INIT('GHU ');
+ DCL  FUREPL        CHAR(4)          INIT('REPL');
+ DCL  FUDEL         CHAR(4)          INIT('DLET');
+ DCL  IOAREA        CHAR(450);
+
+ DCL 1  EPIK1                                                         ,
+      2 EP1SKIP     CHAR(01) INIT('1')                                ,
+      2 EP1FIL1     CHAR(45) INIT('EMpOPIKH TPApEZA THr EkkAdOr A.E.'),
+      2 EP1FIL2     CHAR(33) INIT('AkkAcH YpOkOIpOY STATEMENT THr DA'),
+      2 EP1FIL3     CHAR(33) INIT('TA BASE KATAhErExN               '),
+      2 EP1FIL4     CHAR(15) INIT('*DK314Z  rEk.:')                   ,
+      2 EP1SEL      PIC'ZZZ' INIT(0)                                  ,
+      2 EP1FIL5     CHAR(03) INIT(' ')                                ;
+ DCL 1  EPIK2                                                         ,
+      2 EP2SKIP     CHAR(01) INIT(' ')                                ,
+      2 EP2FIL1     CHAR(45) INIT('dIEYhYNrH MHXANOPcANxrHr         '),
+      2 EP2FIL2     CHAR(33) INIT('================================='),
+      2 EP2FIL3     CHAR(33) INIT('==================               '),
+      2 EP2FIL4     CHAR(15) INIT('              ')                   ,
+      2 EP2SEL      PIc'ZZZ' INIT(0)                                  ,
+      2 EP2FIL5     CHAR(03) INIT(' ')                                ;
+ DCL 1  EPIK3                                                         ,
+      2 EP3SKIP     CHAR(01) INIT(' ')                                ,
+      2 EP3FIL1     CHAR(10) INIT('APIhMOr   ')                       ,
+      2 EP3FIL2     CHAR(33) INIT('TPEXONTA  rTOIXEIA  ApO  THN  DAT'),
+      2 EP3FIL3     CHAR(20) INIT('A  BASE  KATAhErExN ')             ,
+      2 EP3FIL4     CHAR(23) INIT('                       ')          ,
+      2 EP3FIL5     CHAR(23) INIT('                       ')          ,
+      2 EP3FIL6     CHAR(23) INIT('                       ')          ;
+ DCL 1  EPIK4                                                         ,
+      2 EP4SKIP     CHAR(01) INIT(' ')                                ,
+      2 EP4FIL1     CHAR(10) INIT('kOc/rMOY  ')                       ,
+      2 EP4FIL2     CHAR(33) INIT('KAT/MA  E p x N Y M I A       pAk'),
+      2 EP4FIL3     CHAR(20) INIT('AIO KSRPRYP D/B     ')             ,
+      2 EP4FIL4     CHAR(19) INIT('pOrO KAPTAr            ')          ,
+      2 EP4FIL5     CHAR(27) INIT('NEO pOrO KSRPRYP       ')          ,
+      2 EP4FIL6     CHAR(23) INIT('                       ')          ;
+ DCL 1  EPIK5                                                         ,
+      2 EP5SKIP     CHAR(01) INIT(' ')                                ,
+      2 EP5FIL1     CHAR(80) INIT((80)'=')                            ,
+      2 EP5FIL2     CHAR(52) INIT((52)'=')                            ;
+ DCL 1  LINE1                                         ,
+      2 L1SKIP      CHAR(01)                 INIT(' '),
+      2 L1ARLOG     PIC'ZZZZBZZZZ-'          INIT(000),
+      2 L1DBKAT     PIC'ZZZZZ-'              INIT(000),
+      2 L1DBONM     CHAR(23)                 INIT(000),
+      2 L1FILER     CHAR(01)                 INIT(' '),
+      2 L1DBPRYP    PIC'ZZ.ZZZ.ZZZ.ZZ9V,99-' INIT(000),
+      2 L1AFPRYP    PIC'ZZ.ZZZ.ZZZ.ZZ9V,99-' INIT(000),
+      2 L1NWPRYP    PIC'ZZ.ZZZ.ZZZ.ZZ9V,99-' INIT(000),
+      2 L1FILL      CHAR(38)                 INIT(' ');
+ DCL 1  LINE2                                    ,
+      2 L2SKIP      CHAR(001)           INIT(' '),
+      2 L2MESSA     CHAR(132)           INIT(' ');
+
+ DCL 1  SSAQROOT               ,    /*QUALIFIED SSA cIA ROOT SEGMENTS*/
+      2 SSRSEGNM    CHAR(8)  INIT ('KROOTSEG'),    /* ONOMA SEGM.    */
+      2 SSRLFTPR    CHAR(1)  INIT ('(')       ,
+      2 SSRKNAME    CHAR(8)  INIT ('KSRARLOG'),    /* ONOMA KkEIdIOY */
+      2 SSROPERT    CHAR(2)  INIT (' =')      ,
+      2 SSRAXKEY    FIXED(9) INIT (0)         ,    /* AnIA KkEIdIOY  */
+      2 SSRRGTPR    CHAR(1)  INIT (')')       ;
+ DCL 1  SSBAXKEY    BASED(ADDR(SSRAXKEY))     ,
+      2 SSBAXK1     BIT(36)                   ,
+      2 SSBAXK2     BIT(04)                   ;
+
+ DCL 1  PCBD BASED(PCBDPTR),   /* PCB THr DISC DATA BASE KATAhErExN  */
+     2  PCBDNAME       CHAR (8) ,         /* ONOMA DATA BASE         */
+     2  PCBDHILV       CHAR (2) ,         /* HIERARCHY LEVEL         */
+     2  PCBDCODE       CHAR (2) ,         /* STATUS CODE             */
+     2  PCBDPROP       CHAR (4) ,         /* PROCESSING OPTIONS      */
+     2  PCBDINLK       FIXED BIN(31),     /* INTERNAL LINKAGE        */
+     2  PCBDSEGM       CHAR (8) ,         /* SEGMENT NAME            */
+     2  PCBDCKEY       FIXED BIN(31),     /* CURRENT ACTIVE LENGTH   */
+     2  PCBDNOSS       FIXED BIN(31),     /* NUMBER OF SENSITIVE SEG */
+     2  PCBDBK         CHAR (32);
+
+ % INCLUDE  KSDBMAP ;
+
+ % INCLUDE  DAYATNS ;                 /* Y2000 */
+ DCL W_DATE   PIC  '(8)9'  INIT(0);   /* Y2000 */
+
+ %PAGE;
+ /*         P  R  O  C  E  D  U  R  E                                */
+
+ /*WSDTINP = DATE;  */                 /* Y2000 */
+   W_DATE  = DAYA6R8 (DATE);           /* Y2000 */
+   WSDTINP = W_DATE;                   /* Y2000 */
+   WSTMINP = TIME;
+   KFIOROOT = ADDR(IOAREA);
+   KFIOSADD = ADDR(IOAREA);
+   OPEN  FILE(AFAIRF),FILE(PRINTF);
+   ON  ENDFILE(AFAIRF)  SWEOFAF = 1;
+                     /* ANAcNxrH TAINIAr dIOPhxrExN                  */
+ READAFR:
+   READ  FILE(AFAIRF)  INTO(AFAIRR);
+   IF  SWEOFAF = 1   THEN DO;
+       GOTO  TELOS;
+   END;
+   SINPAFR  = SINPAFR  + 1;
+   LINE1    = '' ;
+   LINE2    = '' ;
+   IF  METRSEL > 60   THEN DO;
+       METRSEL = 6 ;
+       EP1SEL  = EP1SEL + 1 ;
+       WRITE  FILE(PRINTF)  FROM(EPIK1);
+       WRITE  FILE(PRINTF)  FROM(EPIK2);
+       WRITE  FILE(PRINTF)  FROM(EPIK3);
+       WRITE  FILE(PRINTF)  FROM(EPIK4);
+       WRITE  FILE(PRINTF)  FROM(EPIK5);
+   END;
+   IF  AFTYPOS = 'C1'  !  AFTYPOS = 'C2'   THEN;
+   ELSE DO;
+       SINPERR = SINPERR + 1 ;
+       METRSEL = METRSEL + 2 ;
+       PRINTR  = ' ' !!  AFAIRR ;
+       L2MESSA = '*** ApOPPIpTETAI,O TYpOr TOY dEkTIOY pPEpEI NA EIN'
+                 !! 'AI C1 H C2 ***' ;
+       WRITE  FILE(PRINTF)  FROM(PRINTR);
+       WRITE  FILE(PRINTF)  FROM(LINE2) ;
+       GOTO  READAFR ;
+   END;
+   IF  AFTYPOS = 'C1'   THEN DO ;
+       IF  VERIFY(AFARLOG,'0123456789') = 0   THEN DO ;
+           WSREPL = AFARLOG ;
+           GOTO  READAFR ;
+       END ;
+       ELSE  DO ;
+           SINPERR = SINPERR + 1 ;
+           METRSEL = METRSEL + 2 ;
+           PRINTR  = ' ' !!  AFAIRR ;
+           L2MESSA = '*** ApOPPIpTETAI,dEkTIO TYpOY C1 MH APIhMHT'
+                 !! 'IKO ***' ;
+           WRITE  FILE(PRINTF)  FROM(PRINTR);
+           WRITE  FILE(PRINTF)  FROM(LINE2) ;
+           GOTO  READAFR ;
+       END ;
+   END ;
+                    /* RECORD ME MH APIhMHTIKA rTOIXEIA ApOPPIpTETAI */
+   IF  VERIFY(AFARLOG,'0123456789') = 0  &
+       VERIFY(AFPRYP ,'0123456789') = 0   THEN ;
+   ELSE DO ;
+       SINPERR = SINPERR + 1 ;
+       METRSEL = METRSEL + 2 ;
+       PRINTR  = ' ' !!  AFAIRR ;
+       L2MESSA = '*** ApOPPIpTETAI,dEkTIO TYpOY C2 MH APIhMHTIKO ***' ;
+       WRITE  FILE(PRINTF)  FROM(PRINTR) ;
+       WRITE  FILE(PRINTF)  FROM(LINE2)  ;
+       GOTO  READAFR ;
+   END ;
+
+   L1ARLOG  = AFARLOG ;
+   L1AFPRYP = AFPRYP  ;
+
+             /* dEYTEPH EccPAuH cIA TON IdIO kOcAPIArMO ApOPPIpTETAI */
+   IF  AFARLOG ^= WWARLOG   THEN DO ;
+       WWARLOG = AFARLOG ;
+   END ;
+   ELSE    DO ;
+       SINPERR = SINPERR + 1 ;
+       METRSEL = METRSEL + 2 ;
+       L2MESSA = '*** ApOPPIpTETAI,dEYTEPH AkkAcH rTON IdIO '
+                 !! 'kOcAPIArMO ***' ;
+       WRITE  FILE(PRINTF)  FROM(LINE1) ;
+       WRITE  FILE(PRINTF)  FROM(LINE2) ;
+       GOTO  READAFR ;
+   END ;
+                     /* EYPErH TOY kOcAPIArMOY rTHN DATA BASE KATAh. */
+   SSRAXKEY = AFARLOG ;
+   SSBAXK2  = '1111'B ;
+   CALL  PLITDLI(FOUR,FUGHU,PCBD,IOAREA,SSAQROOT);
+   IF  PCBDCODE = 'GE'   THEN DO;
+       SINPERR = SINPERR + 1 ;
+       METRSEL = METRSEL + 2 ;
+       L2MESSA = '*** ApOPPIpTETAI,O kOcAPIArMOr dEN YpAPXEI rTHN DA'
+                 !! 'TA BASE KATAhErExN ***' ;
+       WRITE  FILE(PRINTF)  FROM(LINE1) ;
+       WRITE  FILE(PRINTF)  FROM(LINE2) ;
+       GOTO  READAFR ;
+   END;
+   ELSE DO;
+       IF  PCBDCODE ^= '  '   THEN DO;
+           L2MESSA = '****** INVALID GET HOLD UNIQUE,STATUS = ' !!
+                     PCBDCODE !! ' ******' ;
+           WRITE  FILE(PRINTF)  FROM(LINE1) ;
+           WRITE  FILE(PRINTF)  FROM(LINE2) ;
+           WRITE  FILE(PRINTF)  FROM(LINE2) ;
+           WRITE  FILE(PRINTF)  FROM(LINE2) ;
+           CALL PLIDUMP('TFSHBD60RQ') ;
+           STOP ;
+       END;
+   END;
+           /* METAuOPA rTOIXEIxN THr DATA BASE rTHN cPAMMH EKTYpxrHr */
+   L1DBKAT = KSRKATMA ;
+   L1DBONM = KSRONOMA ;
+   L1DBPRYP= KSRPRYP  ;
+               /* ENHMEPxrH-REWRITE TOY ROOT SEGMENT TOY kOcAPIArMOY */
+   IF  AFSIGN = '-'   THEN
+       KSRPRYP = AFPRYP * (-1) ;
+   ELSE
+       KSRPRYP = AFPRYP ;
+   L1NWPRYP = KSRPRYP ;
+   SENHMER = SENHMER + 1 ;
+   METRSEL = METRSEL + 2 ;
+   WRITE  FILE(PRINTF)  FROM(LINE1) ;
+   WRITE  FILE(PRINTF)  FROM(LINE2) ;
+   IF  WSREPL = 20000000   THEN ;
+   ELSE
+       GOTO  RJMP ;
+   CALL PLITDLI(THREE,FUREPL,PCBD,IOAREA);
+   IF  PCBDCODE ^= '  '   THEN DO;
+       L2MESSA = '****** INVALID REPLACE,STATUS = ' !!
+                 PCBDCODE !! ' ******' ;
+       WRITE  FILE(PRINTF)  FROM(LINE1) ;
+       WRITE  FILE(PRINTF)  FROM(LINE2) ;
+       WRITE  FILE(PRINTF)  FROM(LINE2) ;
+       WRITE  FILE(PRINTF)  FROM(LINE2) ;
+       CALL PLIDUMP('TFSHBD60RQ') ;
+       STOP ;
+   END;
+ RJMP :
+   IF  KSRARAKE < 0  !  KSRPOAKE < 0   THEN DO ;
+       METRSEL = METRSEL + 1 ;
+       L2MESSA = '*** pPOrOXH,APNHTIKA pOrA,KSRARAKE=' !! KSRARAKE !!
+                 ',KSRPOAKE=' !! KSRPOAKE !! ' ***' ;
+       WRITE  FILE(PRINTF)  FROM(LINE1) ;
+       WRITE  FILE(PRINTF)  FROM(LINE2) ;
+       GOTO  READAFR ;
+   END ;
+   GOTO READAFR;
+ /*
+       E N D   O F   M A I N   P R O G R A M
+                                                                     */
+ TELOS:
+   PRINTR='1* EccPAuEr APXEIOY dIOPhxrExN        = '!!SINPAFR ;
+   WRITE  FILE(PRINTF)  FROM(PRINTR);
+   PRINTR='0* EccPAuEr pOY ApOPPIuhHKAN          = '!!SINPERR ;
+   WRITE  FILE(PRINTF)  FROM(PRINTR);
+   PRINTR='0* ROOT SEGMENTS D/B pOY ENHMEPxhHKAN = '!!SENHMER ;
+   WRITE  FILE(PRINTF)  FROM(PRINTR);
+ /*WSDTOUT = DATE;  */                 /* Y2000 */
+   W_DATE  = DAYA6R8 (DATE);           /* Y2000 */
+   WSDTOUT = W_DATE;                   /* Y2000 */
+   WSTMOUT = TIME;
+   PRINTR='-* TO RUN APXIrE THN '!!WSDTINP!!' rTIr '!!WSTMINP!!
+          ' KAI TEkEIxrE THN '!!WSDTOUT!!' rTIr '!!WSTMOUT;
+   WRITE  FILE(PRINTF)  FROM(PRINTR);
+   IF  WSREPL = 20000000   THEN DO ;
+       PRINTR='-*** ME ENHMEPxrH THr DATA BASE KATAhErExN ***' ;
+       WRITE  FILE(PRINTF)  FROM(PRINTR);
+       PRINTR='-* pPOrOXH EpANAkHwH THr POHr NA pEPIEXEI TIr ApOPPIuhE'
+          !!'IrEr MEIxrEIr KAI MONO TYXON dIOPhxrEIr TxN YpOkOIpxN *';
+       WRITE  FILE(PRINTF)  FROM(PRINTR);
+   END ;
+   ELSE   DO ;
+       PRINTR='-*** XxPIr ENHMEPxrH THr DATA BASE KATAhErExN ***' ;
+       WRITE  FILE(PRINTF)  FROM(PRINTR);
+   END ;
+ DCL PCBIO POINTER;DCL PLITDLI EXTERNAL ENTRY; END DK314Z;
+

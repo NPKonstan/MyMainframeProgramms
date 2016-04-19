@@ -1,0 +1,964 @@
+ /* PROCESS A,GOSTMT,NEST,OPT(TIME),AG,MI('!'),S,X,OF,MAP,INC;        */
+
+      /*-----------  PROGRAM   K O S T E R 1 -----------------*/
+      /*                                                      */
+      /*    MATCHING RECORDS KOSTOLOGHSHS GIA STATISTIKA      */
+      /*                                                      */
+      /*    ARIQMOY TRANSACTIONS MHNIAOY ARXEIOY              */
+      /*                                                      */
+      /*                                                      */
+      /*------------------------------------------------------*/
+      /* MEGALWMA PINAKA TABL_NEW (800->850)  S.A. 10.10.2006 */
+      /* MEGALWMA PINAKA TABL_NEW (850->900)  S.A. 11.02.2008 */
+      /* MEGALWMA PINAKA TABL_NEW (900->980)  S.A. 14.02.2008 */
+      /* MEGALWMA PINAKA TABL_NEW (980->995)  S.A. 06.05.2008 */
+      /* MEGALWMA PINAKA TABL_NEW (980->1010) S.A. 07.08.2008 */
+      /* Forget limit of TABL_NEW             npk  10.11.2008 */
+      /*------------------------------------------------------*/
+
+ KOSTER1: PROC OPTIONS(MAIN) ;
+ /*****       VSE/MVS TRANSLATION PROCESSED BY MVS-MS       *****/
+ /*****          SUNDAY    96/05/12  AT  00.24.44           *****/
+ /*** PL/1 OPTIMIZER EXECUTION TIME OPTIONS ***/
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+ /*** MVS-MS DATE SIMULATION VARIABLES ***/
+ DCL CZX3VDAT CHAR(6); FETCH CZXDATEP;
+ DCL CZXDATEP ENTRY OPTIONS(INTER,ASM) ;
+ /***            END OF MVS-MS INSERT            ***/
+
+ /*---------------------------------------------------------------
+         FILE DECLARATIONS
+ ---------------------------------------------------------------*/
+
+ DCL  CARD   FILE RECORD INPUT
+             ENV (FB RECSIZE(80)
+                                );
+
+ DCL 1  RECCARD,
+       2 TRANS_ID      CHAR(04),
+       2 FILL_RECARD1  CHAR(01),
+       2 INDICATION    CHAR(02),
+       2 FILL_RECCARD2 CHAR(73);
+
+ /* -------------------------------------------------------- */
+
+     DCL PRINT
+             FILE RECORD
+             OUTPUT
+             ENV(
+             FB RECSIZE(133)
+             CTLASA) ;
+ /********************************************************************/
+ DCL 1 LINE,
+       2 CNTRCH          CHAR  (1)   INIT ('1'),
+       2 GRAMMH          CHAR  (132) INIT (' ');
+
+ /* -------------------------------------------------------- */
+ /********************************************************************/
+
+ DCL LOGFL  FILE RECORD INPUT  ENV(                    FB RECSIZE(84)
+                                  );
+
+ /********************************************************/
+ /* LOGFL =LOGFILE MHNIAIO                                */
+ /********************************************************/
+ DCL  1  RECLOGFL,
+         2 LHMEROM      FIXED(07),
+         2 LSMTOOO      CHAR(4),
+         2 LKATMA       CHAR(4),
+         2 LOG_TRANS_ID CHAR(4),
+         2 LOG_COMMA    CHAR(1),
+         2 LOG_ARLOG    PIC'(8)9',
+         2 WFILLER      CHAR(59);
+ /********************************************************/
+ DCL  LOG_CIDB       CHAR(15)  BASED(ADDR(LOG_ARLOG));
+
+ DCL LOGFLN FILE RECORD OUTPUT ENV(                    FB RECSIZE(84)
+                                  );
+
+ /***********************************************************/
+ /* LOGFLN=LOGFILE MHNIAIO ME TIS MH OIKONOMIKES TRANS ONLY */
+ /***********************************************************/
+ DCL  1  RECLOGFLN,
+         2 LHMEROMN      FIXED(07),
+         2 LSMTOOON      CHAR(4),
+         2 LKATMAN       CHAR(4),
+         2 LOG_TRANS_IDN CHAR(4),
+         2 LOG_COMMAN    CHAR(1),
+         2 LOG_ARLOGN    FIXED(09),
+         2 LOG_KATHOLN   FIXED(05),
+         2 WFILLERN      CHAR(59);
+ /********************************************************/
+ DCL  LOG_KATHOL     PIC '(4)9'   BASED(ADDR(LOG_ARLOG));
+ DCL  LOG_ARLOG_R    FIXED(9)     INIT(0);
+ DCL  LOG_ARLOG_RR   BIT(40)      BASED(ADDR(LOG_ARLOG_R));
+ DCL  BIT_40_0       BIT(40)      INIT
+      ('0000000000000000000000000000000000000000'B);
+ DCL  LOG_KATMA      FIXED(12)    INIT(0);
+ DCL  LOG_KATH       FIXED(12)    INIT(0);
+ DCL  LOG_LOGAR      FIXED(12)    INIT(0);
+ DCL  RHMEROM        PIC '(6)9'   INIT(0);
+ DCL  CHMEROM        CHAR(04)     BASED(ADDR(RHMEROM));
+ DCL   WW_ARLOG            PIC '(9)9' INIT (0);
+ DCL   W_ARLOG             CHAR(9) BASED(ADDR(WW_ARLOG));
+ DCL   WW_KATHOL           CHAR(4)    INIT ('    ');
+ DCL   W_KATHOL            PIC '(5)9' INIT(0);
+ /*==================================================================*/
+ % PAGE;
+
+ /*---------------------------------------------------------------
+         OTHER DECLARATIONS
+ ---------------------------------------------------------------*/
+ DCL  PRIORITY  BUILTIN;/****  DATE SIMULATION DEFINED FUNCTION  ****/
+ DATE: PROC IRREDUCIBLE RETURNS(CHAR(6)) ;
+       CALL CZXDATEP          ( CZX3VDAT) ;
+       RETURN (CZX3VDAT) ;
+       END DATE ;
+ /****        END OF MVS-MS INSERT        ****/
+
+ DCL  ADDR      BUILTIN;
+
+ DCL  ONCODE    BUILTIN;
+
+ DCL  SUBSTR    BUILTIN;
+
+ /* -------------------------------------------------------  */
+
+ DCL  1 TABL_KNOWN(200),
+        2  TRAN_KNOWN       CHAR(4),
+        2  ARTRAN_KNOWN     FIXED(15);
+
+ DCL  1 TABL_OTHER(400),
+        2  TRAN_OTHER       CHAR(4),
+        2  ARTRAN_OTHER     FIXED(15);
+
+ DCL  1 TABL_REJECT(800),
+        2  TRAN_REJECT       CHAR(4),
+        2  ARTRAN_REJECT     FIXED(15);
+
+ DCL  LIMIT             FIXED (7) INIT (1010);/*NPK*/
+ /*DCL  1 TABL_NEW(1010),                 * 10.10.2006 11.02.2008 */
+ DCL  1 TABL_NEW(*) CONTROLLED,            /* 10.11.2008 NPK */
+        2  TRAN_NEW          CHAR(4),
+        2  ARTRAN_NEW        FIXED(15);
+ DCL  1 MY_MIRROR(*) CONTROLLED,            /* 10.11.2008 NPK */
+        2  TRAN_NEW1          CHAR(4),
+        2  ARTRAN_NEW1        FIXED(15);
+
+ ALLOCATE TABL_NEW(LIMIT);
+ ALLOCATE MY_MIRROR(LIMIT);
+
+ DCL   W_CARDS             FIXED (12) INIT (0);
+ DCL   LOGFL_RECS          FIXED (12) INIT (0);
+ DCL   LOGFL_COUNT         FIXED (12) INIT (0);
+ DCL   LOGFL_TOTAL         FIXED (12) INIT (0);
+ DCL   LOGFLN_TOTAL        FIXED (12) INIT (0);
+ DCL   LOGFLN_OTHER        FIXED (12) INIT (0);
+ DCL   LOGFLN_KMET_0       FIXED (12) INIT (0);
+ DCL   LOGFLN_KMET         FIXED (12) INIT (0);
+ DCL   LOGFLN_TAN0_KAN0    FIXED (12) INIT (0);
+ DCL   LINE_CT             FIXED (3) INIT (0);
+ DCL   WS_PAGE             FIXED (5) INIT (0);
+ DCL   ABEND_CNT           PIC '9'      INIT (1);
+ DCL   ZERO                PIC '9'      INIT (0);
+ DCL   PRWTH_FORA          PIC '9'      INIT (0);
+ DCL   COUNT_KNOWN         PIC '9999'   INIT (0);
+ DCL   COUNT_OTHER         PIC '9999'   INIT (0);
+ DCL   COUNT_REJECT        PIC '9999'   INIT (0);
+ DCL   COUNT_NEW           PIC '9999'   INIT (0);
+ DCL   I                   PIC '9999'   INIT (0);
+ DCL   FOUND_KNOWN         BIT (1)   INIT ('0'B);
+ DCL   FOUND_KNOWN_1       BIT (1)   INIT ('0'B);
+ DCL   FOUND_OTHER         BIT (1)   INIT ('0'B);
+ DCL   FOUND_REJECT        BIT (1)   INIT ('0'B);
+ DCL   FOUND_NEW           BIT (1)   INIT ('0'B);
+ DCL   VERFIELD2             CHAR (10)
+       INIT('0123456789');
+ DCL   VERFIELD3             CHAR (1)
+       INIT(',');
+
+ DCL   EOF_1             CHAR  (03)  INIT ('NO ');
+ DCL   EOF_2             CHAR  (03)  INIT ('NO ');
+ DCL   W_TRANS_ID        CHAR  (04)  INIT ('    ');
+ DCL   CARD_DATE         CHAR  (04)  INIT ('    ');
+ DCL   1 CARD_DATE_R       BASED(ADDR(CARD_DATE)),
+         2 CARD_YY       CHAR (02),
+         2 CARD_MM       CHAR (02);
+ DCL   W_DATE            CHAR (06)   INIT (' ');
+
+ DCL   W_YY              CHAR (02)   INIT (' ');
+
+ DCL   W_DATE_R          PIC '(6)9' BASED(ADDR(W_DATE));
+
+ %PAGE;
+ /*---------------------------------------------------------------
+         HEADER AND DETAIL LINES
+ ---------------------------------------------------------------*/
+ DCL 1 HDR1,
+       2 CC              CHAR  (1) INIT ('1'),
+       2 DATA1           CHAR  (16) INIT ('EMpOPIKH TPApEZA'),
+       2 FIL1            CHAR  (62) INIT (' '),
+       2 DATA2           CHAR  (12) INIT ('*KOSTER1 *  '),
+       2 FIL2            CHAR  (30) INIT (' '),
+       2 W_SYS_DATE      PIC   '99.99.99',
+       2 FIL3            CHAR  (4) INIT (' ');
+
+ DCL 1 HDR2,
+       2 CC              CHAR  (1)  INIT ('0'),
+       2 FIL1            CHAR  (20) INIT (' '),
+       2 DATA1           CHAR  (52) INIT
+         ('APIhMOr TRANSACTIONS Opxr EMuANIZONTAI rTO LOGFILE T'),
+       2 DATA11          CHAR  (17) INIT
+         ('OY MHNOr         '),
+       2 MM1             CHAR  (2)  INIT ('  '),
+       2 TT1             CHAR  (1)  INIT ('.'),
+       2 YY1             CHAR  (2)  INIT ('  '),
+       2 FF1             CHAR  (16)  INIT (' '),
+       2 DATA2           CHAR  (17) INIT
+         ('             rEk.'),
+       2 W_PAGE          PIC 'ZZZZ9';
+
+ DCL 1 HDR2A,
+       2 CC              CHAR  (1)  INIT ('0'),
+       2 FIL1            CHAR  (20) INIT (' '),
+       2 DATA1           CHAR  (52) INIT
+         ('APIhMOr TRANSACTIONS MH OIKONOMIKEr pOY AuOPOYN EuAP'),
+       2 DATA11          CHAR  (17) INIT
+         ('MOcH TOY LOGFILE '),
+       2 FF1             CHAR  (21)  INIT (' '),
+       2 DATA2           CHAR  (22) INIT
+         ('                      ');
+
+ DCL 1 HDR2B,
+       2 CC              CHAR  (1)  INIT ('0'),
+       2 FIL1            CHAR  (20) INIT (' '),
+       2 DATA1           CHAR  (52) INIT
+         ('APIhMOr TRANSACTIONS KOrTOkOcIKEr pOY AuOPOYN TIr Ak'),
+       2 DATA11          CHAR  (17) INIT
+         ('kEr EuAPMOcEr    '),
+       2 FF1             CHAR  (21)  INIT (' '),
+       2 DATA2           CHAR  (22) INIT
+         ('                      ');
+
+ DCL 1 HDR2B1,
+       2 CC              CHAR  (1)  INIT ('0'),
+       2 FIL1            CHAR  (20) INIT (' '),
+       2 DATA1           CHAR  (52) INIT
+         ('APIhMOr TRANSACTIONS pOY EINAI MH KOrTOkOcIKEr      '),
+       2 DATA11          CHAR  (17) INIT
+         ('                 '),
+       2 FF1             CHAR  (21)  INIT (' '),
+       2 DATA2           CHAR  (22) INIT
+         ('                      ');
+
+ DCL 1 HDR2C,
+       2 CC              CHAR  (1)  INIT ('0'),
+       2 FIL1            CHAR  (20) INIT (' '),
+       2 DATA1           CHAR  (52) INIT
+         ('APIhMOr NExN TRANSACTIONS pOY BPEhHKAN rTO LOGFILE  '),
+       2 DATA11          CHAR  (17) INIT
+         ('                 '),
+       2 FF1             CHAR  (21)  INIT (' '),
+       2 DATA2           CHAR  (22) INIT
+         ('                      ');
+
+ DCL 1 HDR3,
+       2 CC              CHAR  (1)  INIT ('0'),
+       2 FIL1            CHAR  (15) INIT (' '),
+       2 DATA1           CHAR  (20) INIT
+         ('ONOMArIA TRANSACTION'),
+       2 FIL2            CHAR  (07) INIT (' '),
+       2 DATA2           CHAR  (19) INIT
+         ('rYNOkO TRANSACTIONS'),
+       2 FIL5            CHAR  (71) INIT (' ');
+
+ DCL 1 LINE1,
+       2 CC              CHAR  (1)  INIT (' '),
+       2 FIL11           CHAR  (22) INIT (' '),
+       2 WW_TRAN         CHAR  (04),
+       2 FIL1A           CHAR  (09) INIT (' '),
+       2 FIL2            CHAR  (07) INIT (' '),
+       2 WW_ARTRAN       PIC   'ZZZZZZZZZZZZZZ9',
+       2 FIL1B           CHAR  (04) INIT (' '),
+       2 FIL5            CHAR  (71) INIT (' ');
+
+ DCL 1 LINE2,
+       2 CC              CHAR  (1)  INIT ('0'),
+       2 DATA1           CHAR  (49) INIT
+         ('**  EccPAuEr pOY dIABArTHKAN ApO LOGFILE       **'),
+       2 FIL1            CHAR  (09) INIT (' '),
+       2 W_LOGFL_RECS    PIC 'ZZZ.ZZZ.ZZZ.ZZ9',
+       2 FIL2            CHAR  (59) INIT (' ');
+
+ DCL 1 LINE3,
+       2 CC              CHAR  (1)  INIT ('0'),
+       2 DATA1           CHAR  (49) INIT
+         ('**  EccPAuEr pOY uOPTxhHKAN rTOYr pINAKEr      **'),
+       2 FIL1            CHAR  (09) INIT (' '),
+       2 W_LOGFL_TOTAL   PIC 'ZZZ.ZZZ.ZZZ.ZZ9',
+       2 FIL2            CHAR  (59) INIT (' ');
+
+ DCL 1 LINE4,
+       2 CC              CHAR  (1)  INIT ('1'),
+       2 FIL1            CHAR  (26) INIT (' '),
+       2 DATA1           CHAR  (49) INIT
+         ('** T E k O r    K A T A r T A r H r *************'),
+       2 FIL2            CHAR  (57) INIT (' ');
+
+ /* -------- SYSTEM DATE MANIPULATION ---------------------  */
+
+      W_DATE = DATE;
+
+      W_YY  = SUBSTR(W_DATE,1,2);
+
+      SUBSTR(W_DATE,1,2) = SUBSTR(W_DATE,5,2);
+
+      SUBSTR(W_DATE,5,2) = W_YY;
+
+      W_SYS_DATE = W_DATE_R;
+
+ /* -------------------------------------------------------  */
+
+ /*---------------------------------------------------------------
+         HOUSEKEEPING
+ ---------------------------------------------------------------*/
+ OPEN FILE (CARD),
+      FILE (LOGFL),
+      FILE (LOGFLN),
+      FILE (PRINT);
+
+ ON ENDFILE(CARD)
+ BEGIN ;
+    EOF_1 = 'YES';
+ END;
+
+ ON ENDFILE(LOGFL)
+ BEGIN ;
+      EOF_2 = 'YES';
+ END;
+
+ GRAMMH = '************ CHECKLIST pPOcPAMMATOr KOSTER1  **********';
+ WRITE FILE (PRINT) FROM (LINE);
+ CNTRCH = '0';
+
+ TABL_KNOWN  = '';
+ TABL_OTHER  = '';
+ TABL_REJECT = '';
+ TABL_NEW    = '';
+
+ READ FILE(CARD) INTO  (RECCARD);
+
+ IF EOF_1 = 'YES'  THEN
+    DO;
+       GRAMMH = '*******  dEN YpAPXOYN CONTROL CARDS     ********';
+       WRITE FILE (PRINT) FROM (LINE);
+       ABEND_CNT  =  ABEND_CNT / ZERO;
+    END;
+
+ CARD_DATE = TRANS_ID;
+
+ READ FILE(CARD) INTO  (RECCARD);
+
+ /*-------------------------------------------------------------*/
+
+ LOAD_CARDS: ;
+
+   DO WHILE   ( EOF_1 = 'NO ' ) ;
+
+      W_CARDS = W_CARDS + 1;
+
+      IF INDICATION = '00' THEN
+         DO;
+            COUNT_REJECT = COUNT_REJECT + 1;
+
+            IF COUNT_REJECT > 800 THEN
+               DO;
+                 GRAMMH = '** OVERFLOW TOY pINAKA ' !!
+                          'TxN ApOPPIuhENTxN TRANSACTIONS  **';
+                 WRITE FILE (PRINT) FROM (LINE);
+                 CNTRCH = '0';
+                 GRAMMH = 'RECS READ ' !! W_CARDS !!
+                          '  LOAD KNOWN ' !! COUNT_KNOWN !!
+                          '  LOAD OTHER ' !! COUNT_OTHER !!
+                          '  LOAD REJECT ' !! COUNT_REJECT;
+                 WRITE FILE (PRINT) FROM (LINE);
+                 ABEND_CNT  =  ABEND_CNT / ZERO;
+               END;
+
+            CALL LOAD_TABL_REJECT;
+         END;
+      ELSE DO;
+      IF INDICATION = '02' THEN
+         DO;
+            COUNT_OTHER  = COUNT_OTHER  + 1;
+
+            IF COUNT_OTHER > 400 THEN
+               DO;
+                  GRAMMH = '** OVERFLOW TOY pINAKA ' !!
+                           'TxN AkkxN EuAP. TRANSACTIONS **';
+                  WRITE FILE (PRINT) FROM (LINE);
+                 CNTRCH = '0';
+                 GRAMMH = 'RECS READ ' !! W_CARDS !!
+                          '  LOAD KNOWN ' !! COUNT_KNOWN !!
+                          '  LOAD OTHER ' !! COUNT_OTHER !!
+                          '  LOAD REJECT ' !! COUNT_REJECT;
+                 WRITE FILE (PRINT) FROM (LINE);
+                 ABEND_CNT  =  ABEND_CNT / ZERO;
+               END;
+
+            CALL LOAD_TABL_OTHER;
+         END;
+      ELSE DO;
+      IF INDICATION = '01' THEN
+         DO;
+            COUNT_KNOWN  = COUNT_KNOWN  + 1;
+
+            IF COUNT_KNOWN > 200 THEN
+               DO;
+                  GRAMMH = '** OVERFLOW TOY pINAKA ' !!
+                           'TxN cNxrTxN TRANSACTIONS **';
+                  WRITE FILE (PRINT) FROM (LINE);
+                 CNTRCH = '0';
+                 GRAMMH = 'RECS READ ' !! W_CARDS !!
+                          '  LOAD KNOWN ' !! COUNT_KNOWN !!
+                          '  LOAD OTHER ' !! COUNT_OTHER !!
+                          '  LOAD REJECT ' !! COUNT_REJECT;
+                 WRITE FILE (PRINT) FROM (LINE);
+                 ABEND_CNT  =  ABEND_CNT / ZERO;
+               END;
+
+            CALL LOAD_TABL_KNOWN;
+         END;
+      ELSE DO;
+        GRAMMH = '*** dEN YpAPXEI INDICATION rE CONTROL CARD ***';
+        WRITE FILE (PRINT) FROM (LINE);
+      END;
+      END;
+      END;
+
+      READ FILE(CARD) INTO  (RECCARD);
+
+   END;
+
+ /*--------------------------------------------------------*/
+ LOAD_TABL_KNOWN:    PROC;
+
+        TRAN_KNOWN(COUNT_KNOWN) = TRANS_ID;
+
+ END LOAD_TABL_KNOWN;
+ /*--------------------------------------------------------*/
+ LOAD_TABL_OTHER:    PROC;
+
+        TRAN_OTHER(COUNT_OTHER) = TRANS_ID;
+
+ END LOAD_TABL_OTHER;
+ /*--------------------------------------------------------*/
+
+ LOAD_TABL_REJECT:    PROC;
+
+        TRAN_REJECT(COUNT_REJECT) = TRANS_ID;
+
+ END LOAD_TABL_REJECT;
+ /*--------------------------------------------------------*/
+ READ_AGAIN: ;
+ READ FILE(LOGFL) INTO  (RECLOGFL);
+
+ IF LHMEROM = 0 THEN DO;
+    GOTO READ_AGAIN;
+ END;
+
+ IF PRWTH_FORA = 0 THEN
+ DO;
+
+ RHMEROM = LHMEROM;
+
+ IF CHMEROM ^= CARD_DATE THEN
+    DO;
+       GRAMMH = '* kAhOr TAINIA LOGFILE H kAhOr DATE CONTROL CARD *';
+       WRITE FILE (PRINT) FROM (LINE);
+       ABEND_CNT  =  ABEND_CNT / ZERO;
+    END;
+
+ PRWTH_FORA = 1;
+ MM1 = CARD_MM;
+ YY1 = CARD_YY;
+
+ END;
+
+   W_TRANS_ID = LOG_TRANS_ID;
+
+ /*-------------------------------------------------------------*/
+
+ LOGFILE_MATCH: ;
+
+   DO WHILE ( EOF_2 = 'NO ' ) ;
+
+      DO WHILE ( W_TRANS_ID = LOG_TRANS_ID ) ;
+         LOGFL_RECS  = LOGFL_RECS + 1;
+         LOGFL_COUNT = LOGFL_COUNT + 1;
+
+         CALL WRITE_NEW_LOGFL;
+
+         READ FILE(LOGFL) INTO  (RECLOGFL);
+         IF EOF_2 = 'YES' THEN
+            DO;
+               LOG_TRANS_ID = '9999';
+            END;
+      END;
+
+      IF W_TRANS_ID ^= LOG_TRANS_ID THEN
+         DO;
+            CALL SEARCH_TABLES;
+         END;
+
+      W_TRANS_ID = LOG_TRANS_ID;
+
+   END;
+ /*--------------------------------------------------------*/
+
+ WRITE_NEW_LOGFL:  PROC;
+
+    DO I = 1 TO COUNT_KNOWN WHILE (^FOUND_KNOWN_1);
+       IF W_TRANS_ID = TRAN_KNOWN(I) THEN
+          DO;
+            RECLOGFLN     ='';
+            LHMEROMN      = LHMEROM;
+            LSMTOOON      = LSMTOOO;
+            LOG_TRANS_IDN = LOG_TRANS_ID;
+            LOG_COMMAN    = LOG_COMMA;
+            WFILLERN      = ' ';
+
+            IF LOG_TRANS_ID = 'KAN0' ! LOG_TRANS_ID = 'TAN0' !
+               LOG_TRANS_ID = 'ANOI'  THEN
+               DO;
+            IF VERIFY(SUBSTR(LKATMA,1,3),VERFIELD2) ^= 0 THEN
+              DO;
+                CNTRCH = '0';
+                GRAMMH = '**kAhOr pEdIO KATArTHMATOr '!! LKATMA !!
+                         ' ME TRANS-ID '!! LOG_TRANS_ID;
+                WRITE FILE (PRINT) FROM (LINE);
+                LOG_KATMA = LOG_KATMA + 1;
+                FOUND_KNOWN_1 = '1'B;
+                GOTO EXIT1;
+              END;
+
+
+            IF LOG_TRANS_ID = 'ANOI'  THEN
+               DO;
+               IF SUBSTR(LOG_CIDB,3,2) = ',T' !
+                  SUBSTR(LOG_CIDB,3,2) = ',K' THEN DO;
+                  WW_KATHOL = SUBSTR(LOG_CIDB,6,4) ;
+                  GOTO SSS;
+               END;
+               IF SUBSTR(LOG_CIDB,4,2) = ',T' !
+                  SUBSTR(LOG_CIDB,4,2) = ',K' THEN DO;
+                  WW_KATHOL = SUBSTR(LOG_CIDB,7,4) ;
+                  GOTO SSS;
+               END;
+               IF SUBSTR(LOG_CIDB,5,2) = ',T' !
+                  SUBSTR(LOG_CIDB,5,2) = ',K' THEN DO;
+                  WW_KATHOL = SUBSTR(LOG_CIDB,8,4) ;
+                  GOTO SSS;
+               END;
+               IF SUBSTR(LOG_CIDB,6,2) = ',T' !
+                  SUBSTR(LOG_CIDB,6,2) = ',K' THEN DO;
+                  WW_KATHOL = SUBSTR(LOG_CIDB,9,4) ;
+                  GOTO SSS;
+               END;
+               IF SUBSTR(LOG_CIDB,7,2) = ',T' !
+                  SUBSTR(LOG_CIDB,7,2) = ',K' THEN DO;
+                  WW_KATHOL = SUBSTR(LOG_CIDB,10,4) ;
+                  GOTO SSS;
+               END;
+               IF SUBSTR(LOG_CIDB,8,2) = ',T' !
+                  SUBSTR(LOG_CIDB,8,2) = ',K' THEN DO;
+                  WW_KATHOL = SUBSTR(LOG_CIDB,11,4) ;
+                  GOTO SSS;
+               END;
+               IF SUBSTR(LOG_CIDB,9,2) = ',T' !
+                  SUBSTR(LOG_CIDB,9,2) = ',K' THEN DO;
+                  WW_KATHOL = SUBSTR(LOG_CIDB,12,4) ;
+                  GOTO SSS;
+               END;
+               ELSE DO;
+                GOTO EXIT1;
+               END;
+              END;
+   SSS:;
+
+            IF VERIFY(WW_KATHOL,VERFIELD2) ^= 0 THEN
+              DO;
+                CNTRCH = '0';
+                GRAMMH = '**kAhOr APIhMOr KAhOkIKOY '!! WW_KATHOL !!
+                         ' ME TRANS-ID '!! LOG_TRANS_ID;
+                WRITE FILE (PRINT) FROM (LINE);
+                LOG_KATH = LOG_KATH + 1;
+                FOUND_KNOWN_1 = '1'B;
+                GOTO EXIT1;
+              END;
+
+            W_KATHOL  = WW_KATHOL;
+            LOG_KATHOL = W_KATHOL;
+
+                  LKATMAN     = LKATMA;
+                  LOG_KATHOLN = LOG_KATHOL;
+                  LOG_ARLOGN  = 0;
+                  LOGFLN_TAN0_KAN0  = LOGFLN_TAN0_KAN0 + 1;
+               END;
+            ELSE DO;
+            IF LOG_TRANS_ID = 'KMET' !
+               LOG_TRANS_ID = 'AMET' !
+               LOG_TRANS_ID = 'AET0' !
+               LOG_TRANS_ID = 'AEAT' !
+               LOG_TRANS_ID = 'AET2' !
+               LOG_TRANS_ID = 'AEpE' !
+               LOG_TRANS_ID = 'AEKT' THEN
+               DO;
+            IF VERIFY(SUBSTR(LKATMA,1,3),VERFIELD2) ^= 0 THEN
+              DO;
+                CNTRCH = '0';
+                GRAMMH = '**kAhOr pEdIO KATArTHMATOr '!! LKATMA !!
+                         ' ME TRANS-ID '!! LOG_TRANS_ID;
+                WRITE FILE (PRINT) FROM (LINE);
+                LOG_KATMA = LOG_KATMA + 1;
+                FOUND_KNOWN_1 = '1'B;
+                GOTO EXIT1;
+              END;
+
+                      LKATMAN     = LKATMA;
+                      LOG_ARLOGN = 0;
+                      LOGFLN_KMET  = LOGFLN_KMET + 1;
+               END;
+            ELSE DO;
+
+            IF VERIFY(SUBSTR(LKATMA,1,3),VERFIELD2) ^= 0 THEN
+              DO;
+                CNTRCH = '0';
+                GRAMMH = '**kAhOr pEdIO KATArTHMATOr '!! LKATMA !!
+                         ' ME TRANS-ID '!! LOG_TRANS_ID;
+                WRITE FILE (PRINT) FROM (LINE);
+                LOG_KATMA = LOG_KATMA + 1;
+                FOUND_KNOWN_1 = '1'B;
+                GOTO EXIT1;
+              END;
+
+            WW_ARLOG = LOG_ARLOG;
+            IF VERIFY(W_ARLOG,VERFIELD2) ^= 0 THEN
+              DO;
+                CNTRCH = '0';
+                GRAMMH = '**kAhOr APIhMOr kOcAPIArMOY '!! WW_ARLOG !!
+                         ' ME TRANS-ID '!! LOG_TRANS_ID;
+                WRITE FILE (PRINT) FROM (LINE);
+                LOG_LOGAR = LOG_LOGAR + 1;
+                FOUND_KNOWN_1 = '1'B;
+                GOTO EXIT1;
+              END;
+
+                   LKATMAN     = LKATMA;
+                   LOG_ARLOGN = LOG_ARLOG;
+                   LOGFLN_OTHER = LOGFLN_OTHER + 1;
+                 END;
+             END;
+             WRITE FILE (LOGFLN) FROM (RECLOGFLN);
+             LOGFLN_TOTAL = LOGFLN_TOTAL + 1;
+             FOUND_KNOWN_1 = '1'B;
+          END;
+     EXIT1:;
+    END;
+    IF FOUND_KNOWN_1 = '1'B THEN
+       DO;
+          FOUND_KNOWN_1 = '0'B;
+       END;
+
+ END WRITE_NEW_LOGFL;
+
+ /*--------------------------------------------------------*/
+
+ SEARCH_TABLES:    PROC;
+
+    DO I = 1 TO COUNT_KNOWN WHILE (^FOUND_KNOWN);
+       IF W_TRANS_ID = TRAN_KNOWN(I) THEN
+          DO;
+             ARTRAN_KNOWN(I) = LOGFL_COUNT;
+             LOGFL_TOTAL = LOGFL_TOTAL + LOGFL_COUNT;
+             LOGFL_COUNT = 0;
+             FOUND_KNOWN = '1'B;
+          END;
+    END;
+
+    IF FOUND_KNOWN = '1'B THEN
+       DO;
+          FOUND_KNOWN = '0'B;
+          GOTO EXIT;
+       END;
+
+    I = 1;
+
+    DO I = 1 TO COUNT_REJECT WHILE (^FOUND_REJECT);
+       IF W_TRANS_ID = TRAN_REJECT(I) THEN
+          DO;
+             ARTRAN_REJECT(I) = LOGFL_COUNT;
+             LOGFL_TOTAL = LOGFL_TOTAL + LOGFL_COUNT;
+             LOGFL_COUNT = 0;
+             FOUND_REJECT = '1'B;
+          END;
+    END;
+
+    IF FOUND_REJECT = '1'B THEN
+       DO;
+          FOUND_REJECT = '0'B;
+          GOTO EXIT;
+       END;
+
+    I = 1;
+
+    DO I = 1 TO COUNT_OTHER WHILE (^FOUND_OTHER);
+       IF W_TRANS_ID = TRAN_OTHER(I) THEN
+          DO;
+             ARTRAN_OTHER(I) = LOGFL_COUNT;
+             LOGFL_TOTAL = LOGFL_TOTAL + LOGFL_COUNT;
+             LOGFL_COUNT = 0;
+             FOUND_OTHER = '1'B;
+          END;
+    END;
+
+    IF FOUND_OTHER = '1'B THEN
+       DO;
+          FOUND_OTHER = '0'B;
+          GOTO EXIT;
+       END;
+
+    I = 1;
+
+    DO I = 1 TO COUNT_NEW WHILE (^FOUND_NEW);
+       IF W_TRANS_ID = TRAN_NEW(I) THEN
+          DO;
+             ARTRAN_NEW(I) = LOGFL_COUNT;
+             LOGFL_TOTAL = LOGFL_TOTAL + LOGFL_COUNT;
+             LOGFL_COUNT = 0;
+             FOUND_NEW = '1'B;
+          END;
+    END;
+
+    IF FOUND_NEW = '1'B THEN
+       DO;
+          FOUND_NEW = '0'B;
+          GOTO EXIT;
+       END;
+    ELSE DO;
+          COUNT_NEW = COUNT_NEW + 1;
+
+            IF COUNT_NEW > LIMIT THEN      /* 10.11.2008 NPK        */
+               DO;
+                     MY_MIRROR = TABL_NEW;
+                     LIMIT =     LIMIT + 20;
+                     FREE        TABL_NEW;
+                     ALLOCATE    TABL_NEW(LIMIT);
+                     TABL_NEW =  MY_MIRROR;
+                     FREE        MY_MIRROR       ;
+                     ALLOCATE    MY_MIRROR(LIMIT);
+               /* FORGET ABEND NPK
+                  GRAMMH = '** OVERFLOW TOY pINAKA ' !!
+                           'TxN NExN TRANSACTIONS **';
+                  WRITE FILE (PRINT) FROM (LINE);
+                 CNTRCH = '0';
+                 GRAMMH = 'RECS READ ' !! W_CARDS !!
+                          '  LOAD KNOWN ' !! COUNT_KNOWN !!
+                          '  LOAD OTHER ' !! COUNT_OTHER !!
+                          '  LOAD REJECT ' !! COUNT_REJECT;
+                 WRITE FILE (PRINT) FROM (LINE);
+                 ABEND_CNT  =  ABEND_CNT / ZERO; */
+               END;
+
+          TRAN_NEW(COUNT_NEW) = W_TRANS_ID;
+          ARTRAN_NEW(COUNT_NEW) = LOGFL_COUNT;
+          LOGFL_TOTAL = LOGFL_TOTAL + LOGFL_COUNT;
+          LOGFL_COUNT = 0;
+       END;
+
+ /*--------------------------------------------------------*/
+
+  EXIT:
+
+ /*--------------------------------------------------------*/
+
+ END SEARCH_TABLES;
+
+ /*--------------------------------------------------------*/
+   CNTRCH = '1';
+ GRAMMH = '************ rYMuxNIA dHMIOYPcIAr NEOY LOGFILE ********';
+ WRITE FILE (PRINT) FROM (LINE);
+   CNTRCH = '0';
+ GRAMMH = '*** !!!!!     p P O r O X H             !!!!!!!!!   ***';
+ WRITE FILE (PRINT) FROM (LINE);
+   CNTRCH = ' ';
+ GRAMMH = '*** NA cINETAI EkEcXOr ME TO rYNOkO TxN KOrTOkOcIKxN***';
+ WRITE FILE (PRINT) FROM (LINE);
+   CNTRCH = ' ';
+ GRAMMH = '*** TRANSACTIONS pOY AuOPOYN EuAPMOcH TOY LOGFILE   ***';
+ WRITE FILE (PRINT) FROM (LINE);
+   CNTRCH = '0';
+   GRAMMH = 'rYNOkO EccPAuxN NEOY LOGFILE             ' !!
+            LOGFLN_TOTAL;
+  WRITE FILE (PRINT) FROM (LINE);
+   GRAMMH = 'rYN. EccP. AMET-KMET-AET0/AEAT-AET2-AEKT-AEpE ' !!
+            LOGFLN_KMET;
+  WRITE FILE (PRINT) FROM (LINE);
+   GRAMMH = 'rYNOkO EccPAuxN TAN0-KAN0-ANOI           ' !!
+            LOGFLN_TAN0_KAN0;
+  WRITE FILE (PRINT) FROM (LINE);
+   GRAMMH = 'rYNOkO EccPAuxN YpOkOIpxN TRANSACTIONS   ' !!
+            LOGFLN_OTHER;
+  WRITE FILE (PRINT) FROM (LINE);
+   GRAMMH  = '**rYNOkO EccPAuxN TOY LOGFILE ME kAhOr kOcAPIArMO    ** '
+           !! LOG_LOGAR;
+  WRITE FILE (PRINT) FROM (LINE);
+   GRAMMH  = '**rYNOkO EccPAuxN TOY LOGFILE ME kAhOr KAhOkIKO      ** '
+           !! LOG_KATH;
+ WRITE FILE (PRINT) FROM (LINE);
+   GRAMMH  = '**rYNOkO EccPAuxN TOY LOGFILE ME kAhOr KATArTHMA     ** '
+           !! LOG_KATMA;
+ WRITE FILE (PRINT) FROM (LINE);
+ /*--------------------------------------------------------*/
+ CALL HEADING1;
+
+ I = 1;
+
+ DO I = 1 TO COUNT_KNOWN;
+    WW_TRAN = TRAN_KNOWN(I);
+    WW_ARTRAN = ARTRAN_KNOWN(I);
+    WRITE FILE (PRINT) FROM (LINE1);
+    LINE_CT = LINE_CT + 1;
+    IF LINE_CT > 45 THEN
+       DO;
+         LINE_CT = 0;
+         CALL HEADING1;
+       END;
+ END;
+
+ /*--------------------------------------------------------*/
+ /*--------------------------------------------------------*/
+ CALL HEADING2;
+
+ I = 1;
+
+ DO I = 1 TO COUNT_OTHER;
+    WW_TRAN = TRAN_OTHER(I);
+    WW_ARTRAN = ARTRAN_OTHER(I);
+    WRITE FILE (PRINT) FROM (LINE1);
+    LINE_CT = LINE_CT + 1;
+    IF LINE_CT > 45 THEN
+       DO;
+         LINE_CT = 0;
+         CALL HEADING2;
+       END;
+ END;
+
+ /*--------------------------------------------------------*/
+
+ CALL HEADING4;
+
+ I = 1;
+ LINE_CT = 0;
+
+ DO I = 1 TO COUNT_REJECT;
+    WW_TRAN = TRAN_REJECT(I);
+    WW_ARTRAN = ARTRAN_REJECT(I);
+    WRITE FILE (PRINT) FROM (LINE1);
+    LINE_CT = LINE_CT + 1;
+    IF LINE_CT > 45 THEN
+       DO;
+         LINE_CT = 0;
+         CALL HEADING4;
+       END;
+ END;
+
+ /*--------------------------------------------------------*/
+
+ CALL HEADING3;
+
+ I = 1;
+ LINE_CT = 0;
+
+ DO I = 1 TO COUNT_NEW;
+    WW_TRAN = TRAN_NEW(I);
+    WW_ARTRAN = ARTRAN_NEW(I);
+    WRITE FILE (PRINT) FROM (LINE1);
+    LINE_CT = LINE_CT + 1;
+    IF LINE_CT > 45 THEN
+       DO;
+         LINE_CT = 0;
+         CALL HEADING3;
+       END;
+ END;
+
+ /*--------------------------------------------------------*/
+
+ HEADING1:    PROC;
+
+    WS_PAGE = WS_PAGE + 1;
+    W_PAGE = WS_PAGE;
+    WRITE FILE (PRINT) FROM (HDR1);
+    WRITE FILE (PRINT) FROM (HDR2);
+    WRITE FILE (PRINT) FROM (HDR2A);
+    WRITE FILE (PRINT) FROM (HDR3);
+
+ END HEADING1;
+ /*--------------------------------------------------------*/
+
+ /*--------------------------------------------------------*/
+
+ HEADING2:    PROC;
+
+    WS_PAGE = WS_PAGE + 1;
+    W_PAGE = WS_PAGE;
+    WRITE FILE (PRINT) FROM (HDR1);
+    WRITE FILE (PRINT) FROM (HDR2);
+    WRITE FILE (PRINT) FROM (HDR2B);
+    WRITE FILE (PRINT) FROM (HDR3);
+
+ END HEADING2;
+ /*--------------------------------------------------------*/
+
+ /*--------------------------------------------------------*/
+
+ HEADING4:    PROC;
+
+    WS_PAGE = WS_PAGE + 1;
+    W_PAGE = WS_PAGE;
+    WRITE FILE (PRINT) FROM (HDR1);
+    WRITE FILE (PRINT) FROM (HDR2);
+    WRITE FILE (PRINT) FROM (HDR2B1);
+    WRITE FILE (PRINT) FROM (HDR3);
+
+ END HEADING4;
+ /*--------------------------------------------------------*/
+
+ /*--------------------------------------------------------*/
+
+ HEADING3:    PROC;
+
+    WS_PAGE = WS_PAGE + 1;
+    W_PAGE = WS_PAGE;
+    WRITE FILE (PRINT) FROM (HDR1);
+    WRITE FILE (PRINT) FROM (HDR2);
+    WRITE FILE (PRINT) FROM (HDR2C);
+    WRITE FILE (PRINT) FROM (HDR3);
+
+ END HEADING3;
+ /*--------------------------------------------------------*/
+
+ TELOS:
+    W_LOGFL_RECS  = LOGFL_RECS;
+    W_LOGFL_TOTAL = LOGFL_TOTAL;
+    WRITE FILE (PRINT) FROM (LINE2);
+    WRITE FILE (PRINT) FROM (LINE3);
+    WRITE FILE (PRINT) FROM (LINE4);
+
+ CLOSE FILE (LOGFL),
+       FILE (LOGFLN),
+       FILE (CARD),
+       FILE (PRINT);
+
+ END KOSTER1;
+

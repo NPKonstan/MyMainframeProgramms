@@ -1,0 +1,515 @@
+ /********************************************************************/
+ /*  SOURCE  NAME        : DK515                                     */
+ /*  PHASE   NAME        : DK515                                     */
+ /*  CREATION DATE       : 02/11/2007                                */
+ /*  PROGRAMMER          : ΚΩΝΣΤΑΝΤΟΠΟΥΛΟΣ ΝΙΚ.                      */
+ /*  LANGUAGE            : BATCH-PL/I                                */
+ /*  ΠΕΡΙΓΡΑΦΗ           : CONSOLIDATION ΕGGΡΑΦΩΝ WIND,ALICO E.T.C.  */
+ /*  Διαβάζει Αρχείο BK.P.XS.COPYMOV INFILE                          */
+ /*  Gράφει Δυο Αρχεία ενα χρεώσεων ένα πιστώσεων                    */
+ /*  Αρχείο Χρεώσεων  CO.P.XS.EISPRAX (Κωδικός Πελάτη : 1905)        */
+ /*  Αρχείο Πιστώσεων CO.P.XS.EISPRAP (Κωδικός Πελάτη : 1906)        */
+ /********************************************************************/
+ /**Προσοχή*Πάντα G αντί για το Ελληνικό αντίστοιχο γράmmα to prevent*/
+ /* LEGACY Stupidity convertion npk 03-11-2007                       */
+ /********************************************************************/
+ DK515: PROC OPTIONS(MAIN);
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+ DCL CZX3VDAT CHAR(6); FETCH CZXDATEP;
+ DCL CZXDATEP ENTRY OPTIONS(INTER,ASM) ;
+ DCL   NULL      BUILTIN;
+ DATE: PROC IRREDUCIBLE RETURNS(CHAR(6)) ;
+         CALL CZXDATEP          ( CZX3VDAT) ;
+         RETURN (CZX3VDAT) ;
+         END DATE ;
+ DCL INFILE  FILE RECORD INPUT       ENV(FB  RECSIZE(074));
+ DCL CARD    FILE RECORD INPUT       ENV(FB  RECSIZE(80));
+ DCL PRT     FILE RECORD OUTPUT      ENV(FB RECSIZE(133) CTLASA);
+ DCL ERRLOG  FILE RECORD OUTPUT      ENV(FB RECSIZE(133) CTLASA);
+ DCL OUTPIS  FILE RECORD OUTPUT      ENV(FB  RECSIZE(200));
+ DCL OUTXRE  FILE RECORD OUTPUT      ENV(FB  RECSIZE(200));
+
+ %INCLUDE RECMOV ;
+ %INCLUDE RECDBCR;
+ %INCLUDE DAYRTNS;
+
+ DCL 1 RECCARD,
+       2 CC_FLR0       CHAR (1),
+       2 CC_ACC_FROM   PIC '(8)9',
+       2 CC_FLR1       CHAR (1),
+       2 CC_ACC_TO     PIC '(8)9',
+       2 CC_FLR2       CHAR (1),
+       2 CC_COD_XRE    PIC '(6)9',
+       2 CC_FLR3       CHAR (1),
+       2 CC_COD_PIST   PIC '(6)9',
+       2 CC_FLR4       CHAR (1),
+       2 CC_COD_KATMA  PIC '(4)9',
+       2 CC_FLR11      CHAR (43);
+
+ /*----------------    ΓΡΑΜΜΕΣ   ΕΚΤΥΠΩΣΗΣ     ---------------------*/
+ DCL 1 LINE,
+       2 T_CTRL       CHAR(1)    INIT(' '),
+       2 GRAMH        CHAR(132)  INIT(' ');
+ /*----------------------------------------------------------------*/
+ DCL  EOF               FIXED(1)    INIT(0);
+ DCL  ERRORS            FIXED(1)    INIT(0);
+ DCL  COUNT_CC          FIXED(5)    INIT(0);
+ DCL  MY_DATETIME PIC '9999.99.99B9999' ;
+
+ DCL 1 COUNTERS ,
+      2 CNT_REC_READ               PIC 'ZZZ.ZZZ.ZZZ.ZZ9' ,
+      2 CNT_REC_REJECT             PIC 'ZZZ.ZZZ.ZZZ.ZZ9' ,
+      2 CNT_REC_PROCCED            PIC 'ZZZ.ZZZ.ZZZ.ZZ9' ,
+      2 CNT_REC_OUTPIS             PIC 'ZZZ.ZZZ.ZZZ.ZZ9' ,
+      2 CNT_REC_OUTXRE             PIC 'ZZZ.ZZZ.ZZZ.ZZ9' ;
+ COUNTERS  = '';
+
+ DCL 1 TABLE(*) CONTROLLED  ,
+         2 TBL_ACC_FROM   PIC '(9)9',
+         2 TBL_ACC_TO     PIC '(9)9',
+         2 TBL_COD_XRE    PIC '(6)9',
+         2 TBL_COD_PIST   PIC '(6)9',
+         2 TBL_COD_KATMA  PIC '(4)9',
+         2 TBL_DATE       FIXED(07),
+         2 TBL_POSO_PIST  FIXED(15,2),
+         2 TBL_POSO_XRE   FIXED(15,2);
+
+ DCL 1 MY_REC CONTROLLED  ,
+         2 MY_ACC_FROM   PIC '(9)9',
+         2 MY_ACC_TO     PIC '(9)9',
+         2 MY_COD_KATMA  PIC '(4)9',
+         2 MY_DATE       FIXED(7)  ,
+         2 MY_COD_XRE    PIC '(6)9',
+         2 MY_COD_PIST   PIC '(6)9';
+ /*----------------------------------------------------------------*/
+ DCL  SUBSTR  BUILTIN;
+ DCL  VERIFY  BUILTIN;
+ DCL  ADDR    BUILTIN;
+ DCL  DATETIME BUILTIN;
+ DCL  INDEX   BUILTIN;
+ /*----------------------------------------------------------------*/
+   OPEN FILE(PRT),FILE(ERRLOG),FILE(INFILE),
+        FILE(OUTPIS),FILE(OUTXRE),FILE(CARD);
+   ERRORS   =  0;
+   EOF      =  0  ;
+   ON ENDFILE(CARD) BEGIN;
+      IF COUNT_CC = 0 THEN DO;/*NOTHING FOUND*/
+        CALL ERROR_LOG_HEADER;
+
+        GRAMH = ' *** ΔΕΝ  ΥΠΑΡΧΕΙ CC ΚΑΡΤΑ ***';
+        WRITE FILE (ERRLOG) FROM (LINE);
+        T_CTRL = ' ';
+        GRAMH = ' *** TO ΠΡΟΓΡΑΜΜΑ DK515 ΘΑ ΣΚΑΣΕΙ ***';
+        WRITE FILE (ERRLOG) FROM (LINE);
+        DCL NPK  FIXED(1) INIT(0);
+        DCL NPK2 FIXED(1) INIT(5);
+        NPK2 = NPK2 /  NPK  ; /*JUST CRASH*/
+      END;
+      EOF = 1   ;
+      CALL LOAD_TABLE;
+      GOTO SKIP_COUNT;
+   END;
+
+   ON ENDFILE(INFILE) BEGIN;
+      CALL UNLOAD_TABLE;
+      EOF  =  1  ;
+   END;
+
+ /*----------------------------------------------------------------*/
+   /************************/
+   /*READ CONTROL CARD FILE*/
+   /************************/
+   READ FILE(CARD) INTO (RECCARD);
+   COUNT_CC = COUNT_CC + 1 ;
+   DO WHILE  ( EOF = 0 );
+     CALL VERIFY_CC( CC_ACC_FROM  ) ;
+     CALL VERIFY_CC( CC_ACC_TO    ) ;
+     CALL VERIFY_CC( CC_COD_XRE   ) ;
+     CALL VERIFY_CC( CC_COD_PIST  ) ;
+     CALL VERIFY_CC( CC_COD_KATMA ) ;
+     put skip list('Απο τον Λογαριασμό : ',CC_ACC_FROM );
+     put skip list('Στον    Λογαριασμό : ',CC_ACC_TO   );
+     put skip list('Κωδικός Χρέωσης    : ',CC_COD_XRE  ) ;
+     put skip list('Κωδικός Πιστωσης   : ',CC_COD_PIST ) ;
+     put skip list('Κωδ. Καταστήματος  : ',CC_COD_KATMA) ;
+     ALLOCATE  MY_REC     ;
+     MY_REC.MY_ACC_FROM  = CC_ACC_FROM        ;
+     MY_REC.MY_ACC_TO    = CC_ACC_TO          ;
+     MY_REC.MY_COD_XRE   = CC_COD_XRE         ;
+     MY_REC.MY_COD_PIST  = CC_COD_PIST        ;
+     MY_REC.MY_COD_KATMA = CC_COD_KATMA       ;
+     MY_REC.MY_DATE      = 0                  ;
+
+     READ FILE(CARD) INTO (RECCARD);
+     COUNT_CC = COUNT_CC+ 1 ;
+   SKIP_COUNT:;
+   END;
+   PUT SKIP LIST('COUNT_CC ' ,CHAR(COUNT_CC));
+ /*----------------------------------------------------------------*/
+   /************************/
+   /*READ INFILE           */
+   /************************/
+   EOF  =  0  ;
+   READ  FILE(INFILE)  INTO(RECISKAT);
+   CALL CHECK_FILE;
+   CNT_REC_READ = CNT_REC_READ    + 1 ;
+   DO WHILE  ( EOF = 0 );
+     CALL SUM_AMOUNT;
+     READ  FILE(INFILE)  INTO(RECISKAT);
+     CNT_REC_READ = CNT_REC_READ    + 1 ;
+   END;
+ /*----------------------------------------------------------------*/
+
+  /*************************************************************/
+  /* SUM_AMOUNT     START                                      */
+  /*************************************************************/
+  SUM_AMOUNT   :PROC ;
+   DCL J FIXED(15) INIT(0);
+
+   DO J = 1 TO COUNT_CC  ;
+    /* PUT SKIP LIST('J = ',CHAR(J),'ACCFROM ', TABLE(J).TBL_ACC_FROM);
+       PUT SKIP LIST('KSMARLOG ',CHAR(KSMARLOG));
+    */
+       IF TABLE(J).TBL_ACC_FROM  = KSMARLOG THEN DO;
+         TABLE(J).TBL_DATE   = KSMHMNIA;
+         SELECT ( KSMKWDEG  );
+           WHEN ('1')
+            TABLE(J).TBL_POSO_PIST = TABLE(J).TBL_POSO_PIST+KSMPOSON;
+           WHEN ('2')
+            TABLE(J).TBL_POSO_XRE  = TABLE(J).TBL_POSO_XRE +KSMPOSON;
+           OTHERWISE DO;
+              CALL ERROR_LOG_HEADER;
+              GRAMH = 'ΠΡΟΒΛΗΜΑ:ΣΤΟΝ ΛΟΓ. '!!TABLE(J).TBL_ACC_FROM;
+              WRITE FILE (ERRLOG) FROM (LINE);
+              T_CTRL = ' ';
+              GRAMH = 'ΣΤΟΝ ΚΩΔΙΚΟ KSMKWDEG:OYTE 1,OYTE 2('!!KSMKWDEG;
+              WRITE FILE (ERRLOG) FROM (LINE);
+              GRAMH = ' * TO ΠΡΟΓΡΑΜΜΑ DK515 ΘΑ ΣΚΑΣΕΙ *';
+              WRITE FILE (ERRLOG) FROM (LINE);
+              DCL NPK  FIXED(1) INIT(0);
+              DCL NPK2 FIXED(1) INIT(5);
+              NPK2 = NPK2 /  NPK  ; /*JUST CRASH*/
+           END;
+         END; /* SELECT */
+         IF (KSMTRKWD = 'KK11' ) !
+            (KSMTRKWD = 'KTX1' ) !
+            (KSMTRKWD = 'KTp1' )  THEN DO;
+             CNT_REC_PROCCED = CNT_REC_PROCCED + 1;
+         END;
+         ELSE DO;
+              CALL ERROR_LOG_HEADER;
+              T_CTRL = ' ';
+              GRAMH = 'ΠΡΟΒΛΗΜΑ:ΣΤΟΝ ΛΟΓ. '!!TABLE(J).TBL_ACC_FROM;
+              WRITE FILE (ERRLOG) FROM (LINE);
+              GRAMH = 'BΡΕΘΗΚΕ ΚΩΔΙΚΟΣ ΣΥΝΑΛΑΓΗΣ KSMTRKWD = '!!KSMTRKWD;
+              WRITE FILE (ERRLOG) FROM (LINE);
+              GRAMH = 'ΑΠΟΔΕΚΤΟΙ ΚΩΔΙΚΟΙ ΣΥΝΑΛΛΑΓΩΝ ΚΚ11.ΚΤΧ1,ΚΤΠ1 *';
+              WRITE FILE (ERRLOG) FROM (LINE);
+              CNT_REC_REJECT = CNT_REC_REJECT + 1;
+         END;
+  END SUM_AMOUNT    ;
+  /*************************************************************/
+  /* SUM_AMOUNT     END                                        */
+  /*************************************************************/
+  /*************************************************************/
+  /* LOAD_TABLE     START                                      */
+  /*************************************************************/
+  LOAD_TABLE   :PROC ;
+   DCL K FIXED(15) INIT(0);
+
+   ALLOCATE TABLE(COUNT_CC);
+   /*LOAD REVERSE */
+   DO K = COUNT_CC   TO 1 BY -1 ;
+       TABLE(K).TBL_ACC_FROM  = MY_REC.MY_ACC_FROM ;
+       TABLE(K).TBL_ACC_TO    = MY_REC.MY_ACC_TO ;
+       TABLE(K).TBL_COD_XRE   = MY_REC.MY_COD_XRE ;
+       TABLE(K).TBL_COD_PIST  = MY_REC.MY_COD_PIST ;
+       TABLE(K).TBL_COD_KATMA = MY_REC.MY_COD_KATMA;
+       TABLE(K).TBL_DATE      = 0;
+       TABLE(K).TBL_POSO_PIST = 0;
+       TABLE(K).TBL_POSO_XRE  = 0;
+       FREE MY_REC ;/*RELEASE A GENERATION*/
+   END;
+  END LOAD_TABLE    ;
+  /*************************************************************/
+  /* LOAD_TABLE     END                                        */
+  /*************************************************************/
+  /*************************************************************/
+  /* UNLOAD_TABLE     START                                      */
+  /*************************************************************/
+  UNLOAD_TABLE   :PROC ;
+   DCL I FIXED(15) INIT(0);
+   DO I = 1 TO COUNT_CC    ;
+       RECDBCR = '';
+
+       KATMA  =  TABLE(I).TBL_COD_KATMA;                                REC00100
+       HMEKD  =  TABLE(I).TBL_DATE ;                                    REC00100
+       HMVAL  =  TABLE(I).TBL_DATE ;                                    REC00100
+       /* Εάν η Χρέωση Είναι Μεγαλύτερη Απο την Πίστωση */
+       IF(TABLE(I).TBL_POSO_XRE > TABLE(I).TBL_POSO_PIST  ) THEN DO;
+
+          POSON  = TABLE(I).TBL_POSO_XRE - TABLE(I).TBL_POSO_PIST;
+
+          KWDPEL = TABLE(I).TBL_COD_XRE;
+          ARLOG  = TABLE(I).TBL_ACC_FROM ;
+          WRITE FILE ( OUTXRE ) FROM ( RECDBCR) ;
+          CNT_REC_OUTXRE = CNT_REC_OUTXRE + 1;
+
+          KWDPEL = TABLE(I).TBL_COD_PIST;
+          ARLOG  = TABLE(I).TBL_ACC_TO   ;
+          WRITE FILE ( OUTPIS ) FROM ( RECDBCR) ;
+          CNT_REC_OUTPIS = CNT_REC_OUTPIS + 1;
+
+       END;
+       ELSE DO;/* Εάν η Πιστωση Είναι Μεγαλύτερη Απο την Χρεωση */
+
+          POSON = TABLE(I).TBL_POSO_PIST - TABLE(I).TBL_POSO_XRE;
+
+          KWDPEL = TABLE(I).TBL_COD_XRE;
+          ARLOG  = TABLE(I).TBL_ACC_FROM ;
+          WRITE FILE ( OUTPIS ) FROM ( RECDBCR) ;
+          CNT_REC_OUTPIS = CNT_REC_OUTPIS + 1;
+
+          KWDPEL = TABLE(I).TBL_COD_PIST;
+          ARLOG  = TABLE(I).TBL_ACC_TO   ;
+          WRITE FILE ( OUTXRE ) FROM ( RECDBCR) ;
+          CNT_REC_OUTXRE = CNT_REC_OUTXRE + 1;
+
+       END;
+
+   END;
+  END UNLOAD_TABLE    ;
+  /*************************************************************/
+  /* UNLOAD_TABLE     END                                        */
+  /*************************************************************/
+  /*************************************************************/
+  /* ERROR_LOG_HEADER START                                      */
+  /*************************************************************/
+  ERROR_LOG_HEADER : PROC ;
+    IF ERRORS = 0 THEN DO;
+       MY_DATETIME = SUBSTR(DATETIME(),1,12);
+       T_CTRL = '1';
+       GRAMH  = '* * * * * * * Π Ρ Ο Σ Ο Χ Η  * * * * * * * * * ' ;
+       WRITE FILE(ERRLOG) FROM(LINE);
+       T_CTRL = ' ';
+       GRAMH  = '* * ΚΑΤΑΣΤΑΣΗ ΛΑΘΩΝ ΤΟΥ ΠΡΟΓΡΑΜΜΑΤΟΣ DK515 * *' ;
+       WRITE FILE(ERRLOG) FROM(LINE);
+       GRAMH = 'Hμέρα και Ωρα Ροής :                             '
+                             !!MY_DATETIME;
+       WRITE FILE(ERRLOG) FROM(LINE);
+       GRAMH  = '* * * * * * * * * * * * * * * * * * * * * *' ;
+       WRITE FILE(ERRLOG) FROM(LINE);
+    END;
+    ERRORS = 1;
+  END ERROR_LOG_HEADER;
+  /*************************************************************/
+  /* ERROR_LOG_HEADER END                                        */
+  /*************************************************************/
+ /*------------------------------------*/
+ /*        START CHECK_FILE            */
+ /*------------------------------------*/
+ CHECK_FILE: PROC ;
+ DCL      MY_DATE2          PIC '(7)9' INIT(0);
+ DCL  1   MY_DATEX          BASED(ADDR(MY_DATE2)),
+       2  MY_CENTURY        CHAR(01),
+       2  MY_YEAR           CHAR(02),
+       2  MY_MONTH          CHAR(02),
+       2  MY_DAY            CHAR(02);
+ DCL  TODAY      CHAR(8);/*HMEROMHNIA ROHS*/
+ DCL  1 SYSDATE  BASED(ADDR(TODAY)),
+             2 SYSCC  CHAR(2),
+             2 SYSYY  CHAR(02),
+             2 SYSMM  CHAR(02),
+             2 SYSDD  CHAR(2);
+    TODAY             = '20'!!
+                          SUBSTR(DATE,1,2) !! /*ETOS */
+                          SUBSTR(DATE,3,2) !! /*MHNAS*/
+                          SUBSTR(DATE,5,2) ;  /*HMERA*/
+    MY_DATE2 = KSMHMNIA  ;/*HMEROMHIA ARXEIOY*/
+    IF( SYSDD ^= MY_DAY  )!( SYSMM ^= MY_MONTH)!
+      ( SYSYY ^= MY_YEAR ) THEN DO;
+      CALL ERROR_LOG_HEADER;
+      T_CTRL = ' ';
+      GRAMH  = '********* ΠΡΟΣΟΧΗ  ΛΑΘΟΣ ΑΡΧΕΙΟ ********** ';
+      WRITE FILE (ERRLOG) FROM (LINE);
+      GRAMH  = 'ΛΑΘΟΣ ΑΡΧΕΙΟ :Ασυμφωνία Στο BK.P.XS.COPYMOV ';
+      WRITE FILE (ERRLOG) FROM (LINE);
+      GRAMH  = 'Η Ημερομηνία Αρχείου Διαφέρει Απο Την Ημερομηνία Ροής ';
+      WRITE FILE (ERRLOG) FROM (LINE);
+      GRAMH  = 'Hμερομηνία Αρχείου : 20'!!SUBSTR(MY_DATE2,2,6);
+      WRITE FILE (ERRLOG) FROM (LINE);
+      GRAMH  = 'Ημερομηνία Ροής    : '!!TODAY;
+      WRITE FILE (ERRLOG) FROM (LINE);
+      GRAMH ='Διαλέξτε Σωστό Αρχείο ή Χρησιμοποιήστε DATE στο JCL';
+      WRITE FILE (ERRLOG) FROM (LINE);
+      GRAMH ='Και Ξανατρέξτε την Ροή                             ';
+      WRITE FILE (ERRLOG) FROM (LINE);
+
+      GO TO TELOS1;
+    END;
+ END CHECK_FILE;
+ /*------------------------------------*/
+ /*          END CHECK_FILE            */
+ /*------------------------------------*/
+ /*          START VERIFY_CC           */
+ /*------------------------------------*/
+ VERIFY_CC: PROC(IN_CC) ;
+    DCL IN_CC      PIC '(8)9';
+    DCL RC FIXED (1) INIT(0) ;
+    IF VERIFY(IN_CC ,'0123456789') ^= 0 THEN  DO;
+      CALL ERROR_LOG_HEADER;
+      T_CTRL = ' ';
+      GRAMH = 'ΜΗ ΑΡΙΘΜΗΤΙΚΟ ΠΕΔΙΟ ΣΤΗΝ ΚΑΡΤΑ ' !! IN_CC     ;
+      WRITE FILE (ERRLOG) FROM (LINE);
+      GO TO TELOS1;
+    END;
+ END VERIFY_CC;
+ /*------------------------------------*/
+ /*          END   VERIFY_CC           */
+ /*------------------------------------*/
+ TELOS:
+   MY_DATETIME = SUBSTR(DATETIME(),1,12);
+   T_CTRL = '1';
+   GRAMH  = '* * ΣΥΜΦΩΝΙΑ ΡΟΗΣ ΠΡΟΓΡΑΜΜΑΤΟΣ DK515 * *' ;
+   WRITE FILE(PRT) FROM(LINE);
+   T_CTRL = ' ';
+   GRAMH = 'Hμέρα και Ωρα Ροής :                             '
+                             !!MY_DATETIME;
+   GRAMH  = 'Διάβασθηκαν      = ' !! CNT_REC_READ!!' Εγγραφές' ;
+   WRITE FILE(PRT) FROM(LINE);
+   T_CTRL = ' ';
+   GRAMH  = 'Επεξεργάσθηκαν   = ' !! CNT_REC_PROCCED + CNT_REC_REJECT
+             !!' Εγγραφές' ;
+   WRITE FILE(PRT) FROM(LINE);
+   GRAMH  = 'Γράφτηκαν = ' !! CNT_REC_OUTXRE !!' Εγγραφές στο αρχείο'
+          !!' Xρεώσεων ' ;
+   WRITE FILE(PRT) FROM(LINE);
+   GRAMH  = 'Γράφτηκαν = ' !! CNT_REC_OUTPIS !!' Εγγραφές στο αρχείο'
+          !!' Πιστώσεων';
+   WRITE FILE(PRT) FROM(LINE);
+
+
+   IF CNT_REC_REJECT > 0 THEN DO;
+   GRAMH  = 'ΠΡΟΣΟΧΗ,Υπάρχουν = ' !! CNT_REC_REJECT!!' Εγγραφές'!!
+            ' Που πρέπει να ελεγχθούν' ;
+   WRITE FILE(PRT) FROM(LINE);
+   GRAMH  = 'Eνημερώστε τον Προγραμματιστή. ' !!
+            'Παραδώστε του την εκτύπωση ERRLOG  ' ;
+   WRITE FILE(PRT) FROM(LINE);
+   END;
+ TELOS1:
+   FREE TABLE ;
+   CLOSE FILE(PRT),FILE(ERRLOG),FILE(INFILE),
+         FILE(OUTPIS),FILE(OUTXRE),FILE(CARD);
+ END DK515;
+  /*
+
+ DCL 1   RECISKAT,
+      2   KSMLINK  CHAR (3),          /  LINK FIELDS                   /
+      2   KSMTYPE  CHAR(08),          /  EXAMPLE  KMOVESEG             /
+      2   KSMARLOG FIXED (9,0),       /  NUMBER OF ACCOUNT             /
+      2   KSMHMNIA FIXED DEC(7,0),    /  DATE OF OPERATION             /
+      2   KSMKARTR FIXED DEC(5,0),    /  TRANSACTION NUMBER            /
+      2   KSMKSEIR FIXED DEC(1,0),    /  SEQUENCE                      /
+      2   KSMSDF   BIT(8),            /  SYSTEM DELETED FLAG           /
+      2   KSMAKYR  CHAR(1),           /  FLAG DELETED
+                                         ('0') = NOT DELETED
+                                         ('1') = DELETED - PRINTED
+                                                 IN STATEMENT          /
+      2   KSMKATHO FIXED DEC(5,0),    /  GENERAL ACCOUNT CODE          /
+      2   KSMKATMA FIXED DEC(5,0),    /  BANK,BRANCH CODE OF ACCOUNT   /
+      2   KSMKWDEG CHAR(1),           /  ENTRY CODE
+                                         ('1') = CREDIT
+                                         ('2') = DEBIT                 /
+      2   KSMKAIT  BIT(8),            /  DESCRIPTION CODE
+      2   KSMPOSON FIXED DEC(11,2),   /  AMOUNT                        /
+      2   KSMKATLE FIXED DEC(5,0),    /  BANK,BRANCH OF OPERATION      /
+      2   KSMKATHA FIXED DEC(5,0),    /  CONTRARY G/A CODE             /
+      2   KSMSANAF,                   /  TRANSACTION REFERENCE         /
+       3  KSMTAY,                     /  TERMINAL IDENTIFICATION       /
+        4 KSMSKAT  CHAR(3),           /  BRANCH OF OPERATION           /
+        4 KSMSTERM CHAR(1),           /  TERMINAL NUMBER (LETTER)      /
+       3  KSMARTRT CHAR(3),           /  NUMBER OF OPERATIONS BY TERM. /
+      2   KSMAROPT CHAR(3),           /  TERMINAL OPERATOR ID.         /
+      2   KSMWRSYN CHAR(4),           /  TIME OF OPERATION             /
+ /                                                                     /
+ /               N O T E : IN THE CASE OF THE BILLS OF EXCHANCE        /
+ /                         COLLECTION THE REFERENCE FIELD WILL         /
+ /                         CONTAIN : BRANCH OF COLLECTION CODE         /
+ /                         PLUS 0000  I.E. 0180000                     /
+ /                                                                     /
+      2   KSMAXIA  FIXED(7,0),        /  VALUE DATE                    /
+      2   KSMAREP  FIXED DEC(9,0),    /  CHECK NUMBER                  /
+      2   KSMYPXR  CHAR(1),           /  INDICATION-BALANCE OUERDRAWN
+                                         ('0') = NOT OVERDRAWN
+                                         ('1') = COVERED FROM SUSPENSE
+                                                 BALANCE
+                                         ('2') = NOT COVERED FROM
+                                                 SUSPENSE BALANCE      /
+      2   KSMTRKWD CHAR(4);           /  TRANSACTION CODE              /
+
+ %PAGE;
+
+            / ------------------------------------ /
+            /  R E C O R D    T A M / P I O Y      /
+            / ------------------------------------ /
+
+ DCL 1 RECDBCR,                                                         REC00080
+       5 PRIORTY          PIC '(3)9' ,/  ΠPOTEPAIOTHTA MIΣΘOΔOΣIAΣ    / REC00180
+       5 KWDXRPIS         PIC '9'    ,/  KΩΔΙ ΧΡΕΩΣΗΣ-ΠΙΣΤΩΣΗΣ (2,1)  / REC00100
+       5 KWDPEL           PIC '(6)9' ,/  KΩΔIKOΣ ΠEΛATH               / REC00090
+       5 KATMA            FIXED (5)  ,/  TPAΠEZA-KAT/MA ΠEΛATH        / REC00100
+       5 ARLOG            FIXED (9)  ,/  APIΘMOΣ ΛOΓAPIAΣMOY          / REC00100
+       5 ONOMA            CHAR (28)  ,/  ONOMATEΠΩNYMO                / REC00100
+       5 C100             CHAR (03)  ,/  ΣTAΘEPA 000 H 100 H XXX      / REC00100
+       5 POSON            FIXED(13,2),/  ΠOΣO  XPEΩΣΗΣ-ΠIΣTΩΣHΣ       / REC00100
+                                      /       ΓIA KATAXΩPHΣH          / REC00100
+       5 POSOXRPI         FIXED(13,2),/  ΑΡΧΙΚΟ ΠΟΣΟ ΓIA KATAXΩPHΣH   / REC00100
+       5 HMEKD            FIXED(07)  ,/  HM/NIA  EKΔOΣHΣ  ΕΕΜΜΗΗ      / REC00100
+       5 HMVAL            FIXED(07)  ,/  VALEUR   ΕΕΜΜΗΗ              / REC00100
+       5 MHTRWO           CHAR(12)   ,/  MHTPΩO ΠEΛΑΤΗ                / REC00100
+       5 STATUS           CHAR(02)   ,/  00=NORMAL    >00 AΠOPIΨH     / REC00100
+       5 AITIOL           FIXED(03)  ,/  AITIOΛOΓIA XPEΩΣHΣ-ΠIΣTΩΣHΣ  / REC00170
+       5 AFM              FIXED(09)  ,/  A.Φ.M.                       / REC00100
+       5 KATHO            FIXED(05)  ,/  KAΘOΛIKO                     / REC00100
+       5 TYPEMIS          PIC '(1)9' ,/  TYΠOΣ MIΣΘOΔOΣIAΣ(1,2)       / REC00140
+                                      /  MONO cIA EMpOP. dEr TO BASED / REC00140
+
+       5 POSODESM         FIXED(9,2) ,/  ΠOΣO ΔEΣMEYΣHΣ               / REC00150
+       5 KWDUNDER         PIC '(3)9' ,/  KΩΔIKOΣ UNDERWRITTING        / REC00150
+
+       5 KATMAXOR         FIXED(05)  ,/  KAT/MA  XOPHΓHΣEΩN/POS       / REC00150
+                                      /  cIA ATM SWITCING,DIASTRANFER /
+                                      /  KATMA AkkHr TPApEZAr rE rYNd /
+                                      /  IArMO ME TO pEdIO BANK       /
+       5 KARTA            CHAR(16)   ,/  APIΘMOΣ KAPTAΣ -             / REC00150
+                                      /  APIΘΜΟΣ XOPHΓΗΣΕΩΝ           /
+       5 XOR_OMILOS       CHAR (05),  /  KATAΣΤΗΜΑ ΟΜΙΛΟΥ ΧΟΡΗΓΗΣΕΩΝ  / REC00190
+
+       5 TERMID           CHAR (08)  ,/  TEPMINAL ID P.O.S.           / REC00170
+       5 BATCHNUM         PIC '(3)9' ,/  BATCH NUMBER                 / REC00170
+       5 SEQNUM           PIC '(4)9' ,/  SEQUENTIAL NUMBER            / REC00170
+       5 HMSYN            PIC '(8)9' ,/  EEEEMMHH ΣΥΝΑΛΛΑΓΗΣ          / REC00170
+
+       5 PARAST           FIXED(9)   ,/ AΡΙΘΜΟΣ ΕΓΓΡΑΦΗΣ-ΠΑΡΑΣΤΑΤΙΚΟΥ / REC00170
+       5 MISTDIA          CHAR(3)    ,/  KATMA KAI TYPOS MISQODOSIAS  / REC00170
+                                      /  MONO GIA THN EMPORIKH,DIASPAY /REC00170
+                                      /  dEr TO BASED(ADDR)) pIO KATx / REC00170
+
+       5 KTMTABLE         FIXED(5)   ,/ TΡΑΠ-ΚΤΜΑ ΠΕΛΑΤΗ ΑΠΟ TABLES   / REC00170
+
+       5 INPUT_IND        CHAR(1)    ,/  INPUT INDICATOR ΠΟΣΟΥ        / REC00100
+                                      /   Ε=EURO SPACE=DRX            / REC00100
+       5 LOG_IND          CHAR(1)    ,/  INDICATOR ΛΟΓΑΡΙΑΣΜΟΥ        / REC00100
+                                      /   Ε=EURO SPACE=DRX            / REC00100
+       5 LOG_POSO         FIXED(13,2),/  ΠOΣO     ΧPEΩΣΗΣ-ΠIΣTΩΣHΣ    / REC00100
+                                      /  ΠΟΥ ΚΑΤΑΧΩΡΗΘHΚΕ ΣΤΟ ΛΟΓ/ΣΜΟ / REC00100
+       5 TERM_POSO        FIXED(13,2),/  ΠOΣO Χ/Π ΠΟΥ ΚΑΤΑΧΩΡΗΘHΚΕ    / REC00100
+                                      /  ΣΤΟ DISK TERMINAL            / REC00100
+       5 POSON_DRX        FIXED(13,2),/  ΠΟΣΟ ΔΡΧ ΓΙΑ ΤΟ ΒΚΤΑΜ1       / REC00100
+       5 BANK             FIXED (3) , /  ΚΩΔΙΚΟΣ ΤΡΑΠΕΖΑΣ ΔΙΑΣ SWITCH / REC00190
+                                      /  KxdIKOr pEkATH = 301,302     / REC00190
+                                      /  KxdIKOr TPApEZAr DIASTRANFER / REC00190
+                                      /  KXDIKOR PEKATH = 513         / REC00190
+                                                                     */ REC00190
+

@@ -1,0 +1,166 @@
+ DK554D:  PROCEDURE OPTIONS(MAIN);
+ /********************************************************************/
+ /* ΠΡΟΓΡΑΜΜΑ DB2 BATCH                                              */
+ /********************************************************************/
+ /*ΒΟΗΘΗΤΙΚΟ Πρόγραμμα για ΔΙΑΓΡΑΦΗ ΔΕΔΟΜΕΝΩΝ ΑΠΟ ΤΟΥΣ ΠΙΚΑΚΕΣ       */
+ /*                                             CTISDK01             */
+ /*                                             CTISAF01             */
+ /*                                             CTISAR01             */
+ /*                                             CTISDE01             */
+ /********************************************************************/
+ /********************************************************************/
+ /* Input :                                                          */
+ /*      AΡΧΕΊΟ 1                                                    */
+ /*READER   με τα πιο κάτω πεδία :                                   */
+ /*YYYY     ετος της μορφής 2011                                     */
+ /*MM       μηνας της μορφης 2011                                    */
+ /*MSR_PRD_ID    CHAR(10)   ημερομηνια της μορφης 01.05.2011         */
+ /*BII_MON_END   CHAR(06)   ημερομηνια της μορφης 201105             */
+ /*                                                                  */
+ /********************************************************************/
+ /********************************************************************/
+ /*           PROGRAM NAME: DK554D     LOAD MODULE: DK554D           */
+ /********************************************************************/
+ /* 11-05-2006 NPK                                                   */
+ /********************************************************************/
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+
+ DCL CZX3VDAT CHAR(6); FETCH CZXDATEP;
+ DCL CZXDATEP ENTRY OPTIONS(INTER,ASM) ;
+ DATE: PROC IRREDUCIBLE RETURNS(CHAR(6)) ;
+         CALL CZXDATEP          ( CZX3VDAT) ;
+         RETURN (CZX3VDAT) ;
+         END DATE ;
+
+ /********************************************************************/
+ /*
+ /********************************************************************/
+  DCL READER FILE  SEQUENTIAL INPUT ENV(FB RECSIZE(80));
+ /***************************/
+ /*DB2 DECLARATIONS         */
+ /***************************/
+
+ /*-ΒΟΗΘΗΤΙΚΟΣ ΠΙΝΑΚΑΣ ΓΙΑ ΤΟ ΜΙΣ ------------------*/
+ EXEC SQL                                                               01460000
+          INCLUDE CTISDK01;                                             01510300
+ EXEC SQL                                                               01460000
+          INCLUDE CTISAF01;                                             01510300
+ EXEC SQL                                                               01460000
+          INCLUDE CTISAR01;                                             01510300
+ EXEC SQL                                                               01460000
+          INCLUDE CTISDE01;                                             01510300
+ EXEC SQL                                                               01510500
+            INCLUDE SQLCA;                                              01510600
+ DCL     LINE                CHAR (133);
+ DCL 1   LNX                 BASED(ADDR(LINE)),
+      2  CTLCHR              CHAR(1)      INIT('1'),
+      2  GRAMH               CHAR(132)    INIT(' ');
+ DCL 1   CC                        ,
+      2  YYYY            PIC'9999',
+      2  F1              CHAR(1),
+      2  MM              PIC'99',
+      2  F2              CHAR(1),
+      2  MSR_PRD_ID      CHAR(10),/*ημερομηνια της μορφης 01.05.2011*/
+      2  F3              CHAR(1),
+      2  BII_MON_END     CHAR(06),/*ημερομηνια της μορφης 201105    */
+      2  F4              CHAR(5),
+      2  FFF             CHAR(50);
+
+ DCL FILE1_FLAG FIXED (1) INIT(0);
+ DCL FILE1_EOF  FIXED (1) INIT(0);
+
+ DCL   WS_MNTH       FIXED DEC(2,0)   INIT(0);
+ DCL   WS_YEAR       FIXED DEC(5,0)   INIT(0);
+
+
+ DCL (ONFILE,ONCODE,ONKEY,PRIORITY,TIME,VERIFY) BUILTIN;
+ DCL (DATETIME,SUBSTR,NULL,ADDR,UNSPEC,TRANSLATE) BUILTIN;
+ DCL (ABS ,DIVIDE,ROUND,CHAR) BUILTIN ;
+  /** ON  CONDITIONS *****************************************/
+  ON ERROR BEGIN;
+     ON ERROR SYSTEM;
+     PUT SKIP LIST('ESKASE TO DK554D');
+     PUT SKIP LIST('TODAY IS : ',DATETIME());
+  END;
+  /*******************************************************************/
+
+   OPEN FILE(READER);
+
+   READ FILE(READER) INTO (CC);
+
+   PUT SKIP LIST('***************************************************');
+   PUT SKIP LIST('CARD FOR THE PROGRAM DK554DEL,RUNTIME ',DATETIME());
+   PUT SKIP LIST('YYYY        = ',CC.YYYY          );
+   PUT SKIP LIST('MM          = ',CC.MM            );
+   PUT SKIP LIST('MSR_PRD_ID  = ',CC.MSR_PRD_ID    );
+   PUT SKIP LIST('BII_MON_END = ',CC.BII_MON_END   );
+   PUT SKIP LIST('***************************************************');
+
+
+   CTISDK01.KEY_YEAR     =  YYYY         ;
+   CTISDK01.KEY_MONTH    =  MM           ;
+   EXEC SQL DELETE FROM  CTISDK01
+               WHERE KEY_YEAR  = :CTISDK01.KEY_YEAR  AND
+                     KEY_MONTH = :CTISDK01.KEY_MONTH ;
+       IF SQLCODE = 0 THEN DO;
+          PUT SKIP LIST ('Επιτυχία : Σβύστηκαν οι Εγγραφές');
+          PUT SKIP LIST ('απο τον πίνακα CTISDK01         ');
+          PUT SKIP LIST ('ΕΤΟΣ : ',YYYY);
+          PUT SKIP LIST ('ΜΗΝΑΣ: ',MM  );
+        END;
+        ELSE DO;
+          PUT SKIP LIST ('APOTYXIA :ΔΕΝ Σβύστηκαν οι Εγγραφές');
+          PUT SKIP LIST ('απο τον πίνακα CTISDK01         ');
+          PUT SKIP LIST ('ΕΤΟΣ : ',YYYY);
+          PUT SKIP LIST ('ΜΗΝΑΣ: ',MM  );
+          PUT SKIP LIST ('sqlcode: ',char(sqlcode) );
+        END;
+   PUT SKIP LIST('*********************************');
+
+     EXEC SQL COMMIT;
+     EXEC SQL DELETE   FROM CTISAF01
+     WHERE  BII_MON_END = :CC.BII_MON_END  AND
+            SRC_STM_ID  = 'EMP_SHCR'    ;
+       IF SQLCODE = 0 THEN DO;
+          PUT SKIP LIST ('Επιτυχία : Σβύστηκαν οι Εγγραφές');
+          PUT SKIP LIST ('απο τον πίνακα CTISAF01         ');
+        END;
+        ELSE DO;
+          PUT SKIP LIST ('APOTYXIA :ΔΕΝ Σβύστηκαν οι Εγγραφές');
+          PUT SKIP LIST ('απο τον πίνακα CTISAF01         ');
+          PUT SKIP LIST ('sqlcode: ',char(sqlcode) );
+        END;
+   PUT SKIP LIST('*********************************');
+
+     EXEC SQL COMMIT;
+     EXEC SQL DELETE   FROM CTISAR01
+     WHERE  BII_MON_END = :CC.BII_MON_END  AND
+            SRC_STM_ID  = 'EMP_SHCR'    ;
+       IF SQLCODE = 0 THEN DO;
+          PUT SKIP LIST ('Επιτυχία : Σβύστηκαν οι Εγγραφές');
+          PUT SKIP LIST ('απο τον πίνακα CTISAR01         ');
+        END;
+        ELSE DO;
+          PUT SKIP LIST ('APOTYXIA :ΔΕΝ Σβύστηκαν οι Εγγραφές');
+          PUT SKIP LIST ('απο τον πίνακα CTISAR01         ');
+          PUT SKIP LIST ('sqlcode: ',char(sqlcode) );
+        END;
+   PUT SKIP LIST('*********************************');
+
+     EXEC SQL COMMIT;
+     EXEC SQL DELETE   FROM CTISDE01
+     WHERE    MSR_PRD_ID  = :CC.MSR_PRD_ID  AND
+              SOURCE_APL_CD = '70' ;
+       IF SQLCODE = 0 THEN DO;
+          PUT SKIP LIST ('Επιτυχία : Σβύστηκαν οι Εγγραφές');
+          PUT SKIP LIST ('απο τον πίνακα CTISDE01         ');
+        END;
+        ELSE DO;
+          PUT SKIP LIST ('APOTYXIA :ΔΕΝ Σβύστηκαν οι Εγγραφές');
+          PUT SKIP LIST ('απο τον πίνακα CTISDE01         ');
+          PUT SKIP LIST ('sqlcode: ',char(sqlcode) );
+        END;
+   PUT SKIP LIST('*********************************');
+
+ END DK554D;
+

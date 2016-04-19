@@ -1,0 +1,267 @@
+* PROCESS XOPTS(DLI);
+ /* PROCESS INCLUDE,XOPTS(DLI),AG,A,M,MAP,MI(':'),NEST,NIS,OPT(2),X,OF*/
+ /*------------------------------------------------------------------*/
+ /* AJ257 : ApkHPxTA dEkTIA OpAp ME HMEPOMHNIA kHnHr pkHPxMHr        */
+ /*         MIKPOTEPH ApO AYTH TOY rYrTHMATOr pOY EKAhAPIZONTAI      */
+ /*                                           uEBPOYAPIOr 98  B.A.   */
+ /*                                            OK FOR EURO           */
+ /*------------------------------------------------------------------*/
+
+ PLITDLI: PROCEDURE OPTIONS(MAIN);
+ /*****       VSE/MVS TRANSLATION PROCESSED BY MVS-MS       *****/
+ /*****          SATURDAY  96/05/11  AT  22.38.25           *****/
+ /*** PL/1 OPTIMIZER EXECUTION TIME OPTIONS ***/
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+ /*** MVS-MS DATE SIMULATION VARIABLES ***/
+ DCL CZX3VDAT CHAR(6); FETCH CZXDATEP;
+ DCL CZXDATEP ENTRY OPTIONS(INTER,ASM) ;
+ /***            END OF MVS-MS INSERT            ***/
+
+ % INCLUDE  AJSEGA ;
+
+
+   DCL FILIN FILE RECORD INPUT  ENV(
+                 FB    RECSIZE(300));
+   DCL RECIN           CHAR(300);
+   DCL 1 OMF           BASED(ADDR(RECIN)),
+         2 ARLOGAR     PIC'(13)9',
+  /*     2 ARLOG2      PIC'99',
+         2 ARLOG3      PIC'9',
+         2 ARLOG4      PIC'(6)9',
+         2 ARLOG5      PIC'9',
+         2 ARLOG6      PIC'99',        */
+         2 ONOMA       CHAR(45),
+         2 DIEYT       CHAR(35),
+         2 TAMEIO      CHAR(207);
+ /*-------------------------------------------------------------------*/
+
+ DCL  KEYDEL    FIXED(13)  INIT(0);
+
+ DCL 1 FKEYDEL BASED(ADDR(KEYDEL)),
+       2 FKEY1 BIT(52),
+       2 FILBIT BIT(4);
+
+    /*start npk convert for enterpice pli 21-05-2007 ***/
+    DCL   HMNIA    char(8) init('');
+    /*end   npk convert for enterpice pli 21-05-2007 ***/
+    DCL 1 HMNIA2   BASED(ADDR(HMNIA)),
+          2 HMDEKA    CHAR(2),
+          2 HMNIA3    PIC'999999';         /* MORFH YYMMDD */
+
+ DCL  HMOT1   PIC'99999999'  BASED(ADDR(HMNIA2));  /* MORFH YYMMDD */
+ DCL  HMOUT    PIC'99999999'  INIT(0);         /* MORFH YYMMDD */
+
+ DCL  PRINT  FILE RECORD SEQUENTIAL OUTPUT
+      ENV(FB RECSIZE(133) CTLASA);
+
+ DCL  LINE CHAR (133);
+
+ DCL  1 LNX  BASED(ADDR(LINE)),
+      2  CTLCHR  CHAR(1)    INIT('1'),
+      2  GRAMH   CHAR(132)  INIT(' ');
+
+ DCL  DATETIME     BUILTIN;
+ DCL  (SUBSTR,TRANSLATE,ADDR)    BUILTIN;
+
+ DCL  MOV_DT_F   FIXED (7)     INIT (0);
+
+ DCL 1 MOV_DT    BASED (ADDR(MOV_DT_F)),
+       2 MOV_DT1       BIT (28),
+       2 MOVBIT1       BIT (4);
+
+ DCL 1 ARTR      BASED (ADDR(ESMKARTR)),
+       2 ARTR1         BIT (20),
+       2 ARTBIT1       BIT (4);
+
+ DCL 1 SEIR      BASED (ADDR(ESMKSEIR)),
+       2 SEIR1         BIT (4),
+       2 SEIBIT1       BIT (4);
+
+
+ DCL  HMDUE   PIC'(6)9' INIT(0) ;
+
+ DCL 1  HMDU BASED(ADDR(HMDUE)),
+        2  YYEA        PIC '99',
+        2  MMEA        PIC '99',
+        2  DDEA        PIC '99';
+ /*--------- DHMIOYRGIA PEDIWN HMEROMHNIWN -----------*/
+
+ DCL  W_DATE CHAR (08) INIT (' '); /* CIA SYSDATE YYMMDD */
+
+ DCL 1  WRKDATE        BASED(ADDR(W_DATE)), /* REDEFINES SYSDATE */
+        2  WRK_YY1     PIC '99',
+        2  WRK_DA2,
+          3 WRK_YY2   PIC '99',
+          3 WRK_MM    PIC '99',
+          3 WRK_DD    PIC '99';
+  DCL SDAT CHAR(06) BASED(ADDR(WRK_DA2));
+  DCL WDAT PIC'(08)9'  BASED(ADDR(W_DATE));
+
+      W_DATE = DATETIME;       /* ALPHANUMERIC HMEROMHNIA  */
+
+ DCL  1  WRK,    /* DEXETAI THN SYSDATE ANESTRAMENH SE DDMMYY */
+         2  W_DD          PIC '99'       INIT(0),
+         2  W_MM          PIC '99'       INIT(0),
+         2  W_YY          PIC '99'       INIT(0);
+    /* -----------------------------------------  */
+    /* GINETAI H ANASTROFH THS SYSDATE SE DDMMYY  */
+    /* -----------------------------------------  */
+         W_DD = WRK_DD;
+         W_MM = WRK_MM;
+         W_YY = WRK_YY2;
+
+ DCL  WRKDT       CHAR (6)   BASED(ADDR(WRK)); /* H SYSDATE DDMMYY */
+    /* -----------------------------------------  */
+    /* STO SHMEIO AYTO H WRKDT EXEI TIMH THN TIMH */
+    /* THS SYSDATE STH MORFH DDMMYY               */
+    /* -----------------------------------------  */
+
+ DCL  FLOW_DT     PIC '999999'  BASED(ADDR(SDAT));
+
+ DCL DECIMAL_PART CHAR(2) INIT(' ');
+
+ DCL STR_AKATHAR CHAR(14) INIT(' ');
+ DCL CHAR_AKATHAR(14) BASED(ADDR(STR_AKATHAR)) CHAR(1);
+ DCL STR_AKATH1 CHAR(14) INIT('0');
+ DCL   PIC_AKATHAR BASED(ADDR(STR_AKATH1))  PIC'(12)9V99';
+
+ DCL STR_FOROS CHAR(14) INIT(' ');
+ DCL CHAR_FOROS(14) BASED(ADDR(STR_FOROS)) CHAR(1);
+ DCL STR_FOR1 CHAR(14) INIT('0');
+ DCL   PIC_FOROS BASED(ADDR(STR_FOR1))    PIC'(12)9V99';
+
+ DCL  WRKAREA     CHAR(600)     INIT('');
+ DCL  WRKAREA1    CHAR(600)     INIT('');
+
+
+ DCL 1 MOV_KEY,                      /* GIA MOVMENT */
+       2 MOV_KEY1      FIXED (7),
+       2 MOV_KEY2      FIXED (5),
+       2 MOV_KEY3      FIXED (1);
+
+ DCL MOV_KEY_R    CHAR (08) BASED(ADDR(MOV_KEY));
+
+ DCL  EOF_VSOPAP       PIC'9'      INIT(0);
+ DCL  IN_VSAM          FIXED (15)  INIT(0);
+ DCL  OUT_VSAM         FIXED (15)  INIT(0);
+ DCL  REP_ROT          FIXED (15)  INIT(0);
+ DCL  REC_OUT          FIXED (15)  INIT(0);
+ /*DCL  POSO_OUT         FIXED (15)  INIT(0) */
+ DCL  POSO_OUT1        FIXED (15,2)  INIT(0);
+ DCL  POSO_OUT2        FIXED (15,2)  INIT(0);
+ DCL  INS_MOV          FIXED (15)  INIT(0);
+ DCL  LIM2000          PIC'(6)9'   INIT(791231);
+
+  /*----------------------------------------------------------*/
+
+
+ OPEN FILE (FILIN),
+      FILE(PRINT);
+
+  TFIOROOT = ADDR(WRKAREA);     /* ADDRESSABILITY OF WORK_AREA */
+  TFIOSADD = ADDR(WRKAREA1);    /* ADDRESSABILITY OF WORK_AREA */
+
+         ON ENDFILE(FILIN) BEGIN;
+                             EOF_VSOPAP = 1;
+                             GOTO TELOS;
+                            END;
+
+  MAIN:;
+  DO WHILE (EOF_VSOPAP = 0);
+       READ FILE(FILIN) INTO(RECIN);
+       IN_VSAM = IN_VSAM + 1;
+          KEYDEL = ARLOGAR;
+           FILBIT = '1111'B;
+
+             EXEC DLI
+                GU USING PCB(2)
+                SEGMENT (FROOTSEG)
+                WHERE (FROOTKEY=KEYDEL)
+                INTO (WRKAREA);
+
+    IF DIBSTAT ^= ' ' THEN DO;
+          CTLCHR = '1';
+          GRAMH = DIBSTAT !! 'dEN BPIrKEI ROOT_SEGMENT ME KkEIdI: ' !!
+                  KEYDEL;
+          WRITE FILE (PRINT) FROM (LINE);
+          GOTO MAIN;
+          END;
+
+    IF DIBSTAT = 'GE' THEN DO;
+          CTLCHR = '1';
+          GRAMH = ' TO ROOT_SEGMENT  ME KkEIdI :'!!KEYDEL!!
+                  ' EINAI ANYpAPKTO '!! DIBSTAT;
+          WRITE FILE (PRINT) FROM (LINE);
+          GOTO MAIN;
+          END;
+
+    IF DIBSEGM^= 'FROOTSEG' THEN DO;
+          CTLCHR = '1';
+          GRAMH = ' kAhOr TYpOr SEGMENT rTHN ANEYPErH TOY ROOT '!!
+                  ' ME KkEIdI :'!!KEYDEL!! DIBSEGM !! DIBSTAT;
+          WRITE FILE(PRINT) FROM(LINE);
+          GOTO MAIN;
+     END;
+
+    CALL PRO_ROOT;
+    END;        /* END WHILE_LOOP */
+  /*-----------------------------------------------------------*/
+  /* ROUTINA EPEXERGASIAS TOY ROOT SEGMENT KAI INSERT MOVEMENT */
+  /*-----------------------------------------------------------*/
+
+  PRO_ROOT: PROC;
+
+
+       ESRDIEYT= DIEYT ;
+       ESRONDIK = ONOMA  ;
+
+    EXEC DLI
+           REPL  USING PCB(2)
+           SEGMENT (FROOTSEG)
+           FROM    (WRKAREA);
+
+    IF DIBSTAT  ^= ' '
+         THEN DO;
+             GRAMH = ' kAhOr KATA THN ANTIKATArTArH TOY ROOT '!!
+                     ' SEGMENT THr D/B '!! ESRARLOG !! DIBSTAT;
+             WRITE FILE (PRINT) FROM (LINE);
+             GOTO MAIN;
+    END;
+
+       REP_ROT = REP_ROT + 1;
+
+  RETURN1:;
+
+  END PRO_ROOT;
+
+
+  /*-------------------------------------------------------------*/
+
+ TELOS:
+
+   CTLCHR = '1';
+   GRAMH = '***** r Y M u x N I A   A u A I P E h E N T x N   d E k T'
+         !! ' I x N  O p A p *' !!
+            ' THR ' !! W_DD !! '.' !! W_MM !! '.' !! W_YY
+         !! ' **AJ257** ' ;
+   WRITE FILE (PRINT) FROM (LINE);
+
+   CTLCHR = '0';
+   GRAMH = '** rYNOkO RECORDS pOY dIABArTHKAN  ApO VSAM ** '!! IN_VSAM;
+   WRITE FILE (PRINT) FROM (LINE);
+
+   GRAMH = '** rYNOkO RECORDS  pOY ANTIKATArTAhHKAN **'!! REP_ROT;
+   WRITE FILE (PRINT) FROM (LINE);
+
+   GRAMH = '** rYNOkO MOVEMENTS pOY EIrHXhHKAN  ** '!! INS_MOV;
+   WRITE FILE (PRINT) FROM (LINE);
+
+   GRAMH = '** rYNOkO EccPAuxN rTHN EnOdO       ** '!! REC_OUT;
+   WRITE FILE (PRINT) FROM (LINE);
+
+
+ CLOSE FILE (FILIN),
+       FILE (PRINT);
+
+  END;
+

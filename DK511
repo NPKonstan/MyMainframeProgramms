@@ -1,0 +1,425 @@
+ DK511 : PROC OPTIONS (MAIN);
+ /***********************************************************/
+ /*          MEMBER = DK511   PLI + DB2                     */
+ /***********************************************************/
+ /* INTERFACE Δημιουργίας της Λίστας 12
+ *****************************************************************
+ ΛΙΣΤΑ 12 : Χρήση λογαριασμών DAV.
+ Λίστα του συνόλου των τρεχόντων λογαριασμών DAV την 31/12/2006 με, για
+ κάθε DAV και για το διάστημα των τελευταίων 12 μηνών :
+ Δεκατρείς στοιχεία που απαιτούνται για κάθε λογαριασμό DAV :    */
+ /*npk 25-01-2007 */
+ /****************************************************************/
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+ DCL PRT     FILE RECORD OUTPUT ENV(  FB RECSIZE(133)
+                            CTLASA) ;
+ DCL OUTFILE FILE RECORD OUTPUT ENV(  FB  RECSIZE(197) ) ;
+ DCL READER  FILE  RECORD  INPUT  ENV(
+                 FB    RECSIZE(080)             );
+
+ DCL   ADDR     BUILTIN;
+ DCL   SUBSTR   BUILTIN;
+ DCL   DATETIME BUILTIN;
+ DCL   PLIRETC  BUILTIN;
+ DCL   EOC           BIT(1)    INIT('0'B);
+ DCL   TOT_FETCHED   FIXED(9)  INIT(0);
+ DCL   WCIDB      CHAR(18) INIT(' ');
+ DCL   PIC_LOGAR   PIC'(08)9' INIT(0);
+ DCL   WS_KEY_YEAR DEC FIXED(5,0) INIT(0);
+
+ DCL 1 REC_READER,
+          2 CC_YEAR   PIC '(4)9',
+          2 CC_       CHAR(76);
+        OPEN FILE(READER );
+        READ  FILE(READER)  INTO(REC_READER) ;
+        CLOSE FILE(READER ) ;
+ DCL 1   ERLINE              ,
+      2  ERLIN1       CHAR(1)      INIT('1'),
+      2  ERLIN2       CHAR(132)    INIT(' ');
+
+ DCL IGLML12 CHAR(197) BASED(ADDR(IGLML121)) ;
+ DCL 1 IGLML121                         ,
+   /*PEDIO 1*/
+ 2 IGL_COD_PELATH        PIC'(09)9'     , /* Κωδικός CIDB*/
+ 2 IGL_DELIMITER_1       CHAR(01) INIT(';') ,
+   /*PANTA 70*/
+ 2 IGL_COD_EFARM         CHAR(02) INIT('70'), /* Κωδικός εφαρμογή*/
+   /*PEDIO 2*/
+ 2 IGL_NUM_AR_LOGAR      CHAR(16)       , /*Αριθμός λογαριασμού*/
+ 2 IGL_DELIMITER_2       CHAR(01) INIT(';') ,
+   /*PEDIO 3*/
+ 2 IGL_MESO_YPOL_YTD     PIC'S(13)9V,99', /*Μέσο υπόλοιπο περιόδου*/
+ 2 IGL_DELIMITER_3       CHAR(01) INIT(';') ,
+   /*PEDIO 4*/
+ 2 IGL_MESO_YPOL_A       PIC'S(13)9V,99', /*Μέσο υπόλοιπο Α  τριμήνου*/
+ 2 IGL_DELIMITER_4       CHAR(01) INIT(';') ,
+   /*PEDIO 5*/
+ 2 IGL_MESO_YPOL_B       PIC'S(13)9V,99', /*Μέσο υπόλοιπο Β  τριμήνου*/
+ 2 IGL_DELIMITER_5       CHAR(01) INIT(';') ,
+   /*PEDIO 6*/
+ 2 IGL_MESO_YPOL_C       PIC'S(13)9V,99', /*Μέσο υπόλοιπο Γ  τριμήνου*/
+ 2 IGL_DELIMITER_6       CHAR(01) INIT(';') ,
+   /*PEDIO 7*/
+ 2 IGL_MESO_YPOL_D       PIC'S(13)9V,99', /*Μέσο υπόλοιπο Δ  τριμήνου*/
+ 2 IGL_DELIMITER_7       CHAR(01) INIT(';') ,
+   /*PEDIO 8*/
+ 2 IGL_PLHTHOS_EKDO      PIC'(07)9'  ,   /*Πλήθος επιταγών εκδίδονται*/
+ 2 IGL_DELIMITER_8       CHAR(01) INIT(';') ,
+   /*PEDIO 9*/
+ 2 IGL_SYNOLO_EKDO       PIC'S(13)9V,99',/*Σύνολο επιταγών εκδίδονται*/
+ 2 IGL_DELIMITER_9       CHAR(01) INIT(';') ,
+   /*PEDIO 10*/
+ 2 IGL_PLHTHOS_EISP      PIC'(07)9'     ,/*Πλήθος επιταγών εισπράττον*/
+ 2 IGL_DELIMITER_10      CHAR(01) INIT(';') ,
+   /*PEDIO 11*/
+ 2 IGL_SYNOLO_EISP       PIC'S(13)9V,99',/*Σύνολο επιταγών εισπράττον*/
+ 2 IGL_DELIMITER_11      CHAR(01) INIT(';') ,
+   /*PEDIO 12*/
+ 2 IGL_PLHTHOS_PLHR      PIC'(07)9'     ,/*Πλήθος πληρωμών σε μετρητά*/
+ 2 IGL_DELIMITER_12      CHAR(01) INIT(';') ,
+   /*PEDIO 13*/
+ 2 IGL_SYNOLO_PLHR       PIC'S(13)9V,99',/*Σύνολο πληρωμών σε μετρητά*/
+ 2 IGL_DELIMITER_13      CHAR(01) INIT(';') ;
+
+ EXEC SQL
+          INCLUDE CTDKSTTP;
+ EXEC SQL                                                               01460000
+          INCLUDE CTISDK01;                                             01510300
+ EXEC SQL                                                               01460000
+          INCLUDE T04CNV97;                                             01510300
+ EXEC SQL
+   INCLUDE SQLCA;
+
+  OPEN FILE(PRT),FILE(OUTFILE);
+  OPEN FILE(READER );
+  /*READ CC-CARD FOR YEAR*/
+  READ  FILE(READER)  INTO(REC_READER) ;
+  WS_KEY_YEAR = CC_YEAR;
+
+  CLOSE FILE(READER ) ;
+
+  CALL DECLARE_CURSOR;
+  CALL OPEN_CURSOR;
+  CALL ROUT_FETCH_ROWS;
+  DO WHILE(^EOC);
+     CALL ROUT_FETCH_ROWS;
+     CALL GET_CIDB       ;
+     CALL GET_MESO_YPOL_YTD;
+     CALL GET_MESO_YPOL_A       ;
+     CALL GET_MESO_YPOL_B       ;
+     CALL GET_MESO_YPOL_C       ;
+     CALL GET_MESO_YPOL_D       ;
+
+     /* ΓΡΑΨΕ  RECORD     */
+     WRITE FILE(OUTFILE ) FROM(IGLML12);
+     /* INITIALIZE FIELDS */
+     IGL_COD_PELATH   = 0;
+     IGL_NUM_AR_LOGAR ='';
+     PIC_LOGAR = 0;
+     IGL_MESO_YPOL_YTD= 0;
+     IGL_MESO_YPOL_A  = 0;
+     IGL_MESO_YPOL_B  = 0;
+     IGL_MESO_YPOL_C  = 0;
+     IGL_MESO_YPOL_D  = 0;
+     IGL_SYNOLO_EKDO  = 0;
+     IGL_PLHTHOS_EKDO = 0;
+     IGL_PLHTHOS_EISP = 0;
+     IGL_SYNOLO_EISP  = 0;
+     IGL_PLHTHOS_PLHR = 0;
+     IGL_SYNOLO_PLHR  = 0;
+
+     CALL ROUT_FETCH_ROWS;
+  END; /*DO WHILE END*/
+
+ /*  =============================================  */
+     GET_MESO_YPOL_YTD:       PROC;
+
+         CTISDK01 = '';
+         CTISDK01.KEY_ACCN1 =  PIC_LOGAR                   ;
+         CTISDK01.KEY_YEAR  =  WS_KEY_YEAR;
+
+        EXEC SQL SELECT
+             (SUM(NUM_VCAVGBL) - SUM(NUM_VDAVGBL))/12
+             INTO :CTISDK01.NUM_VCAVGBL
+             FROM CTISDK01
+             WHERE  KEY_ACCN1 =  :CTISDK01.KEY_ACCN1  AND
+                    KEY_YEAR  =  :CTISDK01.KEY_YEAR WITH UR  ;
+                /*  KEY_MONTH =  :CTISDK01.KEY_MONTH */
+       IF SQLCODE ^= 0   THEN  DO;
+            ERLIN2 = 'ERROR  ΕΥΡΕΣΗ ΜΕΣΟΥ ΜΗΝΙΑΙΟΥ ΠΕΡΙΟΔΟΥ CTISDK01 : '!!
+                  !!' AΡΙΘΜ.ΛΟΓΑΡ. '!! CTISDK01.KEY_ACCN1
+                  !!' SQLCODE : '!!SQLCODE;
+            WRITE FILE(PRT) FROM(ERLINE);
+            /*PEDIO 3*/
+            IGL_MESO_YPOL_YTD = 0  ;
+       END;
+       ELSE
+            /*PEDIO 3*/
+            IGL_MESO_YPOL_YTD = CTISDK01.NUM_VCAVGBL ;
+     END GET_MESO_YPOL_YTD    ;
+ /*  =============================================  */
+ /*  =============================================  */
+     GET_MESO_YPOL_A:        PROC;
+         CTISDK01 = '';
+         CTISDK01.KEY_ACCN1 =  PIC_LOGAR                   ;
+         CTISDK01.KEY_YEAR  =  WS_KEY_YEAR  ;
+
+        EXEC SQL SELECT
+             (SUM(NUM_VCAVGBL) - SUM(NUM_VDAVGBL))/3
+             INTO :CTISDK01.NUM_VCAVGBL
+             FROM CTISDK01
+             WHERE  KEY_ACCN1 =  :CTISDK01.KEY_ACCN1  AND
+                    KEY_YEAR  =  :CTISDK01.KEY_YEAR   AND
+                    KEY_MONTH IN (1,2,3) WITH UR;
+       IF SQLCODE ^= 0   THEN  DO;
+            ERLIN2 = 'ERROR  ΕΥΡΕΣΗ ΜΕΣΟΥ ΜΗΝ. A TΡΙΜΗΝΟΥ CTISDK01 : '  !!
+                  !!' AΡΙΘΜ.ΛΟΓΑΡ. '!! CTISDK01.KEY_ACCN1
+                  !!' SQLCODE : '!!SQLCODE;
+            WRITE FILE(PRT) FROM(ERLINE);
+            /*PEDIO 4*/
+            IGL_MESO_YPOL_A = 0  ;
+       END;
+       ELSE
+            /*PEDIO 4*/
+            IGL_MESO_YPOL_A = CTISDK01.NUM_VCAVGBL ;
+     END GET_MESO_YPOL_A      ;
+ /*  =============================================  */
+ /*  =============================================  */
+     GET_MESO_YPOL_B:         PROC;
+         CTISDK01 = '';
+         CTISDK01.KEY_ACCN1 =  PIC_LOGAR                 ;
+         CTISDK01.KEY_YEAR  =  WS_KEY_YEAR  ;
+
+        EXEC SQL SELECT
+             (SUM(NUM_VCAVGBL) - SUM(NUM_VDAVGBL))/3
+             INTO :CTISDK01.NUM_VCAVGBL
+             FROM CTISDK01
+             WHERE  KEY_ACCN1 =  :CTISDK01.KEY_ACCN1  AND
+                    KEY_YEAR  =  :CTISDK01.KEY_YEAR   AND
+                    KEY_MONTH IN (4,5,6) WITH UR;
+       IF SQLCODE ^= 0   THEN  DO;
+            ERLIN2 = 'ERROR  ΕΥΡΕΣΗ ΜΕΣΟΥ ΜΗΝ. B TΡΙΜΗΝΟΥ CTISDK01 : '  !!
+                  !!' AΡΙΘΜ.ΛΟΓΑΡ. '!! CTISDK01.KEY_ACCN1
+                  !!' SQLCODE : '!!SQLCODE;
+            WRITE FILE(PRT) FROM(ERLINE);
+            /*PEDIO 5*/
+            IGL_MESO_YPOL_B = 0  ;
+       END;
+       ELSE
+            /*PEDIO 5*/
+            IGL_MESO_YPOL_B = CTISDK01.NUM_VCAVGBL ;
+     END GET_MESO_YPOL_B      ;
+ /*  =============================================  */
+ /*  =============================================  */
+     GET_MESO_YPOL_C:         PROC;
+         CTISDK01 = '';
+         CTISDK01.KEY_ACCN1 =  PIC_LOGAR                   ;
+         CTISDK01.KEY_YEAR  =  WS_KEY_YEAR  ;
+
+        EXEC SQL SELECT
+             (SUM(NUM_VCAVGBL) - SUM(NUM_VDAVGBL))/3
+             INTO :CTISDK01.NUM_VCAVGBL
+             FROM CTISDK01
+             WHERE  KEY_ACCN1 =  :CTISDK01.KEY_ACCN1  AND
+                    KEY_YEAR  =  :CTISDK01.KEY_YEAR   AND
+                    KEY_MONTH IN (7,8,9) WITH UR;
+       IF SQLCODE ^= 0   THEN  DO;
+            ERLIN2 = 'ERROR  ΕΥΡΕΣΗ ΜΕΣΟΥ ΜΗΝ. G TΡΙΜΗΝΟΥ CTISDK01 : '  !!
+                  !!' AΡΙΘΜ.ΛΟΓΑΡ. '!! CTISDK01.KEY_ACCN1
+                  !!' SQLCODE : '!!SQLCODE;
+            WRITE FILE(PRT) FROM(ERLINE);
+            /*PEDIO 6*/
+            IGL_MESO_YPOL_C = 0  ;
+       END;
+       ELSE
+            /*PEDIO 6*/
+            IGL_MESO_YPOL_C = CTISDK01.NUM_VCAVGBL ;
+     END GET_MESO_YPOL_C      ;
+ /*  =============================================  */
+ /*  =============================================  */
+     GET_MESO_YPOL_D:         PROC;
+         CTISDK01 = '';
+         CTISDK01.KEY_ACCN1 =  PIC_LOGAR                   ;
+         CTISDK01.KEY_YEAR  =  WS_KEY_YEAR  ;
+
+        EXEC SQL SELECT
+             (SUM(NUM_VCAVGBL) - SUM(NUM_VDAVGBL))/3
+             INTO :CTISDK01.NUM_VCAVGBL
+             FROM CTISDK01
+             WHERE  KEY_ACCN1 =  :CTISDK01.KEY_ACCN1  AND
+                    KEY_YEAR  =  :CTISDK01.KEY_YEAR   AND
+                    KEY_MONTH IN (10,11,12) WITH UR;
+       IF SQLCODE ^= 0   THEN  DO;
+            ERLIN2 = 'ERROR  ΕΥΡΕΣΗ ΜΕΣΟΥ ΜΗΝ. D TΡΙΜΗΝΟΥ CTISDK01 : '  !!
+                  !!' AΡΙΘΜ.ΛΟΓΑΡ. '!! CTISDK01.KEY_ACCN1
+                  !!' SQLCODE : '!!SQLCODE;
+            WRITE FILE(PRT) FROM(ERLINE);
+            /*PEDIO 7*/
+            IGL_MESO_YPOL_D = 0  ;
+       END;
+       ELSE
+            /*PEDIO 7*/
+            IGL_MESO_YPOL_D = CTISDK01.NUM_VCAVGBL ;
+     END GET_MESO_YPOL_D      ;
+ /*  =============================================  */
+     GET_CIDB:                PROC;
+
+       T04CNV97.COD_PELATH = 0;
+       /* CREATE ACCOUNT NUMBER FOR T04CNV97 */
+       WCIDB    =    DKSTTP.KEY_ACCN1;
+
+       EXEC SQL
+            SELECT  COD_PELATH                                             05270
+            INTO :T04CNV97.COD_PELATH
+            FROM   T04CNV97                                                05290
+            WHERE  T04CNV97.COD_EFARM      = '70'   AND                    05300
+                   T04CNV97.NUM_AR_LOGAR   = :WCIDB                        05310
+            WITH UR;                                                       05320
+                                                                           05330
+       IF SQLCODE ^= 0   THEN  DO;
+            ERLIN2 = 'ERROR ** ΕΥΡΕΣΗ ΠΕΛΑΤΗ ΣΤΟΝ Τ04CNV97 : '          !!
+                  !!' AΡΙΘΜ.ΛΟΓΑΡ. '!! WCIDB !!' SQLCODE : '!!SQLCODE;
+            WRITE FILE(PRT) FROM(ERLINE);
+   /*PEDIO 1*/
+            IGL_COD_PELATH = 999999999  ;
+       END;
+       ELSE
+   /*PEDIO 1*/
+            IGL_COD_PELATH = T04CNV97.COD_PELATH ;
+     END GET_CIDB;
+
+ /*  =============================================  */
+ DECLARE_CURSOR:  PROC;
+        EXEC SQL
+          DECLARE CUR1 CURSOR WITH HOLD FOR
+          SELECT
+                  KEY_ACCN1 ,
+                  SUM(NUM_CHEDNR)           ,
+                  SUM(NUM_CHEDAM)           ,
+                  SUM(NUM_CHECNR)           ,
+                  SUM(NUM_CHECAM)           ,
+                  SUM(NUM_TAMCNR)           ,
+                  SUM(NUM_TAMCAM)
+          FROM CTDKSTTP
+          WHERE KEY_YEAR    = :WS_KEY_YEAR AND
+                KEY_KATHEG ^= 5150         AND
+                FLG_CLOSED ^= '1'
+                GROUP BY KEY_ACCN1 ;
+
+ END DECLARE_CURSOR;
+
+ /*  =============================================  */
+ OPEN_CURSOR:  PROC;
+    EXEC SQL
+             OPEN CUR1;
+    IF SQLCODE ^= 0 THEN DO;
+       ERLIN1= '1';
+       ERLIN2= ' ERROR OPENING CURSOR CUR1 SQLCODE= '!!SQLCODE;
+       WRITE FILE(PRT) FROM(ERLINE);
+       GOTO TELOS;
+    END;
+ END OPEN_CURSOR;
+ /*  ---------------------------------------------  */
+ ROUT_FETCH_ROWS: PROC;
+
+  EXEC SQL FETCH CUR1 INTO
+         :DKSTTP.KEY_ACCN1 ,
+         :DKSTTP.NUM_CHEDNR  ,
+         :DKSTTP.NUM_CHEDAM  ,
+         :DKSTTP.NUM_CHECNR  ,
+         :DKSTTP.NUM_CHECAM  ,
+         :DKSTTP.NUM_TAMCNR  ,
+         :DKSTTP.NUM_TAMCAM ;
+
+    IF SQLCODE = 100 THEN DO;
+   PUT SKIP LIST('TELOS  ' );
+       EOC='1'B;
+       RETURN;
+    END;
+    IF SQLCODE ^= 0 THEN DO;
+       ERLIN1= ' ';
+       ERLIN2= ' ERROR FETCHING CURSOR CUR1 SQLCODE= '!!SQLCODE;
+       WRITE FILE(PRT) FROM(ERLINE);
+       GOTO TELOS;
+
+    END;
+   IGL_NUM_AR_LOGAR=SUBSTR(DKSTTP.KEY_ACCN1,1,16) ; /* PEDIO 2*/
+   PUT SKIP LIST('AR LOG ',DKSTTP.KEY_ACCN1 );
+   PUT SKIP LIST('IGL OG ',IGL_NUM_AR_LOGAR                );
+
+
+
+   PIC_LOGAR       =SUBSTR(DKSTTP.KEY_ACCN1,1,16) ; /* CONVERTPEDIO 2*/
+   PUT SKIP LIST('PIC LOG ',PIC_LOGAR               );
+   IGL_PLHTHOS_EKDO=DKSTTP.NUM_CHEDNR  ; /* PEDIO 8 */
+   IGL_SYNOLO_EKDO =DKSTTP.NUM_CHEDAM  ; /* PEDIO 9 */
+   IGL_PLHTHOS_EISP=DKSTTP.NUM_CHECNR  ; /* PEDIO 10*/
+   IGL_SYNOLO_EISP =DKSTTP.NUM_CHECAM  ; /* PEDIO 11*/
+   IGL_PLHTHOS_PLHR=DKSTTP.NUM_TAMCNR  ; /* PEDIO 12*/
+   IGL_SYNOLO_PLHR =DKSTTP.NUM_TAMCAM  ; /* PEDIO 13*/
+
+   TOT_FETCHED = TOT_FETCHED+1;
+ END ROUT_FETCH_ROWS;
+ /*  ---------------------------------------------  */
+ CLOSE_CURSOR:  PROC;
+         EXEC SQL
+            CLOSE CUR1;
+    IF SQLCODE ^= 0 THEN DO;
+       ERLIN1= ' ';
+       ERLIN2= ' ERROR CLOSING CURSOR CUR1 SQLCODE= '!!SQLCODE;
+       WRITE FILE(PRT) FROM(ERLINE);
+       GOTO TELOS;
+    END;
+ END CLOSE_CURSOR;
+ /*  ---------------------------------------------  */
+ TELOS:
+
+       CALL CLOSE_CURSOR;
+       ERLIN1= '1';
+       ERLIN2= ' TΕΛΟΣ ΠΡΟΓΡΑΜΜΑΤΟΣ DK511 THN = '!!DATETIME();
+       WRITE FILE(PRT) FROM(ERLINE);
+       ERLIN1= ' ';
+       ERLIN2= ' ΓΡΑΦΤΗΚΑΝ '!!CHAR(TOT_FETCHED) !!
+               ' ΕΓΓΡΑΦΕΣ ΣΤΟ ΑΡΧΕΙΟ ΛΙΣΤΑ12 ';
+       WRITE FILE(PRT) FROM(ERLINE);
+
+       CLOSE FILE(PRT),FILE(OUTFILE);
+ END DK511;
+ /*
+ ΛΙΣΤΑ 12 : Χρήση λογαριασμών DAV.
+ Λίστα του συνόλου των τρεχόντων λογαριασμών DAV την 31/12/2006 με, για
+ κάθε DAV και για το διάστημα των τελευταίων 12 μηνών :
+ Δεκατρείς στοιχεία που απαιτούνται για κάθε λογαριασμό DAV :        */
+ /********************************************************************
+
+ DCL IGLML12 CHAR(197) BASED(ADDR(IGLML121)) ;
+ DCL 1 IGLML121                         ,
+ 2 IGL_COD_PELATH        PIC'(09)9'     ,  Κωδικός CIDB
+ 2 IGL_DELIMITER_1       CHAR(01) INIT(';') ,
+ 2 IGL_COD_EFARM         CHAR(02)       ,  Κωδικός εφαρμογή
+ 2 IGL_NUM_AR_LOGAR      CHAR(16)       , *Αριθμός λογαριασμού
+ 2 IGL_DELIMITER_2       CHAR(01) INIT(';') ,
+ 2 IGL_MESO_YPOL_YTD     PIC'S(13)9V,99', *Μέσο υπόλοιπο περιόδου
+ 2 IGL_DELIMITER_3       CHAR(01) INIT(';') ,
+ 2 IGL_MESO_YPOL_A       PIC'S(13)9V,99',  Μέσο υπόλοιπο Α  τριμήνου
+ 2 IGL_DELIMITER_4       CHAR(01) INIT(';') ,
+ 2 IGL_MESO_YPOL_B       PIC'S(13)9V,99',  Μέσο υπόλοιπο Β  τριμήνου
+ 2 IGL_DELIMITER_5       CHAR(01) INIT(';') ,
+ 2 IGL_MESO_YPOL_C       PIC'S(13)9V,99',  Μέσο υπόλοιπο Γ  τριμήνου
+ 2 IGL_DELIMITER_6       CHAR(01) INIT(';') ,
+ 2 IGL_MESO_YPOL_D       PIC'S(13)9V,99',  Μέσο υπόλοιπο Δ  τριμήνου
+ 2 IGL_DELIMITER_7       CHAR(01) INIT(';') ,
+ 2 IGL_PLHTHOS_EKDO      PIC'(07)9'     ,  Πλήθος επιταγών εκδίδονται
+ 2 IGL_DELIMITER_8       CHAR(01) INIT(';') ,
+ 2 IGL_SYNOLO_EKDO       PIC'S(13)9V,99',  Σύνολο επιταγών εκδίδονται
+ 2 IGL_DELIMITER_9       CHAR(01) INIT(';') ,
+ 2 IGL_PLHTHOS_EISP      PIC'(07)9'     ,  Πλήθος επιταγών εισπράττον
+ 2 IGL_DELIMITER_10      CHAR(01) INIT(';') ,
+ 2 IGL_SYNOLO_EISP       PIC'S(13)9V,99',  Σύνολο επιταγών εισπράττον
+ 2 IGL_DELIMITER_11      CHAR(01) INIT(';') ,
+ 2 IGL_PLHTHOS_PLHR      PIC'(07)9'     ,  Πλήθος πληρωμών σε μετρητά
+ 2 IGL_DELIMITER_12      CHAR(01) INIT(';') ,
+ 2 IGL_SYNOLO_PLHR       PIC'S(13)9V,99',  Σύνολο πληρωμών σε μετρητά
+ 2 IGL_DELIMITER_13      CHAR(01) INIT(';') ;
+ */
+

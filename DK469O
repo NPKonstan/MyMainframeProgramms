@@ -1,0 +1,374 @@
+* PROCESS XOPTS(DLI);
+ /*-----------------------------------------------------------------*/
+ /*         PROGRAM NAME: DK469                                     */
+ /*  dHMIOYPcIA APXEIOY TOKAPIhMxN ApO MOVEMENT                     */
+ /*  cIA kOcIrTIKA KkEIrIMATOr KATAhErExN                           */
+ /*                                                                 */
+ /*                                                 r.A. 13.05.2003 */
+ /*-----------------------------------------------------------------*/
+ /* NEA KAhOkIKA 5114, 5150, 5120                   r.A. 23.04.2004 */
+ /* KAhOPIrMOr WRKAREA                              r.A. 17.10.2005 */
+ /* XPHrH THr DKR4TO6I cIA EYPErH EnAw. KAhOkIKOY   r.A. 17.10.2005 */
+ /*-----------------------------------------------------------------*/
+ DK469:  PROC OPTIONS(MAIN);
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+ DCL CZX3VDAT CHAR(6); FETCH CZXDATEP;
+ DCL CZXDATEP ENTRY OPTIONS(INTER,ASM) ;
+ /*                  KAhOPIrMOr APXEIxN                             */
+ /*-----------------------------------------------------------------*/
+ /*                   INPUT  APXEIO  T/P                            */
+ /*-----------------------------------------------------------------*/
+ DCL ISTOR01    FILE RECORD INPUT  ENV(FB RECSIZE(74));
+ /*-----------------------------------------------------------------*/
+ /*                   OUTPUT  APXEIO TOKAPIhMxN                     */
+ /*-----------------------------------------------------------------*/
+ DCL TOKAR      FILE RECORD OUTPUT ENV(FB RECSIZE(140));
+ /*-----------------------------------------------------------------*/
+ /*------------------------------------------------------------------*/
+ /*                      OUTPUT  PRINT  FILE                         */
+ /*------------------------------------------------------------------*/
+ DCL     FPRINT1 FILE SEQUENTIAL OUTPUT ENV(FB RECSIZE(133) CTLASA);
+ /*------------------------------------------------------------------*/
+ /*------------------------------------------------------------------*/
+ DCL 1   LINE1,
+      2  CC1                 CHAR(01)      INIT(' '),
+      2  LINE                CHAR(132)     INIT(' ');
+ /*------------------------------------------------------------------*/
+ /*------------------------------------------------------------------*/
+ %SKIP(2);
+
+ %INCLUDE  KSDBMAP ;
+ %INCLUDE  TOKARIRO;
+
+ % INCLUDE (DAYATNS);
+   DCL  ( KFIOROOT, KFIOSADD ) POINTER;
+
+ /*------------------------------------------------------------------*/
+
+      /****************************************************/
+      /*    DESCRIPTION TOY FILE  ** MOVEMENT **          */
+      /*    RECSIZE = 74    CHARACTERS                    */
+      /*    BLKSIZE = 6290  CHARACTERS                    */
+      /*                                                  */
+      /***********************************************  c */
+
+            /*------------------------------------*/
+            /* R E C O R D    K A T A h E r E x N */
+            /*------------------------------------*/
+
+ DCL 1   RECISKAT,
+      2   KSKLINK  CHAR (3),          /* LINK FIELDS                  */
+      2   KSKTYPE  CHAR(08),          /* EXAMPLE  KMOVESEG            */
+      2   KSKARLOG FIXED (9,0),       /* NUMBER OF ACCOUNT            */
+      2   KSKHMNIA FIXED DEC(7,0),    /* DATE OF OPERATION            */
+      2   KSKKARTR FIXED DEC(5,0),    /* TRANSACTION NUMBER           */
+      2   KSKKSEIR FIXED DEC(1,0),    /* SEQUENCE                     */
+      2   KSKSDF   BIT(8),            /* SYSTEM DELETED FLAG          */
+      2   KSKAKYR  CHAR(1),           /* FLAG DELETED
+                                         ('0') = NOT DELETED
+                                         ('1') = DELETED - PRINTED
+                                                 IN STATEMENT         */
+      2   KSKKATHO FIXED DEC(5,0),    /* GENERAL ACCOUNT CODE         */
+      2   KSKKATMA FIXED DEC(5,0),    /* BANK,BRANCH CODE OF ACCOUNT  */
+      2   KSKKWDEG CHAR(1),           /* ENTRY CODE
+                                         ('1') = CREDIT
+                                         ('2') = DEBIT                */
+      2   KSKKAIT  BIT(8),            /* DESCRIPTION CODE
+                                         '00000001'=COLLECTION OF BILLS
+                                         '00000010'=REMITTANCE
+                                         '00000011'=EXPENSES
+                                         '00000100'=TRANSFER
+                                         '00000101'=COMISSIOM
+                                         '00000110'=COUPONS
+                                         '00000111'=SAFE KEEPING
+                                         '00001000'=PONDS
+                                         '00001001'=INTEREST
+                                         '00001010'=PAYMENT ORDER
+                                         '00001011'=CHECK
+                                         '00001100'=REVERSING
+                                         '00001101'=ONLY FOR SAVINGS
+                                         '00001110'=ONLY FOR SAVINGS
+                                         '00001111'=ONLY FOR SAVINGS
+                                         '00010000'=ONLY FOR SAVINGS
+                                         '00010001'=DEPOSIT
+                                         '00010010'=WITHDRAWAL
+                                         '00010011'=ONLY FOR SAVINGS
+                                         '00010100'=EXPENSES FOR BILLS
+                                                    PROTESTED/VIA EDP
+                                         '00010101'=COLLECTION OF BILLS
+                                                    VIA EDP
+                                         '00010110'=ONLY FOR SAVINGS  */
+      2   KSKPOSON FIXED DEC(11,2),   /* AMOUNT                       */
+      2   KSKKATLE FIXED DEC(5,0),    /* BANK,BRANCH OF OPERATION     */
+      2   KSKKATHA FIXED DEC(5,0),    /* CONTRARY G/A CODE            */
+      2   KSKSANAF,                   /* TRANSACTION REFERENCE        */
+       3  KSKTAY,                     /* TERMINAL IDENTIFICATION      */
+        4 KSKSKAT  CHAR(3),           /* BRANCH OF OPERATION          */
+        4 KSKSTERM CHAR(1),           /* TERMINAL NUMBER (LETTER)     */
+       3  KSKARTRT CHAR(3),           /* NUMBER OF OPERATIONS BY TERM.*/
+      2   KSKAROPT CHAR(3),           /* TERMINAL OPERATOR ID.        */
+      2   KSKWRSYN CHAR(4),           /* TIME OF OPERATION            */
+ /*                                                                   */
+ /***            N O T E : IN THE CASE OF THE BILLS OF EXCHANCE     ***/
+ /***                      COLLECTION THE REFERENCE FIELD WILL      ***/
+ /***                      CONTAIN : BRANCH OF COLLECTION CODE      ***/
+ /***                      PLUS 0000  I.E. 0180000                  ***/
+ /*                                                                   */
+      2   KSKAXIA  FIXED(7,0),        /* VALUE DATE                   */
+      2   KSKAREP  FIXED DEC(9,0),    /* CHECK NUMBER                 */
+      2   KSKYPXR  CHAR(1),           /* INDICATION-BALANCE OUERDRAWN
+                                         ('0') = NOT OVERDRAWN
+                                         ('1') = COVERED FROM SUSPENSE
+                                                 BALANCE
+                                         ('2') = NOT COVERED FROM
+                                                 SUSPENSE BALANCE     */
+      2   KSKTRKWD CHAR(4);           /* TRANSACTION CODE             */
+
+ %PAGE;
+
+
+ /******** END OF MOVEMENT FILE DESCRIPTION *******************/
+ /*------------------------------------------------------------------*/
+   DCL ADDR      BUILTIN;
+
+ DCL  PRIORITY  BUILTIN;/****  DATE SIMULATION DEFINED FUNCTION  ****/
+ DATE: PROC IRREDUCIBLE RETURNS(CHAR(6)) ;
+       CALL CZXDATEP          ( CZX3VDAT) ;
+       RETURN (CZX3VDAT) ;
+       END DATE ;
+ /****        END OF MVS-MS INSERT        ****/
+ DCL     MESSAGE             CHAR(200);
+ DCL     IOAREA              CHAR(78);
+ DCL     DATEX               PIC '(6)9'    INIT(0);
+ DCL     DATEP               PIC '99.99.9999';
+ DCL     PREC1               PIC 'ZZ.ZZZ.ZZ9';
+ DCL     PAMOUN1             PIC 'ZZ.ZZZ.ZZZ.ZZ9V,99-';
+ DCL     INAMOUNT            FIXED(13,2)   INIT(0);
+ DCL     SAMOUNT             FIXED(13,2)   INIT(0);
+ DCL     READ_REC            FIXED(15,0)   INIT(0);
+ DCL     WRITE_REC           FIXED(15,0)   INIT(0);
+ DCL     REC_EKTOS           FIXED(15,0)   INIT(0);
+ DCL     WKSKKATMA           PIC'9999'    INIT(0);
+ DCL  1  WKATMAR             BASED(ADDR(WKSKKATMA)),
+       2 WTRAP               PIC '9',
+       2 WKATMA              PIC'999';
+
+ DCL  WRKAREA          CHAR(450);
+ DCL  MARLOG           FIXED (09)  INIT(0);
+ DCL 1 MARLOG1   BASED (ADDR(MARLOG)),
+       2 LOGAR1        BIT (36),
+       2 FILBIT        BIT (4);
+
+ DCL     ERR_FLAG            PIC '9'       INIT(0);
+ DCL     I                   PIC '99'      INIT(0);
+ DCL     A                   PIC '9'       INIT(0);
+ DCL     B                   PIC '9'       INIT(0);
+ DCL     SW1                 PIC '9'       INIT(0);
+ DCL     U1                  PIC '99'      INIT(0);
+
+
+       /*-----------------------------*/         /* 17.10.2005 */
+       /* EXTERNAL PROCEDURE DKR4TO6I */
+       /*-----------------------------*/
+ DCL DKR4TO6I EXTERNAL ENTRY(FIXED(5),CHAR(2),CHAR(1),FIXED(9),
+             FIXED(3))
+             RETURNS(FIXED(7));
+ FETCH DKR4TO6I TITLE ('DKR4TO6I');
+
+   DCL    NEWKATOL  PIC'(06)9' INIT(0)  ;
+   DCL    WSKATOL5  FIXED(5,0) INIT(0)  ;
+   DCL    WSKATOL7  FIXED(7,0) INIT(0)  ;
+   DCL    WSARLOG   FIXED(9,0) INIT(0)  ;
+   DCL    WSKWDEP   CHAR(02)   INIT(' ');
+   DCL    WSFN      CHAR(01)   INIT(' ');
+   DCL    ERROR_FLG FIXED(3,0) INIT(0)  ; /* ERROR FLAG APO DKR4TO6I */
+
+ /*-----------------------------------------------------------------*/
+ %PAGE;
+                       /*  MAIN  PROGRAM  */
+ %SKIP(2);
+         KFIOROOT = ADDR(WRKAREA) ;             /* 24.10.2005 */
+         KFIOSADD = ADDR(WRKAREA) ;
+         DATEX=DATE;
+ %SKIP(2);
+         CC1='1';
+         LINE='EMpOPIKH TPApEZA THr EkkAdOr AE'!!(60)' '!!'DK469';
+         WRITE FILE(FPRINT1)   FROM(LINE1);
+         DATEP=DAYA6S8(DATEX);
+         CC1='-';
+         LINE=(10)' '!!'RECORDS MOVEMENT rE APXEIO TOKAPIhMxN'
+              !!'  THN '!!DATEP;
+         WRITE FILE(FPRINT1)   FROM(LINE1);
+         CC1=' ';
+         LINE=(10)' '!!(61)'-';
+         WRITE FILE(FPRINT1)   FROM(LINE1);
+         /*---------------------------------------------------------*/
+         OPEN FILE(ISTOR01),FILE(TOKAR),
+              FILE(FPRINT1);
+         ON ENDFILE(ISTOR01) GOTO EXIT1;
+ %SKIP(2);
+ RR1:        READ FILE(ISTOR01)    INTO(RECISKAT);
+             READ_REC = READ_REC + 1;
+             TKRREC = '';
+             WKSKKATMA = KSKKATMA;
+             TKRTRAP   = WTRAP;
+             TKRKATMA  = WKATMA;
+
+             CALL READ_ROOT_UN;
+             IF ERR_FLAG = 1 THEN
+                GOTO EXIT1;
+
+             CALL FIND_KATHOL;
+             TKRKATOL = NEWKATOL;
+
+             TKRARLOG = KSKARLOG;
+
+             TKRPERID  = '2';
+
+             TKRPTOK1 = 0;
+             TKRPTOK2 = 0;
+             TKRPTOK3 = 0;
+             TKRXTOK1 = 0;
+             TKRXTOK2 = 0;
+             TKREDFR  = 0;
+             TKRTAXES = 0;
+      /*     IF KSKKSEIR = 1 THEN
+                DO;
+                   IF KSKTRKWD = 'KKk1' THEN
+                      TKRPTOK1C = KSKPOSON;
+                   ELSE
+                      IF KSKTRKWD = 'KTk0' ! KSKTRKWD = 'KTk1' THEN
+                         TKRPTOK1C = KSKPOSON * (-1);
+                      ELSE
+                         DO;
+                            CALL ERROR_TRKWD;
+                            GOTO RR1;
+                         END;
+                END;
+             ELSE
+                IF KSKKSEIR = 2 THEN
+                   DO;
+                      IF KSKTRKWD = 'KKk1' THEN
+                         TKRXTOK1C = KSKPOSON;
+                      ELSE
+                        IF KSKTRKWD = 'KTk0' ! KSKTRKWD = 'KTk1' THEN
+                           TKRXTOK1C = KSKPOSON * (-1);
+                        ELSE
+                          DO;
+                            CALL ERROR_TRKWD;
+                            GOTO RR1;
+                          END;
+                   END;
+                ELSE
+                   IF KSKKSEIR = 3 THEN
+                      DO;
+                      IF KSKTRKWD = 'KKk1' THEN
+                         TKRTAXESC = KSKPOSON;
+                      ELSE
+                        IF KSKTRKWD = 'KTk0' ! KSKTRKWD = 'KTk1' THEN
+                         TKRTAXESC = KSKPOSON * (-1);
+                        ELSE
+                           DO;
+                              CALL ERROR_TRKWD;
+                              GOTO RR1;
+                           END;
+                      END; */
+           IF KSKKSEIR = 1 THEN
+              TKRPTOK1C = KSKPOSON;
+           ELSE
+              IF KSKKSEIR = 2 THEN
+                 TKRXTOK1C = KSKPOSON;
+              ELSE
+                 IF KSKKSEIR = 3 THEN
+                    TKRTAXESC = KSKPOSON;
+                 ELSE
+                      DO;
+                        CC1 = ' ';
+                   LINE  = 'KSEIR '!! KSKKSEIR !! ' MH ANAMENOMENH,' !!
+                           ' kOc/MOr : ' !! KSKARLOG;
+                        WRITE FILE (FPRINT1) FROM (LINE1);
+                        REC_EKTOS = REC_EKTOS + 1;
+                        GOTO RR1;
+                      END;
+
+         WRITE FILE(TOKAR)   FROM(TKRREC);
+         WRITE_REC = WRITE_REC + 1;
+         GOTO RR1;
+ %SKIP(2);
+  /* ----------------------------------------------------------- */
+  /*          dIABArMA rYcKEKPIMENOY ROOT SEGMENT                */
+  /* ----------------------------------------------------------- */
+  READ_ROOT_UN: PROC;
+     ERR_FLAG = 0;
+     MARLOG = KSKARLOG;
+     FILBIT = '1111'B;
+     EXEC DLI
+          GU USING PCB(2)
+          SEGMENT (KROOTSEG)
+          WHERE (KSRARLOG=MARLOG)
+          INTO (WRKAREA);
+
+     IF DIBSTAT ^=' ' THEN DO;
+           CC1 = '0';
+           LINE  = '*** READ ERROR - D/B KATAhErExN, ' !!
+                   'STATUS = ' !! DIBSTAT !!' kOc/MOr : ' !! MARLOG;
+           WRITE FILE (FPRINT1) FROM (LINE1);
+           ERR_FLAG = 1;
+     END;
+  END READ_ROOT_UN;
+
+  /* ----------------------------------------------------------- */
+  /*      EYPErH EnAwHuIOY KAhOkIKOY              DK495FEP       */
+  /* ----------------------------------------------------------- */
+  FIND_KATHOL: PROC;
+    WSKATOL5 = KSKKATHO;                   /* 17.10.2005 */
+    WSKWDEP  = KSRKWDEP;
+    WSFN     = KSRFN;
+    WSARLOG  = KSKARLOG;
+
+    WSKATOL7 = DKR4TO6I(WSKATOL5 ,WSKWDEP , WSFN, WSARLOG, ERROR_FLG);
+          NEWKATOL = WSKATOL7;
+
+    IF ERROR_FLG ^= 0 THEN
+       DO;
+          NEWKATOL = 511401;
+          LINE = ' LOG : ' !! KSKARLOG !!
+                 ', ERROR_FLG : ' !! ERROR_FLG ;
+          WRITE FILE (FPRINT1) FROM (LINE1);
+       END;
+  END FIND_KATHOL;
+
+  /* ----------------------------------------------------------- */
+  ERROR_TRKWD: PROC;
+    CC1 = ' ';
+    LINE  = 'TRKWD '!! KSKTRKWD !! ' MH ANAMENOMENH,' !!
+            ' kOc/MOr : ' !! KSKARLOG !! ' pPAnH ' !!
+            KSKSKAT !! KSKSTERM !! KSKARTRT;
+    WRITE FILE (FPRINT1) FROM (LINE1);
+    REC_EKTOS = REC_EKTOS + 1;
+  END ERROR_TRKWD;
+
+ /*-------------------------------------------------------------------*/
+ %SKIP(2);
+ EXIT1: ;
+         /*----------------------------------------------------------*/
+         /*-----------------------------------------------------------*/
+         /*           TEkIKH  rYMuxNIA  pPOcPAMMATOr                  */
+         /*-----------------------------------------------------------*/
+         CC1='0';
+         PREC1=READ_REC;
+         LINE=(05)' '!!'dIABArTHKAN ApO MOVEMENT FILE     :  '!!PREC1;
+         WRITE FILE(FPRINT1)   FROM(LINE1);
+         CC1=' ';
+         PREC1=WRITE_REC;
+         LINE=(05)' '!!'cPAuTHKAN rTO APXEIO TOKAPIhMxN   :  '!!PREC1;
+         WRITE FILE(FPRINT1)   FROM(LINE1);
+         CC1=' ';
+         PREC1=REC_EKTOS;
+         LINE=(05)' '!!'RECORDS ME kAhOr APIhMO rEIPAr    :  '!!PREC1;
+         WRITE FILE(FPRINT1)   FROM(LINE1);
+         /*--------------------------------------------------------*/
+         CLOSE FILE(ISTOR01),FILE(TOKAR),
+               FILE(FPRINT1);
+         END;
+

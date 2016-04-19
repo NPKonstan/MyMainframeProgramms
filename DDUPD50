@@ -1,0 +1,200 @@
+*PROCESS LIMITS (FIXEDDEC(15,31));                                      00010000
+ DDUPD50: PROCEDURE OPTIONS(MAIN);                                      00020000
+ /********************************************************************/ 00030000
+ /* –—œ√—¡ÃÃ¡ PLI KAI DB2                                            */ 00040000
+ /********************************************************************/ 00050000
+ /********************************************************************/ 00060000
+ /* Input :                                                          */ 00070000
+ /*                                                                  */ 00080000
+ /*                                                                  */ 00090000
+ /*  Output:                                                         */ 00100000
+ /*                                                                  */ 00110000
+ /********************************************************************/ 00120000
+ /********************************************************************/ 00130000
+ /*           PROGRAM NAME: DDUPD50    LOAD MODULE: DDUPD50          */ 00140000
+ /********************************************************************/ 00150000
+ /* 23-02-2010      NPK                                              */ 00160000
+ /********************************************************************/ 00170000
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');                    00180000
+                                                                        00190000
+                                                                        00240000
+ DCL    DEC_AA_WORK             FIXED(8,0)     INIT (0);                00250000
+ DCL    DEC_AA_WORKD            PIC '999999'   INIT (0);                00260000
+ DCL    WARLOG                  PIC'(8)9'      INIT (0);                00270000
+ DCL    WVALEUR                 PIC'(8)9'      INIT (0);                00280000
+ DCL    WTODAY                  PIC'(6)9'      INIT (0);                00290000
+ DCL    WTODAY20                PIC'(8)9'      INIT (0);                00300000
+ DCL    WHMEKD                  PIC'(6)9'      INIT (0);                00310000
+ DCL    WHMEKD20                PIC'(8)9'      INIT (0);                00320000
+ DCL    CHMEKD20                CHAR(8)        INIT (' ');              00330000
+ DCL    DAMT                    PIC'ZZ.ZZZ.ZZZ.ZZ9V,99' INIT (0);       00340000
+ DCL    DAAA                    PIC'ZZZ.ZZ9' INIT (0);                  00350000
+                                                                        00360000
+ DCL     PRT FILE     SEQUENTIAL OUTPUT ENV(FB RECSIZE(133) CTLASA);    00370000
+ DCL     LINE                CHAR (133);                                00380000
+ DCL 1   LNX                 BASED(ADDR(LINE)),                         00390000
+      2  CTLCHR              CHAR(1)      INIT('1'),                    00400000
+      2  GRAMH               CHAR(132)    INIT(' ');                    00410000
+                                                                        00420000
+ DCL 1   ERLINE              ,                                          00430000
+      2  ERLIN1       CHAR(1)      INIT('1'),                           00440000
+      2  ERLIN2       CHAR(132)    INIT(' ');                           00450000
+                                                                        00460000
+ DCL EOF_CURSOR1  PIC '9' INIT(0);                                      00470000
+ DCL WS_MSG              CHAR (132);                                    00480000
+ /********************************************************************/ 00530000
+ /***************************/                                          00540000
+ /*DB2 DECLARATIONS         */                                          00550000
+ /***************************/                                          00560000
+ EXEC SQL INCLUDE CTDDMD10;/*                  */                       00570000
+ EXEC SQL INCLUDE CTDDMD15;/*                  */                       00571000
+ EXEC SQL INCLUDE CTDDMV01;/*                  */                       00572000
+ EXEC SQL INCLUDE SQLCA;                                                00580000
+ DCL 1   REC_COUNTERS,                                                  00650000
+      2  REC_APO             FIXED (15)  INIT(0),                       00660000
+      2  REC_CNT             FIXED (15)  INIT(0),                       00670000
+      2  REC_OUT             FIXED (15)  INIT(0),                       00680000
+      2  REC_INP             FIXED (15)  INIT(0),                       00690000
+      2  REC_INP1            FIXED (15)  INIT(0),                       00700000
+      2  REC_ROOT            FIXED (15)  INIT(0),                       00710000
+      2  REC_TOT             FIXED (15)  INIT(0),                       00720000
+      2  REC_ERROR           FIXED (15)  INIT(0),                       00730000
+      2  REC_CONTROL         FIXED (15)  INIT(0),                       00740000
+      2  TOT_NORMAL_REC      FIXED (15)  INIT(0),                       00750000
+      2  CNT_Update_DB2         FIXED (07)  INIT(0),                    00760000
+      2  CNT_Records_Read       FIXED (07)  INIT(0),                    00770000
+      2  CNT_File_Header        FIXED (07)  INIT(0),                    00780000
+      2  CNT_GROUP_Header       FIXED (07)  INIT(0),                    00790000
+      2  CNT_Detail_Record      FIXED (07)  INIT(0),                    00800000
+      2  SAVE_Detail_Record     FIXED (07)  INIT(0),                    00810000
+      2  CNT_Detail_Record_Sup  FIXED (07)  INIT(0),                    00820000
+      2  SAVE_Detail_Record_Sup FIXED (07)  INIT(0),                    00830000
+      2  CNT_Group_Trailer      FIXED (07)  INIT(0),                    00840000
+      2  CNT_FILE_Trailer       FIXED (07)  INIT(0);                    00850000
+ DCL     CNT                    PIC   'Z.ZZZ.ZZZ' INIT(0);              00860000
+ DCL     MYPROC CHAR(40);                                               00870000
+ DCL     MYMSG CHAR(132);                                               00880000
+ DCL     MYLINE   PIC  '99999';                                         00890000
+ DCL     RC       BIT(1) INIT('1'B);                                    00900000
+                                                                        00910000
+                                                                        01360000
+ DCL  SUBSTR       BUILTIN;                                             01370000
+ DCL  DATE         BUILTIN;                                             01380000
+ DCL  TRANSLATE    BUILTIN;                                             01390000
+ DCL  ADDR         BUILTIN;                                             01400000
+ DCL  ABS          BUILTIN;                                             01410000
+ DCL  DIVIDE       BUILTIN;                                             01420000
+ DCL  ROUND        BUILTIN;                                             01430000
+ DCL  DATETIME     BUILTIN;                                             01440000
+                                                                        01460000
+    /*----------------------------------------------------------*/      01470000
+    /*                    MAIN  PROGRAM                         */      01480000
+    /*----------------------------------------------------------*/      01490000
+    OPEN FILE(PRT) ;                                                    01520000
+    CALL UPDATE_CTDDMD10;                                               01610000
+    CALL UPDATE_CTDDMD15;                                               01611001
+    CALL UPDATE_CTDDMV01;                                               01612001
+                                                                        01613000
+  UPDATE_CTDDMD10: PROC;                                                01620000
+    /*PUT SKIP LIST('DAT_DATETIME_PROC:',WDAT_DATETIME_PROC);*/         01670000
+       EXEC SQL                                                         01680000
+            UPDATE CTDDMD10                                             01690000
+          SET                                                           01700000
+            DEC_ARLOG =                                                 01710000
+                        DEC(SUBSTR(CHR_DB_ACC_IBAN,20,8))               01711000
+                                                                        01712000
+          WHERE                                                         01720000
+          SUBSTR(CHR_DB_ACC_IBAN,1,2) =  'GR'  ;                        01730001
+                                                                        01740000
+    IF SQLCODE ^= 0 THEN DO;                                            01750000
+          MYLINE = SOURCELINE();                                        01760000
+          MYMSG  = "À¡»œ” ”‘œ UPDATE ‘œ’ CTDDMD10"!!                    01770000
+                " SQLCODE = "!! CHAR(SQLCODE);                          01780000
+        CALL ERROR1(MYPROC,MYLINE,MYMSG);                               01800000
+   END;                                                                 01810000
+  END UPDATE_CTDDMD10;                                                  02020000
+  UPDATE_CTDDMD15: PROC;                                                02021001
+    /*PUT SKIP LIST('DAT_DATETIME_PROC:',WDAT_DATETIME_PROC);*/         02022001
+       EXEC SQL                                                         02023001
+            UPDATE CTDDMD15                                             02024001
+          SET                                                           02025001
+            DEC_ARLOG =                                                 02026001
+                        DEC(SUBSTR(CHR_DB_ACC_IBAN,20,8))               02027001
+                                                                        02028001
+          WHERE                                                         02029001
+          SUBSTR(CHR_DB_ACC_IBAN,1,2) =  'GR'  ;                        02029101
+                                                                        02029301
+    IF SQLCODE ^= 0 THEN DO;                                            02029401
+          MYLINE = SOURCELINE();                                        02029501
+          MYMSG  = "À¡»œ” ”‘œ UPDATE ‘œ’ CTDDMD15"!!                    02029601
+                " SQLCODE = "!! CHAR(SQLCODE);                          02029701
+        CALL ERROR1(MYPROC,MYLINE,MYMSG);                               02029801
+   END;                                                                 02029901
+  END UPDATE_CTDDMD15;                                                  02030001
+  UPDATE_CTDDMV01: PROC;                                                02030101
+    /*PUT SKIP LIST('DAT_DATETIME_PROC:',WDAT_DATETIME_PROC);*/         02030201
+       EXEC SQL                                                         02030301
+            UPDATE CTDDMV01                                             02030401
+          SET                                                           02030501
+            DEC_ARLOG =                                                 02030601
+                        DEC(SUBSTR(CHR_DB_ACC_IBAN,20,8))               02030701
+                                                                        02030801
+          WHERE                                                         02030901
+          SUBSTR(CHR_DB_ACC_IBAN,1,2) =  'GR'  ;                        02031001
+                                                                        02031101
+    IF SQLCODE ^= 0 THEN DO;                                            02031201
+          MYLINE = SOURCELINE();                                        02031301
+          MYMSG  = "À¡»œ” ”‘œ UPDATE ‘œ’ CTDDMV01"!!                    02031401
+                " SQLCODE = "!! CHAR(SQLCODE);                          02031501
+        CALL ERROR1(MYPROC,MYLINE,MYMSG);                               02031601
+   END;                                                                 02031701
+  END UPDATE_CTDDMV01;                                                  02031801
+ /**************************************************************        02032001
+ *  ERROR                           START                      *        02040000
+ **************************************************************/        02050000
+ ERROR1       :PROC (PRC,LINE,MSG  ) ;                                  02060000
+    DCL MSG      CHAR  (132)  ;                                         02070000
+    DCL LINE     PIC '99999'  ;                                         02080000
+    DCL PRC      CHAR (40)   ;                                          02090000
+    DCL WS_BOOM   FIXED(1) INIT(1);                                     02100000
+    DCL WS_ZERO   FIXED(1) INIT(0);                                     02110000
+                                                                        02120000
+       ERLIN1='1';                                                      02130000
+       ERLIN2='***************************************************';    02140000
+       WRITE FILE(PRT) FROM(ERLINE);                                    02150000
+       ERLIN1='0';                                                      02160000
+                                                                        02170000
+       ERLIN2=' * DDUPD50  «Ã≈—¡ —œ«”         = '!!DATE ();             02180000
+       WRITE FILE(PRT) FROM(ERLINE);                                    02190000
+       ERLIN1=' ';                                                      02200000
+                                                                        02210000
+       ERLIN2='–—œ¬À«Ã¡ ”‘œ –—œ√—¡ÃÃ¡ DDUPD50 Tœ –—œ√—¡ÃÃ¡ »¡ ” ¡”≈…';  02220000
+       WRITE FILE(PRT) FROM(ERLINE);                                    02230000
+       ERLIN2='–—œ¬À«Ã¡ ”‘HN PROCEDURE : '!!PRC;                        02240000
+       WRITE FILE(PRT) FROM(ERLINE);                                    02250000
+       ERLIN2='”‘œ RECORD Ã≈ ¡—…»Ãœ    :  '!!CHAR(CNT_Records_Read);    02260000
+       WRITE FILE(PRT) FROM(ERLINE);                                    02270000
+       ERLIN2='PROBLEM IS SOURCE LINE = '!!CHAR(CNT_Records_Read);      02280000
+       WRITE FILE(PRT) FROM(ERLINE);                                    02290000
+       ERLIN2=MSG;                                                      02300000
+       WRITE FILE(PRT) FROM(ERLINE);                                    02310000
+       ERLIN2='***************************************************';    02320000
+       WRITE FILE(PRT) FROM(ERLINE);                                    02330000
+   /*  WS_BOOM = WS_BOOM /  WS_ZERO  ;*/ /*JUST CRASH*/                 02340000
+   END ERROR1       ;                                                   02350000
+  /**************************************************************       02360000
+  *  ERROR                           END                        *       02370000
+  **************************************************************/       02380000
+ TELOS:                                                                 02390000
+   CTLCHR = '1';                                                        02400000
+   GRAMH =' *”˝ÌÔÎ· –ÒÔ„Ò‹ÏÏ·ÙÔÚ DDUPD50 *';                            02410000
+   WRITE FILE(PRT) FROM(LINE);                                          02420000
+   CTLCHR = ' ';                                                        02430000
+   WRITE FILE(PRT) FROM(LINE);                                          02510000
+   CTLCHR = ' ';                                                        02520000
+   CNT = CNT_Update_DB2 ;                                               02530000
+   GRAMH =' ≈ÌÁÏÂÒ˛ËÁÍ·Ì '!!cnt!!                                       02540000
+                          ' Â„„Ò·ˆ›Ú ÛÙÁÌ DB2(CTDDMD10)         ';      02550000
+   WRITE FILE(PRT) FROM(LINE);                                          02560000
+  END  DDUPD50;                                                         02570000
+

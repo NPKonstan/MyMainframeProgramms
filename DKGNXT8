@@ -1,0 +1,249 @@
+* PROCESS XOPTS(DLI);
+ DKNXT8:  PROCEDURE OPTIONS(MAIN);
+ /*------------------------------------------------------------------*/
+ /*-BATCH PLI+IMS+DB2 -----------------------------------------------*/
+ /*------------------------------------------------------------------*/
+ /*                        DB  ΚΑΤΑΘΕΣΕΩΝ                            */
+ /*              ΠΡΟΓΡΑΜΜΑ  UPDATE πεδίου KSROROI ROOT  SEGMENT      */
+ /*------------------------------------------------------------------*/
+ /*           PROGRAM NAME: DKGNXT8    LOAD MODULE: DKGNXT8          */
+ /*------------------------------------------------------------------*/
+ /*Εάν Ο λογαριασμός είναι ενεργος
+  *             στο καθολικό 5116 και δεν έχει
+  *όρους τότε ενημέρωσε το πεδίο KSROROI με ορους:      KSROROI = '1'*/
+ /*------------------------------------------------------------------*/
+ /*-NPK 15-03-2007     ----------------------------------------------*/
+ /*------------------------------------------------------------------*/
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+ DCL CZX3VDAT CHAR(6); FETCH CZXDATEP;
+ DCL CZXDATEP ENTRY OPTIONS(INTER,ASM) ;
+ % INCLUDE  KSDBMAP ;
+
+ DCL     BITKATEP     BASED(ADDR(KSCKATEP))  BIT (80);
+ DCL     BIT_LOG      BASED(ADDR(KSRKLOG))   BIT(8);
+ DCL     KSRKATPIC    PIC'999' BASED(ADDR(KSMSKAT));
+
+ DCL     (KFIOROOT,KFIOSADD) POINTER;
+
+ DCL     PRT FILE     SEQUENTIAL OUTPUT ENV(FB RECSIZE(133) CTLASA);
+ DCL     LINE                CHAR (133);
+ DCL 1   LNX                 BASED(ADDR(LINE)),
+      2  CTLCHR              CHAR(1)      INIT('1'),
+      2  GRAMH               CHAR(132)    INIT(' ');
+
+ % INCLUDE  DAYATNS ;
+
+ DCL  PRIORITY  BUILTIN;/****  DATE SIMULATION DEFINED FUNCTION  ****/
+ DATE: PROC IRREDUCIBLE RETURNS(CHAR(6)) ;
+       CALL CZXDATEP          ( CZX3VDAT) ;
+       RETURN (CZX3VDAT) ;
+       END DATE ;
+ /****        END OF MVS-MS INSERT        ****/
+
+ EXEC SQL
+         INCLUDE CTBKACCN;
+ EXEC SQL
+         INCLUDE SQLCA;
+
+ DCL     SEGNAME             CHAR(8);
+ DCL     WRKAREA             CHAR(450);
+ DCL     RETCODE             FIXED BIN(31);
+ DCL     BINZROS             CHAR(4) INIT(' ') ;
+ DCL     MHDEN               BIT(32) BASED(ADDR(BINZROS)) ;
+ DCL     MARLOG              FIXED (09)  INIT(0);
+ DCL 1   MARLOG1             BASED(ADDR(MARLOG)),
+      2  LOGAR1              BIT(36),
+      2  FILBIT              BIT(04);
+
+ DCL     EKTCHECK            CHAR(100);
+ DCL 1   REC_COUNTERS,
+      2  REC_APO             FIXED (15)  INIT(0),
+      2  REC_CNT             FIXED (15)  INIT(0),
+      2  REC_TAM             FIXED (15)  INIT(0),
+      2  REC_KAT             FIXED (15)  INIT(0),
+      2  REC_ROOT            FIXED (15)  INIT(0),
+      2  REC_TOT             FIXED (15)  INIT(0),
+      2  REC_ERROR           FIXED (15)  INIT(0),
+      2  REC_CONTROL         FIXED (15)  INIT(0),
+      2  REC_SAFETY          FIXED (15)  INIT(0),
+      2  REC_CHKB            FIXED (15)  INIT(0),
+      2  REC_STAT            FIXED (15)  INIT(0),
+      2  REC_KYRW            FIXED (15)  INIT(0),
+      2  REC_SUSP            FIXED (15)  INIT(0),
+      2  REC_INTR            FIXED (15)  INIT(0),
+      2  REC_GRD             FIXED (15)  INIT(0),
+      2  REC_EURO            FIXED (15)  INIT(0),
+      2  REC_CYP             FIXED (15)  INIT(0),
+      2  REC_CYPE            FIXED (15)  INIT(0),
+      2  REC_AKYR            FIXED (15)  INIT(0),
+      2  REC_999             FIXED (15)  INIT(0),
+      2  REC_LOGIST          FIXED (15)  INIT(0),
+      2  REC_MOVE_GRD1       FIXED (15)  INIT(0),
+      2  REC_MOVE_GRD2       FIXED (15)  INIT(0),
+      2  REC_MOVE_EURO1      FIXED (15)  INIT(0),
+      2  REC_MOVE_EURO2      FIXED (15)  INIT(0),
+      2  REC_STAT_GRD1       FIXED (15)  INIT(0),
+      2  REC_STAT_GRD2       FIXED (15)  INIT(0),
+      2  REC_STAT_EURO1      FIXED (15)  INIT(0),
+      2  REC_STAT_EURO2      FIXED (15)  INIT(0),
+      2  REPL_ROOT           FIXED (15)  INIT(0);
+
+ DCL 1   SWITCHES,
+      2  SWSUSP              FIXED (01)  INIT(0),
+      2  SWOTHER             FIXED (01)  INIT(0),
+      2  SWNOPAS             FIXED (01)  INIT(0),
+      2  SWINTR              FIXED (01)  INIT(0),
+      2  SWERROR             FIXED (01)  INIT(0),
+      2  SWROOT              FIXED (01)  INIT(0),
+      2  SWEURO              FIXED (01)  INIT(0),
+      2  SWCYP               FIXED (01)  INIT(0);
+ DCL     TODAY               PIC '99.99.9999' INIT(0);
+ DCL     WREC                PIC 'ZZZ.ZZZ.ZZZ.ZZZ.ZZ9' INIT(0);
+ DCL     WPOSO               PIC 'ZZZ.ZZZ.ZZZ.ZZZ,V99-' INIT(0);
+ DCL     II                  PIC '99'    INIT(0);
+ DCL     I                   PIC '99'    INIT(0);
+ DCL     J                   PIC '99'    INIT(0);
+
+ DCL     SUBSTR              BUILTIN;
+ DCL     ADDR                BUILTIN;
+ DCL     ABS                 BUILTIN;
+ DCL     ROUND               BUILTIN;
+
+ %PAGE;
+         /*----------------------------------------------------------*/
+         /*                    MAIN  PROGRAM                         */
+         /*----------------------------------------------------------*/
+         KFIOROOT = ADDR(WRKAREA);
+         KFIOSADD = ADDR(WRKAREA);
+         TODAY = DAYA6S8(DATE);
+         CTLCHR = ' ';
+         REC_COUNTERS = '';
+         SWITCHES     = '';
+         EKTCHECK  = ' ';
+         MHDEN     = (32)'0'B ;
+         REC_CNT   = REC_CNT + 1;
+         OPEN  FILE(PRT);
+
+ NXTKAT:                                /* ΔIABAΣMA EΠOMENOY SEGMENT */
+         EXEC DLI
+              GN      USING PCB(2)
+              INTO    (WRKAREA);
+
+         IF DIBSTAT='GB'    THEN GOTO EXIT1;
+         IF DIBSTAT^=' ' & DIBSTAT^='GA' & DIBSTAT^='GK'
+            THEN DO;
+                 GRAMH = ' ERROR READ D/B KAT ' !! KSRARLOG !! ' '
+                                                !! DIBSTAT ;
+                 WRITE FILE (PRT) FROM (LINE);
+                 REC_ERROR = REC_ERROR + 1;
+                 SWERROR = 1;
+                 GOTO NXTKAT;
+                 END;
+
+         REC_TOT=REC_TOT+1;
+         IF  DIBSEGM='KROOTSEG'
+             THEN DO;
+                  REC_ROOT=REC_ROOT+1;
+                  IF  KSRARLOG=999999999         /* CONTROL RECORD  */
+                      THEN DO;
+                           REC_CONTROL=REC_CONTROL+1;
+                           GOTO  NXTKAT;
+                           END;
+                  IF  BIT_LOG ='00000000'B            /* SAFETIES  */
+                      THEN DO;
+                           REC_SAFETY=REC_SAFETY+1;
+                           GOTO  NXTKAT;
+                           END;
+                      ELSE DO;
+                      /* Εάν Ο λογαριασμός είναι ενεργος
+                         στο καθολικό 5116 και δεν έχει
+                         όρους τότε ενημέρωσε το πεδίο KSROROI με ορους
+                         KSROROI = '1'*/
+                           IF KSRAKYR='0' &
+                              KSRKATHO = 5116 & KSROROI = '0' THEN
+                              DO ;
+                              KSROROI = '1' ;
+                              EXEC DLI
+                                REPL USING PCB(2)
+                                SEGMENT (KROOTSEG)
+                                FROM (WRKAREA);
+
+                              IF  DIBSTAT^=' '
+                               THEN DO;
+                                    GRAMH = ' ERROR REPL D/B KAT ' !!
+                                              KSRARLOG!!' '!! DIBSTAT;
+                                    WRITE FILE (PRT) FROM (LINE);
+                                    REC_ERROR = REC_ERROR + 1;
+                                    SWERROR = 1;
+                                    GOTO NXTKAT;
+                                    END;
+                                    ELSE DO;
+                                       CALL UPDATE_DB2_TABLE;
+                                    END;
+                              END;
+                           GOTO NXTKAT;
+                           END;
+                     GOTO NXTKAT;
+                  END;
+                 GOTO NXTKAT;
+ %PAGE;
+  /* ----------------------------------------------------------- */
+
+  /**************************************************************
+  *  UPDATE_DB2_TABLE      START                                *
+  **************************************************************/
+   UPDATE_DB2_TABLE      : PROC;
+       /*PUT SKIP LIST ('UPDATE_DB2_TABLE    ');*/
+        BKACCN.KEY_ARLOG= KSRARLOG;
+        BKACCN.IND_OROI=1;
+                  EXEC SQL
+                       UPDATE CTBKACCN
+                       SET
+                          IND_OROI         = :BKACCN.IND_OROI,
+                          KEY_TIMESTAMP    = CURRENT TIMESTAMP
+                       WHERE
+                          CTBKACCN.COD_EFARM = '70'    AND
+                          CTBKACCN.KEY_ARLOG = :BKACCN.KEY_ARLOG;
+                 IF  SQLCODE^=0 THEN DO;/* DB2 PROBLEM IN CTBKACCN*/
+                     GRAMH ='Προσοχή :Λάθος Updating '!!KSRARLOG !!
+                            ' στόν CTBKACCN,SQLCODE= '!! SQLCODE;
+                     WRITE FILE (PRT) FROM (LINE);
+                 END;
+                 ELSE
+                      REPL_ROOT=REPL_ROOT+1;
+     END  UPDATE_DB2_TABLE;
+  /**************************************************************
+  *  UPDATE_DB2_TABLE            END                            *
+  **************************************************************/
+  /* ----------------------------------------------------------- */
+ EXIT1:
+   GRAMH = '1 ΕNHMEΡΩΣΗ ΛΟΓΑΡΙΑΣΜΩΝ DB KATAΘΕΣΕΩΝ ΜΕ ΟΡΟΥΣ '!!TODAY!!
+           (10)' '!!'DKGNXT8';
+   WRITE FILE (PRT)       FROM(LINE);
+   GRAMH=' '!!(100)'-';
+   WRITE FILE (PRT)       FROM(LINE);
+   CTLCHR=' ';
+   WREC = REC_TOT;
+   GRAMH = '* ΣΥΝΟΛΙΚΑ ΔΙΑΒΑΣΘΗΚΑΝ      '!! WREC;
+   WRITE FILE (PRT) FROM (LINE);
+
+   CTLCHR = ' ';
+   WREC = REC_ROOT;
+   GRAMH = '* ROOT SEGMENTS            '!! WREC;
+   WRITE FILE (PRT) FROM (LINE);
+
+   WREC = REC_CONTROL;
+   GRAMH = '* ROOT CONTROL RECORD      '!! WREC;
+   WRITE FILE (PRT) FROM (LINE);
+
+   WREC = REC_SAFETY;
+   GRAMH = '* ROOT SEGMENTS - SAFETIES '!! WREC;
+   WRITE FILE (PRT) FROM (LINE);
+
+   WREC = REPL_ROOT;
+   GRAMH = '** ΤΕΘΗΚΑΝ ΟΡΟΙ ΣΕ '!! WREC!!' ΛΟΓΑΡΙΑΣΜΟΥΣ ΚΑΤΑΘΕΣΕΩΝ ';
+   WRITE FILE (PRT) FROM (LINE);
+
+   CLOSE FILE(PRT);
+  END  DKNXT8;
+

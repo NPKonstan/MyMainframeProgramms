@@ -1,0 +1,191 @@
+*PROCESS XOPTS(CICS);
+ /********************************************************************/ 00010000
+ /*****                PROGRAM NAME : COMIFUP                    *****/ 00020000
+ /*****                ONLINE  PLI + DB2                         *****/ 00031000
+ /********************************************************************/ 00010000
+ /*****  Online ЯОУТъМА ЦИА ВЯчСГ СЕ пЯОХЕСЛИАЙщР,аЩКОУР тъТКОУР *****/ 00032000
+ /*****  ЙАИ Asset Mgmt.                                         *****/ 00032100
+ /*****  еМГЛщЯЫСГ  ЙЕМТЯИЙЧМ СУМАККАЦЧМ ЦИА ТО MIFID            *****/ 00032200
+ /****   г ЯОУТъМА ЙАКЕъТАИ ЛЭМО ЦИА СУМАККАЦщР complex ПЯОЗЭМТЫМ ****/ 00032200
+ /*****                                                          *****/ 00032200
+ /********************************************************************/ 00010000
+ /*****  DATE : 03/06/2008                                       *****/ 00033000
+ /********************************************************************/ 00038000
+ /********************************************************************/ 00010000
+ /*****  DATE : 29/08/2008 пяосхгйг екецвым циа CA_PROION,CA_CIDB мпй*/ 00033000
+ /********************************************************************/ 00038000
+  COMIFUP: PROC(COM_PTR)   OPTIONS(MAIN, REENTRANT) ;
+  DCL COM_PTR  PTR;
+  DCL 1  COMM_MIFID  BASED(COM_PTR),
+       2 CA_PROION  CHAR(4),  /*INPUT йыдийос пяоиомтос*/
+       2 CA_CIDB    PIC'(9)9',/*имPUT Kыдийос пекатг*/
+       2 CA_ACTION  CHAR(2),  /*имPUT +1 , -1       */
+       2 CA_STATUS  CHAR(1),  /*OUTPUT S SUCCES U UNSUCCES*/
+       2 CA_ERROR   CHAR(6) , /*OUTPUT MFDXXX             */
+       2 CA_ANSWER  CHAR(70), /*OUTPUT пеяицяажг кахоус   */
+       2 CA_ANSWER2 CHAR(70); /*OUTPUT                    */
+
+  DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+
+     /***************************/
+     /*DB2 DECLARATIONS         */
+     /***************************/
+ EXEC SQL                                                               01460000
+          INCLUDE T04CTT46;                                             01510300
+                                                                        01510400
+ EXEC SQL                                                               01510500
+            INCLUDE SQLCA;                                              01510600
+
+  /*
+  PUT SKIP LIST('COMIFUP STARTED ',DATETIME('DD.MM.YYYY'));
+  PUT SKIP LIST('CA_PROION  =    ', CA_PROION            );
+  PUT SKIP LIST('CA_CIDB    =    ', CA_CIDB              );
+  PUT SKIP LIST('CA_ACTION  =    ', CA_ACTION            );
+  */
+       IF CA_CIDB    = '0' THEN DO;
+         CA_STATUS = 'U' ;
+         CA_ERROR = 'MFD014';
+         CA_ANSWER2='кахос йыдийос CA_CIDB   '!!CA_CIDB;
+         CA_ANSWER = 'пяобкгла стгм емглеяысг йемтяийым '!!                05330
+                        'сумаккацым MIFID';                                05330
+         EXEC CICS RETURN;
+       END;
+
+       IF CA_PROION  = '    ' THEN DO;
+         CA_STATUS = 'U' ;
+         CA_ERROR = 'MFD015';
+         CA_ANSWER2='кахос йыдийос CA_PROION '!!CA_PROION;
+         CA_ANSWER = 'пяобкгла стгм емглеяысг йемтяийым '!!                05330
+                        'сумаккацым MIFID';                                05330
+         EXEC CICS RETURN;
+       END;
+
+  CALL UPDATE_T04CTT46 ;
+
+  EXEC CICS RETURN;
+  /**************************************************************
+  *  UPDATE_T04CTT46          START                             *
+  **************************************************************/
+   UPDATE_T04CTT46        : PROC;
+       T04CTT46 = '';
+       T04CTT46.COD_PERSONA     = CA_CIDB   ;                              05330
+       T04CTT46.COD_PROD_CATEG  = CA_PROION ;                              05330
+
+       IF CA_ACTION  = '+1' THEN DO;
+              T04CTT46.NUM_TRANS  = 1;                                     05330
+       END;
+       ELSE IF CA_ACTION  = '-1' THEN DO;
+                T04CTT46.NUM_TRANS  = -1;                                  05330
+       END;
+       ELSE DO;
+         CA_STATUS = 'U' ;
+         CA_ERROR = 'MFD010';
+         CA_ANSWER2='кахос йыдийос CA_ACTION '!!CA_ACTION!!
+                    ' пяепеи ма еимаи +1 г -1';
+         CA_ANSWER = 'пяобкгла стгм емглеяысг йемтяийым '!!                05330
+                        'сумаккацым MIFID';                                05330
+         EXEC CICS RETURN;
+       END;
+
+       EXEC SQL
+       UPDATE   T04CTT46                                                   05330
+       SET                                                                 05330
+        NUM_TRANS   = NUM_TRANS + :T04CTT46.NUM_TRANS,                     05330
+        FEC_MODIF   = CURRENT DATE                                         05330
+        WHERE                                                              05330
+        COD_EMPRESA     = '0012'  AND                                      05330
+        COD_PERSONA     = :T04CTT46.COD_PERSONA AND                        05330
+        NUM_YEAR        = DEC(YEAR(CURRENT DATE),4,0) AND                  05330
+        COD_PROD_CATEG  = :T04CTT46.COD_PROD_CATEG;                        05330
+                                                                           05330
+       IF SQLCODE ^= 0   THEN  DO;
+          IF SQLCODE = 100   THEN  DO;
+             IF CA_ACTION  = '+1' THEN DO;
+                CALL INSERT_T04CTT46;
+             END;
+             ELSE DO;
+                CA_STATUS = 'U' ;
+                CA_ERROR = 'MFD011';
+                CA_ANSWER2 ='кахос йыдийос CA_ACTION '!!CA_ACTION!!
+                           ' пяепеи ма еимаи +1 (INSERT)';
+                CA_ANSWER = 'пяобкгла стгм емглеяысг йемтяийым '!!         05330
+                        'сумаккацым MIFID';                                05330
+                EXEC CICS RETURN;
+             END;
+          END;
+          ELSE DO;
+            CA_STATUS = 'U';                                               05330
+            CA_ANSWER = 'пяобкгла стгм емглеяысг йемтяийым '!!             05330
+                        'сумаккацым MIFID';                                05330
+            CA_ERROR   = 'MFD012';
+            CA_ANSWER2 = 'SQLCODE='!!SQLCODE!!'PERSONA='!!                 05330
+                          COD_PERSONA!!' PROD_CATEG='!!COD_PROD_CATEG;     05330
+          END;
+       END;
+       ELSE DO;/*SQLCODE=0*/
+         CA_STATUS = 'S' ;                                                 05330
+         CA_ANSWER = '' ;                                                  05330
+         CA_ANSWER2= '' ;                                                  05330
+         CA_ERROR   = '';
+       END;
+
+            /*
+             IF CA_ACTION  = '+1' THEN DO;
+                CALL INSERT_T04CTT46;
+             END;
+             ELSE DO;
+                CA_STATUS = 'U' ;
+                CA_ERROR = 'MFD011';
+                CA_ANSWER ='кахос йыдийос CA_ACTION '!!CA_ACTION!!
+                           ' пяепеи ма еимаи +1 (INSERT)';
+                CA_ANSWER2 = '' ;
+                EXEC CICS RETURN;
+             END; */
+     END  UPDATE_T04CTT46       ;
+  /**************************************************************
+  *  UPDATE_T04CTT46          END                               *
+  **************************************************************/
+  /**************************************************************
+  *  INSERT_T04CTT46          START                             *
+  **************************************************************/
+     INSERT_T04CTT46        : PROC;
+       T04CTT46 = '';
+       T04CTT46.COD_PERSONA     = CA_CIDB   ;                              05330
+       T04CTT46.COD_PROD_CATEG  = CA_PROION ;                              05330
+       T04CTT46.NUM_TRANS       = 1         ;                              05330
+
+       EXEC SQL
+       INSERT  INTO  T04CTT46
+            (COD_EMPRESA,
+             COD_PERSONA,
+             NUM_YEAR,
+             COD_PROD_CATEG,
+             FEC_MODIF,
+             NUM_TRANS)
+        VALUES
+            ('0012',
+            :T04CTT46.COD_PERSONA,
+             DEC(YEAR(CURRENT DATE),4,0),
+            :T04CTT46.COD_PROD_CATEG ,
+            CURRENT DATE,
+            :T04CTT46.NUM_TRANS
+              );
+       IF SQLCODE ^= 0   THEN  DO;
+         CA_STATUS = 'U';                                                  05330
+         CA_ANSWER = 'пяобкгла стгм емглеяысг йемтяийым '!!                05330
+                        'сумаккацым MIFID';                                05330
+         CA_ERROR   = 'MFD013';
+         CA_ANSWER2 = 'SQLCODE='!!SQLCODE!!' INSERT';                      05330
+       END;
+       ELSE DO;                                                            05330
+         CA_STATUS = 'S' ;                                                 05330
+         CA_ANSWER = '' ;                                                  05330
+         CA_ANSWER2= '' ;                                                  05330
+         CA_ERROR  = '';
+       END;
+     END  INSERT_T04CTT46       ;
+  /**************************************************************
+  *  INSERT_T04CTT46          END                               *
+  **************************************************************/
+  END COMIFUP ;
+

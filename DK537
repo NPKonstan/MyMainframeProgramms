@@ -1,0 +1,557 @@
+*PROCESS XOPTS(DLI),GOSTMT;
+         /*PROCESS A,GOSTMT,NEST,OPT(TIME),AG,MI('+'),S,X,MAP; */
+ DK537:   PROC(PCBIO,PCBPTRK)OPTIONS(MAIN);
+ /* АККАФЕИ ТО бйаCCN.IND_COMMON СТОМ  CTBKACCN ЕАМ ТО epeВerg = up */
+ /* АПКЫР ТУПЫМЕИ ТОУР САПИОУР КОЦ/ЛОУР         ЕАМ ТО epeВerg = pr */
+ /* о ПЯОЦЯАЛЛАТИСТГР АККАФЕИ ТО  epeВerg ЛЕ ТО ВЕЯИ АМАКОЦА ЛЕ ТОМ */
+ /* СТОВО . ТО epeВerg ЕИМАИ ПЕДИО ТГР ЙАЯТАР                       */
+ /*------------------------------------------------------------------*/
+ /*                        DB  йатахесеым                            */
+ /*------------------------------------------------------------------*/
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+ DCL CZX3VDAT CHAR(6); FETCH CZXDATEP;
+ DCL CZXDATEP ENTRY OPTIONS(INTER,ASM) ;
+
+ DCL     BITKATEP     BASED(ADDR(KSCKATEP))  BIT (80);
+ DCL     BIT_LOG      BASED(ADDR(KSRKLOG))   BIT(8);
+ DCL     KSRKATPIC    PIC'999' BASED(ADDR(KSMSKAT));
+ DCL     WS_KEYARLOG   DEC FIXED (9,0) INIT(0);
+ DCL     MAIN_BENEF    CHAR(1)  INIT(' ') ;
+
+
+ DCL     CARD    FILE RECORD INPUT  ENV( FB RECSIZE(80) );
+ DCL     PRINT1 FILE  SEQUENTIAL OUTPUT ENV(FB RECSIZE(133) CTLASA);
+ DCL     PRINT2 FILE  SEQUENTIAL OUTPUT ENV(FB RECSIZE(133) CTLASA);
+ DCL     PRINT3 FILE  SEQUENTIAL OUTPUT ENV(FB RECSIZE(133) CTLASA);
+ DCL     PRINT4 FILE  SEQUENTIAL OUTPUT ENV(FB RECSIZE(133) CTLASA);
+ DCL     ERRMSG FILE  SEQUENTIAL OUTPUT ENV(FB RECSIZE(133) CTLASA);
+ DCL     LINE                CHAR (133);
+ DCL 1   LNX                 BASED(ADDR(LINE)),
+      2  CTLCHR              CHAR(1)      INIT('1'),
+      2  GRAMH               CHAR(132)    INIT(' ');
+
+ DCL 1 CARD_REC,
+      2 CC0            CHAR(1)      INIT(' '), /*                   */
+      2 EPEXERG        CHAR(2)      INIT(' '), /* PR (INT) UP (DATE) */
+      2 FILLERC        CHAR(77)     INIT(' '); /* FILLER            */
+
+ % INCLUDE  DAYATNS ;
+ % INCLUDE  KSDBMAP ;
+   EXEC SQL
+       INCLUDE CTBKACCN;
+
+   EXEC SQL
+       INCLUDE T04CNV97;
+
+   EXEC SQL
+        INCLUDE SQLCA  ;
+
+    DCL 1  Syndik  based(addr(T04CNV97.NUM_AR_LOGAR)),
+          2  syn01  char(16),
+          2  syn02  PIC'(02)9'  ;
+
+    DCL 1 WS_ARLOGAR_RR,
+      2 W_ARLOG1   PIC'(8)9',
+      2 W_ARLOG2   CHAR(8),
+      2 W_ARLOG3   CHAR(2);
+    DCL WS_ARLOGAR    CHAR(18)  BASED(ADDR(WS_ARLOGAR_RR));
+    EXEC SQL  DECLARE CURS_CNV   CURSOR FOR
+               SELECT COD_PELATH,
+                      COD_EFARM,
+                      NUM_AR_LOGAR,
+                      COD_KATMA,
+                      IND_OPEN_CLOSE
+              FROM    T04CNV97
+              WHERE   COD_EFARM   = '70'  AND
+                      NUM_AR_LOGAR  LIKE :WS_ARLOGAR AND
+                      COD_EMPRESA = '0012'
+              ORDER BY COD_EFARM,NUM_AR_LOGAR
+              WITH UR;
+
+
+ DCL     (KFIOROOT,KFIOSADD) POINTER;
+
+ DCL  PRIORITY  BUILTIN;/****  DATE SIMULATION DEFINED FUNCTION  ****/
+ DATE: PROC IRREDUCIBLE RETURNS(CHAR(6)) ;
+       CALL CZXDATEP          ( CZX3VDAT) ;
+       RETURN (CZX3VDAT) ;
+       END DATE ;
+ /****        END OF MVS-MS INSERT        ****/
+
+           /*  AREA VANDL/1 - PCB , FUNCTION  */
+  DCL PLITDLI EXTERNAL ENTRY ;
+  DCL PCBPTRK  POINTER ;
+  DCL PCBIO    POINTER ;
+  DCL FOUR STATIC FIXED BIN(31) INIT(4) ;
+  DCL THREE STATIC FIXED BIN(31) INIT(3) ;
+
+ DCL   EOCURS  BIT(1) INIT('0'B);
+ DCL    TEMP_ARLOG   PIC'(08)9'  INIT(0) ;
+ DCL     SEGNAME             CHAR(8);
+ DCL     WRKAREA             CHAR(450);
+ DCL     RETCODE             FIXED BIN(31);
+ DCL     BINZROS             CHAR(4) INIT(' ') ;
+ DCL     MHDEN               BIT(32) BASED(ADDR(BINZROS)) ;
+ DCL     MARLOG              FIXED (09)  INIT(0);
+ DCL     DEDUCTION           PIC'9' INIT(0);
+ DCL 1   MARLOG1             BASED(ADDR(MARLOG)),
+      2  LOGAR1              BIT(36),
+      2  FILBIT              BIT(04);
+
+ DCL     EKTCHECK            CHAR(100);
+ DCL 1   REC_COUNTERS,
+      2  REC_APO             FIXED (15)  INIT(0),
+      2  REC_CNT             FIXED (15)  INIT(0),
+      2  REC_TAM             FIXED (15)  INIT(0),
+      2  REC_KAT             FIXED (15)  INIT(0),
+      2  REC_ROOT            FIXED (15)  INIT(0),
+      2  REC_TOT             FIXED (15)  INIT(0),
+      2  REC_ERROR           FIXED (15)  INIT(0),
+      2  REC_CONTROL         FIXED (15)  INIT(0),
+      2  REC_SAFETY          FIXED (15)  INIT(0),
+      2  REC_CHKB            FIXED (15)  INIT(0),
+      2  REC_STAT            FIXED (15)  INIT(0),
+      2  REC_KYRW            FIXED (15)  INIT(0),
+      2  REC_SUSP            FIXED (15)  INIT(0),
+      2  REC_INTR            FIXED (15)  INIT(0),
+      2  REC_GRD             FIXED (15)  INIT(0),
+      2  REC_EURO            FIXED (15)  INIT(0),
+      2  REC_CYP             FIXED (15)  INIT(0),
+      2  REC_CYPE            FIXED (15)  INIT(0),
+      2  REC_AKYR            FIXED (15)  INIT(0),
+      2  REC_999             FIXED (15)  INIT(0),
+      2  KOINOI_5078         FIXED (15)  INIT(0),
+      2  KOINOI_5114         FIXED (15)  INIT(0),
+      2  KOINOI_5060         FIXED (15)  INIT(0),
+      2  SYND_5078           FIXED (15)  INIT(0),
+      2  SYND_5114           FIXED (15)  INIT(0),
+      2  SYND_5060           FIXED (15)  INIT(0),
+      2  CursRows             FIXED (15)  INIT(0),
+      2  PLITHOS             FIXED (15)  INIT(0),
+      2  KOINOI_ME_ENA_DIKAIOYX FIXED (15) INIT(0),
+      2  KOINOI_ME_0_DIKAIOYX FIXED (15) INIT(0),
+      2  ATOMIKOI_AT_LEAST_2 FIXED (15) INIT(0),
+      2  ATOMIKOI_ME_0      FIXED (15)  INIT(0),
+      2  REC_5078            FIXED (15)  INIT(0),
+      2  REC_5060            FIXED (15)  INIT(0),
+      2  REC_5114            FIXED (15)  INIT(0);
+
+   /* -------       DB2 ERRORS DESCRIPTION      ------ */               00762000
+       DCL 01  ERROR_FIELDS_DB2,                                        00764000
+           02 LT_ASTER            CHAR(20)     INIT((20)'*'),           00765000
+           02 LT_SQLSTATE_ERR     CHAR(10)     INIT('SQLSTATE: '),      00766000
+           02 LT_SQLCODE_ERR      CHAR(09)     INIT('SQLCODE: '),       00767000
+           02 RET_COD             PIC'S99999'  INIT(0),                 00768000
+           02 LT_TABLE_ACCESS     CHAR(06)     INIT('TABLE:'),          00769000
+           02 TABLE_ACCESS        CHAR(10)     INIT(' '),               00769100
+           02 LT_ACTION           CHAR(07)     INIT('ACTION:'),         00769200
+           02 ACTION              CHAR(20)     INIT(' '),               00769300
+           02 LT_PERSON           CHAR(08)     INIT('PERSON :'),        00769400
+           02 LT_GROUP            CHAR(07)     INIT('GROUP :');         00769500
+                                                                        00769600
+ DCL 1   SWITCHES,
+      2  SWSUSP              FIXED (01)  INIT(0),
+      2  SWOTHER             FIXED (01)  INIT(0),
+      2  SWNOPAS             FIXED (01)  INIT(0),
+      2  SWINTR              FIXED (01)  INIT(0),
+      2  SWERROR             FIXED (01)  INIT(0),
+      2  SWROOT              FIXED (01)  INIT(0),
+      2  SWEURO              FIXED (01)  INIT(0),
+      2  SWCYP               FIXED (01)  INIT(0);
+ DCL  PR_LOGAR               PIC'(9)9'  INIT(0) ;
+ DCL     TODAY               PIC '99.99.9999' INIT(0);
+ DCL     WREC                PIC 'ZZZ.ZZZ.ZZZ.ZZZ.ZZ9' INIT(0);
+ DCL     WPOSO               PIC 'ZZZ.ZZZ.ZZZ.ZZZ,V99-' INIT(0);
+ DCL     II                  PIC '99'    INIT(0);
+ DCL     I                   PIC '99'    INIT(0);
+ DCL     J                   PIC '99'    INIT(0);
+ DCL     MAX_LIM             PIC '99'  INIT(10) ;
+ DCL    COUNT_5060             PIC '99'  INIT(00) ;
+ DCL    COUNT_5114             PIC '99'  INIT(00) ;
+ DCL    COUNT_5078             PIC '99'  INIT(00) ;
+
+ DCL     SUBSTR              BUILTIN;
+ DCL     ADDR                BUILTIN;
+ DCL     ABS                 BUILTIN;
+ DCL     ROUND               BUILTIN;
+
+ %PAGE;
+         /*----------------------------------------------------------*/
+         /*                    MAIN  PROGRAM                         */
+         /*----------------------------------------------------------*/
+         KFIOROOT = ADDR(WRKAREA);
+         KFIOSADD = ADDR(WRKAREA);
+         TODAY = DAYA6S8(DATE);
+         CTLCHR = ' ';
+         REC_COUNTERS = '';
+         SWITCHES     = '';
+         EKTCHECK  = ' ';
+         KOINOI_ME_ENA_DIKAIOYX = 0 ;
+         MHDEN     = (32)'0'B ;
+         REC_CNT   = REC_CNT + 1;
+         OPEN  FILE(PRINT1) ;  OPEN  FILE(PRINT2) ;
+         OPEN  FILE(PRINT3) ;  OPEN  FILE(PRINT4) ;
+         OPEN  FILE(ERRMSG) ;  OPEN  FILE(CARD  ) ;
+         READ   FILE (CARD )  INTO ( CARD_REC ) ;
+         GRAMH = '1  паяадонои коц/лои стом пимайа BKACCN  '!!TODAY!!
+                 (30)' '!!'DK537';
+         WRITE FILE (PRINT1)    FROM(LINE);
+         GRAMH=' '!!(100)'-';
+         WRITE FILE (PRINT1)    FROM(LINE);
+
+         GRAMH = '  йоимои H MH KOINOI коцаяиаслои  '!!
+                 'ле ема MONO дийаиоуво поу диояхыхгйе г емдеинг' !!
+                 'се атолийоус' ;
+         WRITE FILE (PRINT1)    FROM(LINE);
+         GRAMH=' '!!(100)'-';
+         WRITE FILE (PRINT1)    FROM(LINE);
+
+
+         GRAMH = '  йоимои H MH KOINOI коцаяиаслои  '!!
+                 'ле 0 дийаиоувоYс   ';
+         WRITE FILE (PRINT3)    FROM(LINE);
+         GRAMH=' '!!(100)'-';
+         WRITE FILE (PRINT3)    FROM(LINE);
+
+
+         GRAMH = '  ATOMIKOI  коцаяиаслои ME тоукавистом  '!!
+                 'дуо  дийаиоувоус поу диояхыхгйе г емдеинг  '!!
+                 'се йоимоус' ;
+         WRITE FILE (PRINT2)    FROM(LINE);
+         GRAMH=' '!!(100)'-';
+         WRITE FILE (PRINT2)    FROM(LINE);
+
+         GRAMH = '  ATOMIKOI  коцаяиаслои ME 0  '!!
+                 '  дийаиоувоус  ';
+         WRITE FILE (PRINT4)    FROM(LINE);
+         GRAMH=' '!!(100)'-';
+         WRITE FILE (PRINT4)    FROM(LINE);
+ NXTKAT:                                /* дIABAсMA EпOMENOY SEGMENT */
+         EXEC DLI
+              GN      USING PCB(3)
+              INTO    (WRKAREA);
+
+         IF DIBSTAT='GB'    THEN GOTO EXIT1;
+         IF DIBSTAT^=' ' & DIBSTAT^='GA' & DIBSTAT^='GK'
+         THEN DO;
+                 GRAMH = ' ERROR READ D/B KAT ' !! KSRARLOG !! ' '
+                                                !! DIBSTAT ;
+                 WRITE FILE (ERRMSG) FROM (LINE);
+                 REC_ERROR = REC_ERROR + 1;
+                 SWERROR = 1;
+                 GOTO NXTKAT;
+         END;
+
+         REC_TOT=REC_TOT+1;
+         IF  DIBSEGM='KROOTSEG'
+         THEN DO;
+                  REC_ROOT=REC_ROOT+1;
+                  IF  KSRARLOG=999999999         /* CONTROL RECORD  */
+                  THEN DO;
+                           REC_CONTROL=REC_CONTROL+1;
+                           GOTO  NXTKAT;
+                  END;
+                  IF  BIT_LOG ='00000000'B            /* SAFETIES  */
+                  THEN DO;
+                           REC_SAFETY=REC_SAFETY+1;
+                           GOTO  NXTKAT;
+                  END;
+                  IF KSRFN='u' & KSRAKYR = 0
+                  THEN DO;
+                         MAIN_BENEF = 'Y' ;
+                         CALL ROUT_SELECT_CTBKACCN ;
+                         IF BKACCN.IND_COMMON = 1 !
+                            BKACCN.IND_COMMON = 2
+                         /* ЙОИМОИ Г  ЛГ ЙОИМОИ КОЦ/ЛОИ */
+                         THEN DO;
+                              PLITHOS =  0 ;
+                              CALL  COUNT_DIKAIOYX;
+                              IF PLITHOS  =    1  &
+                                 MAIN_BENEF = 'Y'    THEN DO;
+                                 CTLCHR = ' ';
+                                 PR_LOGAR = WS_KEYARLOG   ;
+                                 GRAMH =  (05)'*'!! PR_LOGAR   !!
+                                        '  '!!KSRKATHO ;
+                                 WRITE FILE (PRINT1) FROM (LINE);
+                                 KOINOI_ME_ENA_DIKAIOYX =
+                                 KOINOI_ME_ENA_DIKAIOYX + 1;
+                                 IF EPEXERG = 'UP' THEN DO ;
+                                    BKACCN.IND_COMMON   = 0;
+                                    CALL UPD_BKACCN  ;
+                                 END;
+                              END ;
+                              IF PLITHOS  =    0     THEN DO;
+                                 CTLCHR = ' ';
+                                 PR_LOGAR = WS_KEYARLOG   ;
+                                 GRAMH =  (05)'*'!! PR_LOGAR   !!
+                                        '  '!!KSRKATHO ;
+                                 WRITE FILE (PRINT3) FROM (LINE);
+                                 KOINOI_ME_0_DIKAIOYX =
+                                 KOINOI_ME_0_DIKAIOYX  +  1  ;
+                              END ;
+                         END ;
+
+                         IF BKACCN.IND_COMMON = 0
+                         /* АТОЛИЙОИ  КОЦ/ЛОИ */
+                         THEN DO;
+                              PLITHOS =  0 ;
+                              CALL  COUNT_DIKAIOYX;
+                              IF PLITHOS  >  1  THEN DO;
+                                 CTLCHR = ' ';
+                                 PR_LOGAR = WS_KEYARLOG   ;
+                                 GRAMH =  (05)'*'!! PR_LOGAR         !!
+                                        '  '!!KSRKATHO ;
+                                 WRITE FILE (PRINT2) FROM (LINE);
+                                 ATOMIKOI_AT_LEAST_2 =
+                                 ATOMIKOI_AT_LEAST_2  +  1  ;
+                                 IF EPEXERG = 'UP' THEN DO ;
+                                      BKACCN.IND_COMMON   = 1;
+                                      CALL UPD_BKACCN  ;
+                                 END ;
+                              END ;
+                              IF PLITHOS  =  0  THEN DO;
+                                 CTLCHR = ' ';
+                                 PR_LOGAR = WS_KEYARLOG   ;
+                                 GRAMH =  (05)'*'!! PR_LOGAR         !!
+                                        '  '!!KSRKATHO ;
+                                 WRITE FILE (PRINT4) FROM (LINE);
+                                 ATOMIKOI_ME_0   = ATOMIKOI_ME_0
+                                 +  1  ;
+                              END ;
+                         END;
+                  END; /* IF KSRFN='U' & KSRAKYR = 0 */
+ %SKIP(2);
+        END ;  /*  DIBSEGM='KROOTSEG' */
+      GOTO NXTKAT;
+ %PAGE;
+ /*-------------------------------------------------*/
+ UPD_BKACCN: PROC;
+                                                                        01020000
+   EXEC SQL
+       UPDATE CTBKACCN
+       SET
+          IND_COMMON       = :BKACCN.IND_COMMON
+       WHERE
+          CTBKACCN.COD_EFARM =  '70'               AND
+          CTBKACCN.KEY_ARLOG = :WS_KEYARLOG  ;
+
+   IF SQLCODE = 100 THEN DO;
+      ACTION = 'дем упаявеи коц/лос' ;
+      TABLE_ACCESS = 'CTBKACCN';
+      CALL ROUT_DB2_ERROR;
+
+   END;
+
+   IF SQLCODE ^= 0 THEN DO;         /* пяобкгла стO CTBKACCN */
+      TABLE_ACCESS = 'CTBKACCN';
+      CALL ERRHANDLING  ;
+   END;
+
+ END UPD_BKACCN;
+ /*-------------------------------------------------*/
+ COUNT_DIKAIOYX : PROC ;
+
+   TEMP_ARLOG = KSRARLOG;
+   W_ARLOG1 = TEMP_ARLOG;
+   W_ARLOG2 = '';
+   W_ARLOG3 = '%%';
+
+   EXEC SQL  OPEN CURS_CNV;
+   /*
+    trace_mes =  ' AFTER  OPEN  CURSOR  '!! SQLCODE ;
+    EXEC  SQL WRITEQ TS QUEUE
+    ('DIMI') FROM (trace_mes)  LENGTH(50); */
+
+   IF SQLCODE ^= 0 THEN DO;
+      TABLE_ACCESS = 'т04CNV97';
+      IF SQLCODE = 100 THEN DO;
+         ACTION = 'дем амоицеи CURSOR ';
+         CALL ROUT_DB2_ERROR;
+      END;
+      ELSE  DO;
+           ACTION = 'PROBLEM IN TABLE ';
+           CALL ROUT_DB2_ERROR;
+      END ;
+   END;
+
+
+   EOCURS = '0'B; CursRows       = 0;
+   DO WHILE (   ^ EOCURS             ) ;
+      CALL ROUT_FETCH;
+   END;
+
+   EXEC SQL
+      CLOSE CURS_CNV;
+
+   IF SQLCODE ^= 0 THEN DO;
+      TABLE_ACCESS = 'т04CNV97';
+      IF SQLCODE = 100 THEN DO;
+           ACTION = 'дем йкеимеи CURSO';
+           CALL ROUT_DB2_ERROR;
+      END;
+      ELSE  DO;
+           ACTION = 'PROBLEM IN TABLE ';
+           CALL ROUT_DB2_ERROR;
+      END ;
+   END;
+
+   PLITHOS = CURSROWS ;
+
+
+ END  COUNT_DIKAIOYX ;
+  /* ---------------------------------------------- */
+ /*  +++++++++++++++++++++++++++++++++++++++++++++++ */
+ ROUT_FETCH : PROC;
+   EXEC SQL
+        FETCH CURS_CNV
+        INTO
+           :T04CNV97.COD_PELATH,
+           :T04CNV97.COD_EFARM,
+           :T04CNV97.NUM_AR_LOGAR,
+           :T04CNV97.COD_KATMA,
+           :T04CNV97.IND_OPEN_CLOSE;
+
+   IF SQLCODE = 100 THEN DO;
+      EOCURS = '1'B;
+      GO TO END_FETCH;
+   END;
+
+   IF SQLCODE ^= 0 THEN DO;
+      TABLE_ACCESS = 'T04CNV97';
+      CALL  ERRHANDLING ;
+   END;
+
+   CursRows     =  CursRows + 1 ;
+   IF   SYN02  >  01  & CursRows = 1    THEN DO;
+      MAIN_BENEF = 'N' ;
+      PR_LOGAR = WS_KEYARLOG  ;
+      GRAMH =  (05)'*'!! PR_LOGAR !!'  дем евеи йуяио дийаиоуво сто '!!
+                ' CIDB ' ;
+
+      WRITE FILE (ERRMSG) FROM (LINE);
+
+   end ;
+
+
+
+ END_FETCH:
+ END ROUT_FETCH;
+       /*------------------------------------------------*/
+ /*-------------------------------------------------*/
+ /*-------------------------------------------------*/
+ ROUT_SELECT_CTBKACCN : PROC;
+
+   WS_KEYARLOG = KSRARLOG;
+
+   EXEC SQL
+       SELECT       IND_COMMON
+       INTO
+          :BKACCN.IND_COMMON
+       FROM    CTBKACCN
+       WHERE   COD_EFARM = '70'        AND
+               KEY_ARLOG = :WS_KEYARLOG
+       WITH UR;
+
+
+   IF SQLCODE = 100 THEN
+   DO;
+         BKACCN.IND_COMMON = 9 ; /* DUMMY циа ма лгм тупымеи оти
+                                   дгхем диояхыхгйе */
+         ACTION =  WS_KEYARLOG !!  'NOT FOUND IN ';
+         TABLE_ACCESS = 'CTBKACCN';
+         CALL ROUT_DB2_ERROR;
+   END;
+   IF SQLCODE ^= 0 THEN DO;
+      BKACCN.IND_COMMON = 9 ; /* DUMMY циа ма лгм тупымеи оти
+                                   дгхем диояхыхгйе */
+      TABLE_ACCESS = 'CTBKACCN';
+      CALL  ERRHANDLING  ;                /* пяобкгла стO CTBKACCN */
+   END;
+
+ END ROUT_SELECT_CTBKACCN;
+
+ /*******************************************************************/
+ ERRHANDLING : PROC ;
+         ACTION = 'PROBLEM IN TABLE ';
+         CALL ROUT_DB2_ERROR;
+ END ERRHANDLING ;
+ /* -------------------------------------------------------------- */   03700100
+ ROUT_DB2_ERROR: PROC;                                                  03702000
+                                                                        03706000
+           RET_COD = SQLCODE;                                           03707000
+           GRAMH     = '  '!!LT_ASTER !!                                03708000
+                       LT_SQLSTATE_ERR !! SQLSTATE !!' '!!              03709000
+                       LT_SQLCODE_ERR !! RET_COD !!' '!!                03709100
+                       LT_TABLE_ACCESS !! TABLE_ACCESS !!               03709200
+                       LT_ACTION !! ACTION ;                            03709300
+          CALL PUTLAUH;                                                 03709600
+  END ROUT_DB2_ERROR;                                                   03709800
+
+ /* -------------------------------------------------------------- */
+
+ PUTLAUH: PROC ;
+         WRITE FILE(ERRMSG) FROM(LINE) ;
+         GRAMH   = (132)' ' ;
+         END PUTLAUH ;
+
+
+
+ /*  +++++++++++++++++++++++++++++++++++++++++++++++ */
+  /* ----------------------------------------------------------- */
+ EXIT1:
+   CTLCHR = ' ';
+   GRAMH =  (100)'-' ;
+   WRITE FILE (PRINT1) FROM (LINE);
+
+   CTLCHR = ' ';
+   GRAMH =  (100)'-' ;
+   WRITE FILE (PRINT2) FROM (LINE);
+
+   CTLCHR = ' ';
+   WREC = REC_TOT;
+   GRAMH = '**rYNOkIKA dIABArTHKAN     '!! WREC;
+   WRITE FILE (PRINT1) FROM (LINE);
+
+   CTLCHR = ' ';
+   WREC = REC_ROOT;
+   GRAMH = '**ROOT SEGMENTS            '!! WREC;
+   WRITE FILE (PRINT1) FROM (LINE);
+
+   WREC = REC_CONTROL;
+   GRAMH = '**ROOT CONTROL RECORD      '!! WREC;
+   WRITE FILE (PRINT1) FROM (LINE);
+
+   WREC = REC_SAFETY;
+   GRAMH = '**ROOT SEGMENTS - SAFETIES '!! WREC;
+   WRITE FILE (PRINT1) FROM (LINE);
+
+
+   WREC = KOINOI_ME_ENA_DIKAIOYX ;
+   GRAMH = '**KOINOI коц/лои ле  1       дийаиоуво '!!
+           ' поу диояхыхгйе г емдеинг  '!!WREC;
+   WRITE FILE (PRINT1) FROM (LINE);
+
+
+   WREC = KOINOI_ME_0_DIKAIOYX ;
+   GRAMH = '**KOINOI коц/лои ле  0    дийаиоувоус ' !!WREC;
+   WRITE FILE (PRINT3) FROM (LINE);
+
+
+   WREC = ATOMIKOI_AT_LEAST_2 ;
+   GRAMH = '**атолийои коц/лои ле  >1       дийаиоувоус '!!
+           ' поу диояхыхгйе г емдеинг  '!!WREC;
+   WRITE FILE (PRINT2) FROM (LINE);
+
+
+   WREC = ATOMIKOI_ME_0    ;
+   GRAMH = '**атолийои коц/лои ле  0   дийаиоувоус '!!WREC;
+
+   WRITE FILE (PRINT4) FROM (LINE);
+
+
+
+
+   CLOSE FILE(PRINT1),  FILE(PRINT2) ; CLOSE FILE(CARD  ) ;
+   CLOSE FILE(PRINT3),  FILE(PRINT4),  FILE(ERRMSG)  ;
+  END  DK537;
+

@@ -1,0 +1,113 @@
+ /*********************************************************************/
+ /* аутг г яоутима                                                    */
+ /* паиямеи сам INPUT :    YEAR = етос ANAFORAS                       */
+ /*                                                                   */
+ /* йаи епистяежеи   FIRST   CHAR(06)  = глеяолгмиа пяытоу ейтойислоу */
+ /*                  SECOND  CHAR(06)  = глеяолгмиа деутеяоу ейтойисл */
+ /*                  -1 ам еимаи кахос то INPUT                       */
+ /* вягсилопоие╨те сто пяоцяалла DK512                                */
+ /*********************************************************************/
+ /* мпй 15-02-2007                                                    */
+ /*********************************************************************/
+ DKRSTR : PROC(YEAR,FIRST,SECOND)
+           OPTIONS(FETCHABLE)  RETURNS( FIXED (1));
+ DCL YEAR    FIXED(4);
+ DCL P_YEAR    PIC'(4)9';
+ DCL RC      FIXED(1);
+ DCL FIRST   CHAR(06); /*DDMMYY*/
+ DCL SECOND  CHAR(06); /*DDMMYY*/
+ /*DCL DAY_OF_WEEK FIXED DEC(1,0);*/
+ DCL I           FIXED DEC(1,0);
+ DCL ADDR   BUILTIN ;
+ DCL ONCODE BUILTIN ;
+
+ EXEC SQL   INCLUDE SQLCA;                                              01510500
+ EXEC SQL   INCLUDE START;                                              01510500
+  /**************************************************************
+  *  A100_FIND_FIRST_PERIOD      START                         *
+  **************************************************************/
+     A100_FIND_FIRST_PERIOD: PROC RETURNS(CHAR(6) );
+     DCL R_STR CHAR(6);
+ DCL  1 P_DATE  BASED(ADDR(START_DATE)),
+             2 PICDD  PIC'(2)9',
+             2 F1     CHAR(1)  ,
+             2 PICMM  PIC'(2)9',
+             2 F2     CHAR(3)  ,
+             2 PICYY  PIC'(2)9';
+     P_YEAR = YEAR;
+     START_DATE = '14.'!!'06.'!!P_YEAR;
+           PUT SKIP LIST (' START_DATE   ', START_DATE);
+     DO I = 1 TO 7;
+
+        PICDD = PICDD + 1;
+        DAY_OF_WEEK = 0;
+        EXEC SQL SELECT DAYOFWEEK(DATE(:START_DATE))
+        INTO :DAY_OF_WEEK FROM SYSIBM.SYSDUMMY1 ;
+        IF SQLCODE = 0 THEN DO;
+        IF DAY_OF_WEEK = 6 THEN DO;
+           R_STR = SUBSTR(START_DATE,1,2)!!SUBSTR(START_DATE,4,2)!!
+                   SUBSTR(START_DATE,9,2);
+           PUT SKIP LIST (' FROM ROUTINE ', R_STR);
+
+           RETURN (R_STR);
+        END;
+        END;
+        ELSE
+           PUT SKIP LIST (' SQLCODE ', CHAR(SQLCODE));
+
+     END;
+     END  A100_FIND_FIRST_PERIOD;
+  /**************************************************************
+  *  A100_FIND_FIRST_PERIOD      END                            *
+  **************************************************************/
+  /**************************************************************
+  *  A200_FIND_SECOND_PERIOD      START                         *
+  **************************************************************/
+     A200_FIND_SECOND_PERIOD: PROC RETURNS(CHAR(6) );
+     DCL R_STR CHAR(6);
+ DCL  1 P_DATE  BASED(ADDR(START_DATE)),
+             2 PICDD  PIC'(2)9',
+             2 F1     CHAR(1)  ,
+             2 PICMM  PIC'(2)9',
+             2 F2     CHAR(3)  ,
+             2 PICYY  PIC'(2)9';
+     P_YEAR = YEAR;
+     START_DATE = '14.'!!'12.'!!P_YEAR;
+           PUT SKIP LIST (' START_DATE   ', START_DATE);
+     DO I = 1 TO 7;
+
+        PICDD = PICDD + 1;
+        DAY_OF_WEEK = 0;
+        EXEC SQL SELECT DAYOFWEEK(DATE(:START_DATE))
+        INTO :DAY_OF_WEEK FROM SYSIBM.SYSDUMMY1 ;
+        IF SQLCODE = 0 THEN DO;
+        IF DAY_OF_WEEK = 6 THEN DO;
+           R_STR = SUBSTR(START_DATE,1,2)!!SUBSTR(START_DATE,4,2)!!
+                   SUBSTR(START_DATE,9,2);
+           PUT SKIP LIST (' FROM ROUTINE ', R_STR);
+
+           RETURN (R_STR);
+        END;
+        END;
+        ELSE
+           PUT SKIP LIST (' SQLCODE ', CHAR(SQLCODE));
+
+     END;
+     END  A200_FIND_SECOND_PERIOD;
+  /**************************************************************
+  *  A200_FIND_SECOND_PERIOD      END                            *
+  **************************************************************/
+      ON ERROR BEGIN;
+        ON ERROR SYSTEM;
+        PUT SKIP LIST( 'ERROR  ');
+        RC = -1;
+        GOTO R_POINT;
+      END;
+
+     FIRST  = A100_FIND_FIRST_PERIOD();
+     SECOND = A200_FIND_SECOND_PERIOD();
+     RC = 0;
+     R_POINT:;
+     RETURN (RC);
+ END  DKRSTR         ;
+

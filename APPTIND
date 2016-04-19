@@ -1,0 +1,76 @@
+* PROCESS XOPTS(CICS);
+ APPTIND : PROC(EFIXIO1_PTR) OPTIONS(MAIN);
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+ /*-----------------------------------------------------------------*/
+ /*         PROGRAM NAME: APPTIND     PHASE NAME: APPIND            */
+ /* еисацыцг еццяажгс сто VSAM EFINDX1                              */
+ /* Tа дедолема евоум пеяасеи апо пяогцоулемо пяоцяалла             */
+ /* NPK 08-09-2004                                                  */
+ /*-----------------------------------------------------------------*/
+ DCL EFIXIO1_PTR PTR;
+ DCL 1  INPUT_DATA BASED(EFIXIO1_PTR),
+      2  EFIXTRS             PIC '(06)9',   /* KEY (AP.pP.rYrTHMATOr)*/
+      2  EFIXDATE            PIC '(08)9',   /* HM/NIA rYNAkkAcHr     */
+      2  EFIXKTM1            FIXED(05),     /* Kxd. KATArTHMATOr     */
+      2  EFIXAFM1            FIXED(11),     /* A.u.M. / AP.kOc/rMOY  */
+      2  EFIXNT1             FIXED(09),     /* AP.EIdOp./ AP.MHTPxOY */
+      2  EFIXAM1             FIXED(11),     /* pOrO pkHPxMHr / A.u.M */
+      2  EFIXREF1            FIXED(09),     /* REFERENCE 1          .*/
+      2  EFIXSQ1             PIC '99',      /* SEQUENCE NUMBER       */
+      2  EFERROR             CHAR(01),      /* ERROR CONDITION       */
+      2  EFIXFIL             CHAR(08);      /* FILLER...             */
+ /*-------------------------------------------------------------*/
+ DCL 1   EFIXKEY             CHAR(27)       BASED(ADDR(EFIXKTM1));
+
+ DCL (STG,ADDR) BUILTIN;
+
+
+ IF EIBCALEN>0 THEN DO;
+
+      EFERROR = '0';  /*CLEAR ERROR FLAG*/
+
+      EXEC CICS HANDLE CONDITION
+                              NOTFND  (ERR1)
+                              DUPREC  (ERR2)
+                              NOTOPEN (ERR3)
+                              LENGERR (ERR4)
+                              NOSTG   (ERR5)
+                              INVREQ  (ERR6);
+
+      EXEC CICS WRITE  DATASET ('EFINDX1')
+                              FROM (INPUT_DATA)
+                              LENGTH (STG(INPUT_DATA))
+                              RIDFLD (EFIXTRS);
+      GO TO EXIT;/*ока йака, епестяеье*/
+
+ /*кахос,епестяеье йыдийо кахоус сто йакоум пяоцяалла*/
+ ERR1 :
+       EFERROR = '1';
+       GO TO EXIT;
+
+ ERR2 :
+       EFERROR = '2';
+       GO TO EXIT;
+
+ ERR3 :
+       EFERROR = '3';
+       GO TO EXIT;
+
+ ERR4 :
+       EFERROR = '4';
+       GO TO EXIT;
+
+ ERR5 :
+       EFERROR = '5';
+       GO TO EXIT;
+
+ ERR6 :
+       EFERROR = '6';
+       GO TO EXIT;
+
+ END; /*IF EIBCALEN */
+ EXIT:
+  /*PUT SKIP LIST('EFERROR IN APPTIND = ',EFERROR);*/
+ EXEC CICS RETURN;
+ END;
+

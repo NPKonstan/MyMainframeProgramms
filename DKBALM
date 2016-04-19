@@ -1,0 +1,982 @@
+ DKBALM : PROC OPTIONS (MAIN);
+     /***********************************************************/
+     /*          MEMBER = DKBALM                                */
+     /*                                                         */
+     /*  INTERFACE FOR ALM SYSTEM                               */
+     /*  диабафы аявеио тал20     & дглиоуяцы  аявеио циа а.L.M */
+     /*                                                         */
+     /***********************************************************/
+     /* IF THE PROGRAM  IS  USED FOR TEST ONLY                  */
+     /* VARIABLE IS_TEST HAS VALUE YES                          */
+     /* IN PRODUCTION YOU HAVE TO CHANGE THIS VALUE             */
+     /***********************************************************/
+     /* Aккацес                                                 */
+     /***********************************************************/
+     /*22-01-2004                                               */
+     /*           тыяа паиямеи тгм текеутаиа еяцасилг ап то JCL */
+     /*           паяалетяийа                                   */
+     /* еписгс пяостехгйе мео педио сто аявеио (ALMK_EPIT)      */
+     /* KAI KAкеитаи г яоутима поу епистяежеи то йулаимолемо епи*/
+     /***********************************************************/
+     /*26-01-2004                                               */
+     /*     KAкеитаи г яоутима DKR002 епистяежеи TO пистытийо   */
+     /*     йаи та пихама дуо вяеыстийа епитойиа                */
+     /***********************************************************/
+     /*31-03-2004                                               */
+     /*     пяосхгйг меым йахокийым 5114 йаи 5150               */
+     /***********************************************************/
+     /*21-04-2004                                               */
+     /*     аккацг дейаьгжиым йахокийым  ста йахокийа 5121,5120 */
+     /***********************************************************/
+     /*04-05-2004                                               */
+     /*     аккацг :тыяа паиямеи тгм текеутаиа еяцасилг апо     */
+     /*     CONTROL CARD                                        */
+     /*     KAI вягсилопоиеи тгм VALDATE                        */
+     /***********************************************************/
+
+ DCL VALDAY EXTERNAL ENTRY(CHAR(44))
+                                     OPTIONS(INTER,ASM);
+ FETCH VALDAY;
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+ DCL CZX3VDAT CHAR(6); FETCH CZXDATEP;
+ DCL CZXDATEP ENTRY OPTIONS(INTER,ASM) ;
+
+ DCL DKR001 ENTRY (CHAR(10),    /*глеяолгмиа*/
+                   FIXED(8))    /*аяихлос коцаяиаслоу           */
+     RETURNS(PIC'S99V.99');     /*епитойио*/
+     FETCH DKR001 ;
+
+ DCL DKR002 ENTRY (FIXED(7,0),  /*йахокийо 6 ьгжиа*//*INPUT*/
+                   PIC '(7)9',  /*глеяолгмиа аYYMMDD опоу а=1*//*INP*/
+                   FIXED(13,2), /*посом*/ /*INPUT*/
+                   FIXED(11,2), /*ояио оVERDRAFT коцаяиаслоу*//*INP*/
+                   FIXED(5,2),  /*пистытийо епитойио*//*OUTPUT*/
+                   PIC'999V.99',/*вяеыстийо епитойио 1 *//*OUTPUT*/
+                   PIC'999V.99')/*вяеыстийо епитойио 2*//*OUTPUT*/
+    RETURNS( FIXED (1));        /*йыдийос кахоус 1=кахос 0=сысто*/
+     FETCH DKR002 ;
+ DCL  TAM20      FILE RECORD INPUT ENV(
+                 FB RECSIZE(60)                          );
+
+ % INCLUDE  BKR20TOK  ;
+
+ DCL ALMFILE    FILE RECORD OUTPUT                                      00180002
+                          ENV(FB RECSIZE(300) );                        00190002
+
+ DCL  ETAIRIE FILE RECORD DIRECT INPUT
+                 KEYED
+                 ENV ( VSAM );
+
+ DCL READER  FILE RECORD INPUT  ENV( FB RECSIZE(80) );
+
+ DCL PRT   FILE RECORD OUTPUT ENV(                    FB
+           RECSIZE(133)            CTLASA);
+
+
+ % INCLUDE  CUAVDCDS  ;
+
+ DCL 1 ALMREC ,
+   2 ALMNUMBER    CHAR(20)      ,/* APихлос коцаяиаслоу              */
+   2 ALMBALANCE PIC'(12)9V.99'  ,/* диахесило                        */
+   2 ALMBALUER  PIC'(12)9V.99'  ,/* диахесило Oпыс пио памы          */
+   2 ALMCURCODE CHAR(3)        , /* молисла                          */
+   2 ALMRATE    PIC'(4)9V.99999',/* епитойио пистытийо               */
+   2 ALMBASIS   CHAR(1)        ,/*  D---> мотгимG ELSE               */
+   2 ALMDATE    CHAR(8)        ,/*  HM/NIA Yпокоипоу DDMMYYYY        */
+   2 ALMSPRCODE CHAR(4)        ,/*  йахокийо 4-ьгжио                 */
+   2 ALMKATH    CHAR(15)       ,/*  йахокийо 10ЬГЖИО                 */
+   2 ALMDESCR   CHAR(30)       ,/*  пеяицяажг йахокийоу              */
+   2 ALMCUSNAME CHAR(35)       ,/* пкгяес омолатепымуло пекатг       */
+   2 ALMCIDBNUM CHAR(20)       ,/* CIDB NUMBER                       */
+   2 ALMINSTRID CHAR(40)       ,/*  SPACES                           */
+   2 ALMUSERFL  CHAR(2)        ,/*  SPACES                           */
+   2 ALMSAVGBAL PIC'(12)9V.99' ,/* 0.0                               */
+   2 ALMBANK    CHAR(4)        ,/* COD-BRANCH                        */
+   2 ALMBRANCH  CHAR(4)        ,/* COD-BRANCH                        */
+   2 ALMCOST    CHAR(7)        ,/* COD-BRANCH                        */
+   2 ALMKAPEL   CHAR(1)        ,/* жусийо ╧ молийо пяосыпо           */
+   2 ALMTRAP    CHAR(1)        ,/* йыдийос тяапефас поу амгйеи пекатгс*/
+   2 ALMSCB     CHAR(1)  ,/* пяосгло CURRENT BALANCE 1<0  2>=0      */
+   2 ALMSCBE    CHAR(1)  ,/* пяосгло CURRENT BALANCE EURO 1<0 2>=0  */
+   2 ALMSAB     CHAR(1)  ,/* пяосгло AVERAGE CURRENT BALANCE        */
+   2 ALMK_EPIT  PIC'S99V.99',/* епитойио  йулаимолемо           */
+   2 ALM_X1     PIC'999V.99',/* епитойио  вяеыстийо 1памы OVERD */
+   2 ALM_X2     PIC'999V.99',/* епитойио  вяеыстийо 2           */
+   2 ALMOVERD   PIC'(11)9V.99' ,/* POSO OVERDRAFT               */
+   2 ALMFILLER  CHAR(15)    ;
+
+   /* -------------------------------------------------------------- */
+   /*           RECORD VSAM APXEIOY DK.TRAP.EPIX                     */
+   /*           (kOcAPIArMOI cIA EIdIKEr KATArTArEIr)                */
+   /*                                                                */
+   /*           RECORD SIZE = 100                                    */
+   /* -------------------------------------------------------------- */
+
+ % INCLUDE  DKSPACC ;
+
+     /* DECLARATIONS                                                 */
+     DCL T_KEY CHAR(10) BASED(ADDR( DSA_ARLOG));
+     DCL 1  T_KER       BASED(ADDR( DSA_ARLOG)),
+          2 T_KER60     BIT(60)                ,
+          2 T_KER04     BIT(04)                ;
+
+     DCL  EOF          FIXED(1)       INIT(0)  ;
+
+     DCL  FLAG         FIXED(1)       INIT(0)  ;
+
+     DCL  WS_CUSTOMER_FOUND FIXED(1)  INIT(0)  ;
+
+     /****************************/
+     /*SOME VARIABLES FOR TESTING*/
+     /****************************/
+
+     /*IF IT IS TEST IS_TEST HAS VALUE YES*/
+     /*IN PRODUCTION YOU HAVE TO PUT NO  */
+
+     DCL  IS_TEST          CHAR(3)   INIT('NO ');
+     DCL  REC_COUNTER      FIXED(15) INIT(0);
+     DCL  MAX_REC_COUNTER  FIXED(2)  INIT(09); /*MAXIMUM NUMBER OF*/
+                                               /*RECORDS FOR TESTING*/
+     /***************************/
+     /*SOME VARIABLES FOR TOTALS*/
+     /***************************/
+   DCL   SYNOLO_KATHOLIKOY  PIC'ZZZZ.ZZZ.ZZZ.ZZ9V,99-' INIT(0);
+   DCL   TOTAL_REC_KATHOLIKOY PIC'ZZZ.ZZZ.ZZ9' INIT(0);
+   DCL   MY_SYNOLO_KATHOLIKOY  FIXED(15,2) INIT(0);
+
+   DCL 1 COUNTERS ,
+      2 CNT_REC_READ               PIC 'ZZZ.ZZZ.ZZ9' ,
+      2 CNT_REC_REJECT_CYPR        PIC 'ZZZ.ZZZ.ZZ9' ,
+      2 CNT_REC_PROCCED            PIC 'ZZZ.ZZZ.ZZ9' ,
+      2 CNT_REC_REJECT_T04CNV97    PIC 'ZZZ.ZZZ.ZZ9' ,
+      2 CNT_REC_REJECT_T04DOM01    PIC 'ZZZ.ZZZ.ZZ9' ,
+      2 CNT_REC_PROCCED_RIGHT      PIC 'ZZZ.ZZZ.ZZ9' ,
+      2 CNT_REC_WRITTEN            PIC 'ZZZ.ZZZ.ZZ9' ,
+      2 CNT_REC_FISICAL            PIC 'ZZZ.ZZZ.ZZ9' ,
+      2 CNT_REC_BIG_COMPANY        PIC 'ZZZ.ZZZ.ZZ9' ,
+      2 CNT_REC_SMALL_COMPANY      PIC 'ZZZ.ZZZ.ZZ9' ;
+
+     /***************************/
+     /*DB2 DECLARATIONS         */
+     /***************************/
+ EXEC SQL                                                               01460000
+          INCLUDE T04CNV97;                                             01510300
+                                                                        01510400
+ EXEC SQL                                                               01460000
+          INCLUDE T04DBA01;                                             01510300
+                                                                        01510400
+ EXEC SQL                                                               01510500
+            INCLUDE SQLCA;                                              01510600
+
+
+ DCL 1 ERLINE  ,
+       2 ERLIN1    CHAR(1)  INIT(' ')       ,
+       2 ERLIN2    CHAR(132);
+
+ DCL WNAME_60   CHAR(60) INIT(' ');
+ DCL WNAME      CHAR(35) INIT(' ');
+ DCL WDATE      PIC'(8)9' INIT(0);
+ DCL WKAPELDS   CHAR(25) INIT(' ');
+ DCL WPOSO      FIXED(15,2);
+ DCL WPOSO1     FIXED(15,2);
+ DCL WKATHO     PIC'(10)9' INIT(0);
+
+ DCL WFLAG      CHAR(1) INIT(' ');
+ DCL WKAPEL     PIC'99';
+ DCL WTRAPEL    PIC'9';
+ DCL WARPEL     PIC'(8)9';
+ DCL WLOGAR     PIC'(4)9';
+ DCL WCIDB      CHAR(18) INIT(' ');
+ DCL I          PIC'99';
+ DCL WKATMA     PIC'(4)9';
+ DCL WPELATH  DEC FIXED(9,0) INIT(0)  ;
+ DCL WPEL       PIC'(8)9';
+ DCL CNTRYP     FIXED(9) INIT(0);
+ DCL CNTRWR     FIXED(9) INIT(0);
+ DCL CNTRCI     FIXED(9) INIT(0);
+ DCL WYPOL      FIXED(15,2) INIT (0);
+ DCL TOT_KATH   PIC'ZZZZ.ZZZ.ZZZ.ZZ9V,99' INIT(0);
+
+ DCL TODAY      CHAR(17);
+ DCL  1 SYSDATE  BASED(ADDR(TODAY)),
+             2 SYSYY  CHAR(4),
+             2 SYSMM  CHAR(2),
+             2 SYSDD  CHAR(2);
+
+ /*TO BE USED IN ZERO DIVIDE*/
+ DCL BOOM     DEC FIXED(1,0) INIT(0)  ;
+                                   /*NPK 03-10-2007 FOR ENTERPLI*/
+ DCL ZERO     DEC FIXED(1,0) INIT(0)  ;
+
+ DCL INDATE     CHAR(10);
+ DCL  SDATE     CHAR(6);  /*LAST WORKING DATE INPUT FROM JCL */
+ DCL  1 SYSINDATE BASED(ADDR(SDATE)),
+             2 SDD  CHAR(2),
+             2 SMM  CHAR(2),
+             2 SYY  CHAR(2);
+
+
+ DCL WS_ARLOG      FIXED(8);
+ DCL WS_PIC9_ARLOG   PIC '(8)9'  ;
+ DCL WS_PIC9_ARKATMA PIC '(3)9'  ;
+
+ DCL 1 WS_PIC9_KATH_B PIC '(6)9' BASED(ADDR(WS_PIC9_KATH));
+
+ DCL 1 WS_PIC9_KATH                  ,
+       2  WS_PIC9_KATHOL PIC '(4)9'  ,
+       2  WS_99          PIC '99'    ;
+
+ DCL  WS_KATH_OLD   PIC'(6)9' INIT (931900);
+ DCL  WS_KATH_OLD1  CHAR(6) BASED(ADDR(WS_KATH_OLD));
+ DCL  WS_KATH_NEW   PIC'(6)9' INIT (0);
+ DCL  WS_KATH_NEW1  CHAR(6) BASED(ADDR(WS_KATH_NEW));
+
+
+  DCL   ORIO     FIXED(9) INIT(066);
+  DCL   P1KATHOL(66)   CHAR(58)    INIT (
+         '506001 / 5000000005-IdIxTxN                               ',
+         '506002 / 5001000009-ETAIPEIxN                             ',
+         '506003 / 5002000002-dHMOrIxN OPcANIrMxN                   ',
+         '506004 / 5003000006-dHMOrIxN EpIXEIPHrExN                 ',
+         '506005 / 5004000000-pIrTxTIKxN IdPYMATxN-TPApEZxN         ',
+         '506006 / 5004000018-rYNdEdEMENxN TPApEZxN-IdPYMATxN       ',
+         '506007 / 5004000026-TPApEZxN EnxTEP.METETPEw.rE dPX       ',
+         '506099 /           -*** ME kAhOr KxdIKO EpAccEkMATOr ***  ',
+         '506801 / 5011000010 pPONOMIAKOr kOc/rMOr KATAhErExN       ',
+         '506899 /           -*** ME kAhOr KxdIKO EpAccEkMATOr ***  ',
+         '507801 / 5011000001 TPEXOYMENxN k/rMxN KATAhErExN         ',
+         '507899 /           -*** ME kAhOr KxdIKO EpAccEkMATOr ***  ',
+         '508001 / 5000000005-IdIxTxN                               ',
+         '508002 / 5001000009-ETAIPEIxN                             ',
+         '508003 / 5002000002-dHMOrIxN OPcANIrMxN                   ',
+         '508004 / 5003000006-dHMOrIxN EpIXEIPHrExN                 ',
+         '508005 / 5004000000-pIrTxTIKxN IdPYMATxN-TPApEZxN         ',
+         '508006 / 5004000018-rYNdEdEMENxN TPApEZxN-IdPYMATxN       ',
+         '508007 / 5004000026-TPApEZxN EnxTEP.METETPEw.rE dPX       ',
+         '508099 /           -*** ME kAhOr KxdIKO EpAccEkMATOr ***  ',
+         '509005 / 5004000000-pIrTxTIKxN IdPYMATxN-TPApEZxN         ',
+         '509006 / 5004000018-rYNdEdEMENxN TPApEZxN-IdPYMATxN       ',
+         '509099 /           -*** ME kAhOr KxdIKO EpAccEkMATOr ***  ',
+         '510001 / 5000000013-IdIxTxN                               ',
+         '510002 / 5001000017-ETAIPEIxN                             ',
+         '510099 /           -*** ME kAhOr KxdIKO EpAccEkMATOr ***  ' ,
+         /*Aккацг тгм 31-03-2001 меа йахокийа*/
+         '511401 / 5011000001-IdIxTxN                               ',
+         '511499 /           -*** ME kAhOr KxdIKO EpAccEkMATOr ***  ',
+         '511501 / 5304000005-IdIxTxN                               ',
+         '511599 /           -*** ME kAhOr KxdIKO EpAccEkMATOr ***  ',
+         '511601 / 5000000048-IdIxTxN                               ',
+         '511602 / 5001000041-ETAIPEIxN                             ',
+         '511603 / 5002000045-dHMOrIxN OPcANIrMxN                   ',
+         '511604 / 5003000049-dHMOrIxN EpIXEIPHrExN                 ',
+         '511605 / 5004000042-pIrTxTIKxN IdPYMATxN-TPApEZxN         ',
+         '511606 /           -rYNdEdEMENxN TPApEZxN-IdPYMATxN       ',
+         '511607 /           -TPApEZxN EnxTEP.METETPEw.rE dPX       ',
+         '511699 /           -*** ME kAhOr KxdIKO EpAccEkMATOr ***  ',
+         '511701 / 5304000005-IdIxTxN                               ',
+         '511799 /           -*** ME kAhOr KxdIKO EpAccEkMATOr ***  ',
+          /*21-04-2004  аккацг ста йахокийа 5121,5120     */
+         '512001 / 5310000003-IdIxTxN                               ',
+         '512002 / 5310000003-ETAIPEIxN                             ',
+         '512003 / 5311000007-dHMOrIxN OPcANIrMxN                   ',
+         '512004 / 5312000001-dHMOrIxN EpIXEIPHrExN                 ',
+         '512099 /           -*** ME kAhOr KxdIKO EpAccEkMATOr ***  ',
+         '512101 / 5310000003-IdIxTxN                               ',
+         '512102 / 5310000003-ETAIPEIxN                             ',
+         '512103 / 5311000007-dHMOrIxN OPcANIrMxN                   ',
+         '512104 / 5312000001-dHMOrIxN EpIXEIPHrExN                 ',
+         '512199 /           -*** ME kAhOr KxdIKO EpAccEkMATOr ***  ',
+         '512201 / 5001000009-pPONOMIAKOr EpIXEIPHrExN              ',
+         '512299 /           -*** ME kAhOr KxdIKO EpAccEkMATOr ***  ',
+         /*Aккацг тгм 31-03-2001 меа йахокийа*/
+         '515001 / 5100000007-IdIxTxN                               ',
+         '515002 / 5001000009-ETAIPEIxN                             ',
+         '515003 / 5002000002-dHMOrIxN OPcANIrMxN                   ',
+         '515004 / 5003000006-dHMOrIxN EpIXEIPHrExN                 ',
+         '515005 / 5004000000-pIrTxTIKxN IdPYMATxN-TPApEZxN         ',
+         '515006 / 5004000018-rYNdEdEMENxN TPApEZxN-IdPYMATxN       ',
+         '515007 / 5004000026-TPApEZxN EnxTEP.METETPEw.rE dPX       ',
+         '515099 /           -*** ME kAhOr KxdIKO EpAccEkMATOr ***  ',
+         '530001 / 5100000007-TAMIEYTHPIOY                          ',
+         '530099 /           -*** ME kAhOr KxdIKO EpAccEkMATOr ***  ',
+         '000000 /                                                  ',
+         '000000 /                                                  ',
+         '000000 /                                                  ',
+         '000000 /                                                  '); ;
+
+ DCL LAT      CHAR(24) INIT ('ABcdEZHhIKkMNnOpPrTYuXwx');
+ DCL GRE      CHAR(24) INIT ('абцдефгхийклмнопястужвьы');
+
+ DCL KATHOL        FIXED (7,0)    ;
+ DCL P_KATHOL      PIC'(6)9'    ;
+ DCL POSON     DEC  FIXED(13,2);
+ DCL OVERDRAFT DEC  FIXED(11,2);
+ DCL EPITOKIO  FIXED (5,2);
+
+                                ;/* A YYMMDD A=1-->2000 A=0-->1900  */
+ DCL MYDATE      PIC'(7)9' BASED(ADDR(PIC_MYDATE));
+ DCL 1 PIC_MYDATE  ,
+             2 PFF  PIC'9' ,
+             2 PYY  PIC'99',
+             2 PMM  PIC'99',
+             2 PDD  PIC'99';
+
+ DCL INCOUNT FIXED(1) ;
+ DCL WLINE   CHAR(133);
+ DCL   1   RECREAD,
+             2 C1        CHAR(1)         INIT(' '),
+             2 CDATE     CHAR(6)         INIT(' '),
+             2 C3        CHAR(73)        INIT(' ');
+
+ DCL 1 MY_RECREAD_X BASED (ADDR(RECREAD)) ,
+       2 MY_RECREAD CHAR(12),
+       2 FILLER     CHAR(68);
+ DCL (ONFILE,ONCODE,ONKEY,PRIORITY,TIME,VERIFY) BUILTIN;
+ DCL (DATETIME,SUBSTR,NULL,ADDR,UNSPEC,TRANSLATE) BUILTIN;
+
+  ON ERROR BEGIN;
+     ON ERROR SYSTEM;
+     PUT SKIP LIST('ESKASE TO DKBALM');
+  END;
+
+
+  /*******************************************************************/
+  /***********    M A I N   P R O G R A M    *************************/
+  /*******************************************************************/
+
+ %PAGE;
+ ARXH :;
+
+   CNT_REC_READ              = 0 ;
+   CNT_REC_REJECT_CYPR       = 0 ;
+   CNT_REC_PROCCED           = 0 ;
+   CNT_REC_REJECT_T04CNV97   = 0 ;
+   CNT_REC_REJECT_T04DOM01   = 0 ;
+   CNT_REC_PROCCED_RIGHT     = 0 ;
+   CNT_REC_WRITTEN           = 0 ;
+   CNT_REC_FISICAL           = 0 ;
+   CNT_REC_BIG_COMPANY       = 0 ;
+   CNT_REC_SMALL_COMPANY     = 0 ;
+
+   OPEN FILE(TAM20);
+   OPEN FILE(ALMFILE);
+   OPEN FILE(ETAIRIE) ;
+   OPEN FILE(READER);
+   OPEN FILE(PRT) ;
+
+     ON ENDFILE( READER )  BEGIN;
+            BOOM =      1 ;
+
+        ERLIN2='** пяобкгла пяобкгла пяобкгла *******     ';
+        WRITE FILE(PRT   ) FROM (ERLINE);
+        ERLIN2='кахос:дем упаявеи CC  йаята ле глеяолгмиа ';
+        WRITE FILE(PRT   ) FROM (ERLINE);
+        ERLIN2=' пяосхесте CC-CARD ME TEкеутаиа еяцасилг  ';
+        WRITE FILE(PRT   ) FROM (ERLINE);
+        ERLIN2=' се  FORMAT DDMMYY                        ';
+        WRITE FILE(PRT   ) FROM (ERLINE);
+        ERLIN2=' KAI наматяенте то пяоцяалла            ';
+        WRITE FILE(PRT   ) FROM (ERLINE);
+        ERLIN2=' TELOS пяоцяалатос DKBALM      ';
+        WRITE FILE(PRT   ) FROM (ERLINE);
+        ERLIN2 =  ' хA KANEI CANCEL CANCEL CANCEL     ' ;
+        WRITE FILE(PRT   ) FROM (ERLINE);
+        BOOM = BOOM / ZERO;
+
+        GOTO TELOS2;
+     END;
+
+
+   ON KEY (ETAIRIE)
+      BEGIN;
+        IF ONCODE = 51 THEN DO ;                    /* KEY NOT FOUND */
+           FLAG = 1 ;
+         END ;
+
+      END; /* BEGIN */
+
+
+   ON ENDFILE(TAM20)
+        BEGIN ;
+          CALL CHANGE_KATHOL ;
+          GO TO  TELOS;
+        END;
+
+    READ FILE(READER) INTO (RECREAD);
+
+    IF VERIFY(CDATE   ,'0123456789')   > 0  THEN DO;
+        ERLIN1 = '0';
+        ERLIN2='** пяобкгла пяобкгла пяобкгла *******     ';
+        WRITE FILE(PRT   ) FROM (ERLINE);
+        ERLIN2=' кахос глеяолгмиа стгм CC-CARD --> '!!MY_RECREAD  ;
+        WRITE FILE(PRT   ) FROM (ERLINE);
+        ERLIN2=' диояхысте тгм глеяолгмиа стгм CC-CARD ';
+        WRITE FILE(PRT   ) FROM (ERLINE);
+        ERLIN2=' пяосхесте CC-CARD ME TEкеутаиа еяцасилг  ';
+        WRITE FILE(PRT   ) FROM (ERLINE);
+        ERLIN2=' се  FORMAT DDMMYY                        ';
+        WRITE FILE(PRT   ) FROM (ERLINE);
+        ERLIN2=' KAI наматяенте то пяоцяалла            ';
+        WRITE FILE(PRT   ) FROM (ERLINE);
+        ERLIN2=' TELOS пяоцяалатос DKBALM      ';
+        WRITE FILE(PRT   ) FROM (ERLINE);
+        ERLIN2 =  ' хA KANEI CANCEL CANCEL CANCEL     ' ;
+        WRITE FILE(PRT   ) FROM (ERLINE);
+
+        BOOM = BOOM / ZERO;
+
+        GOTO TELOS2;
+    END;
+
+    SDATE = CDATE;/*текеутаиа еяцасилг глеяолгмиа апо йаята*/
+
+    /*EINAI сыстг г пио памы глеяолгмиа ;*/
+    CUAHMERX = CDATE ;
+    CUAKLEIT = 'EO';
+    CALL VALDAY(CUAVDCDS) ;
+
+    IF CUAAPANT ^= ' ' THEN DO;
+        ERLIN2='** пяобкгла пяобкгла пяобкгла *******     ';
+        WRITE FILE(PRT   ) FROM (ERLINE);
+        ERLIN2='лг ояхг HM/NIA апо: (VALDAY) = '!! CDATE     ;
+        WRITE FILE(PRT) FROM (ERLINE);
+        ERLIN2=' диояхысте тгм глеяолгмиа стгм CC-CARD ';
+        WRITE FILE(PRT   ) FROM (ERLINE);
+        ERLIN2=' пяосхесте CC-CARD ME TEкеутаиа еяцасилг  ';
+        WRITE FILE(PRT   ) FROM (ERLINE);
+        ERLIN2=' се  FORMAT DDMMYY                        ';
+        WRITE FILE(PRT   ) FROM (ERLINE);
+        ERLIN2=' KAI наматяенте то пяоцяалла            ';
+        WRITE FILE(PRT   ) FROM (ERLINE);
+        ERLIN2=' TELOS пяоцяалатос DKBALM      ';
+        WRITE FILE(PRT   ) FROM (ERLINE);
+        ERLIN2 =  ' хA KANEI CANCEL CANCEL CANCEL     ' ;
+        WRITE FILE(PRT   ) FROM (ERLINE);
+
+        BOOM = BOOM / ZERO;
+
+     END;
+
+
+        INDATE = SDD!!'.'!!SMM!!'.20'!!SYY ; /*RIGHT FORMAT FOR DB2*/
+     /*PUT SKIP LIST('DKBALM INDATE 1  ',INDATE); */
+
+        PFF  = '1';
+        PYY  = SYY;
+        PMM  = SMM;
+        PDD  = SDD;
+ /* * * * * * * * * * * * * * * * * * * * * * * */
+ READ_FILE:;
+
+     READ  FILE(TAM20) INTO(T20REC);
+
+
+     /*лгм епенеяцастгс то талиеутгяио*/
+     IF T20ARLOGTAM < 80000000 THEN GO TO READ_FILE;
+
+     CNT_REC_READ  = CNT_REC_READ  + 1;
+
+     /*лгм епенеяцасхEIс тяапефес аккес ейтос елпояийгс*/
+     /*оуте йатастглата  CYPRUS*/
+     IF  (T20TRAP ^= 0 ) !
+         (T20KATMA > 452 & T20KATMA < 460) THEN
+          CNT_REC_REJECT_CYPR   = CNT_REC_REJECT_CYPR +1;
+     ELSE DO ;                    /*                              */
+
+    CNT_REC_PROCCED       = CNT_REC_PROCCED   + 1;
+
+    WS_KATH_NEW     = T20KATHO  ;
+     /*екецвы ауто том лацийо аяихло 9319 циати дем упаявеи тетоио*/
+     /*KAхокийо                                                   */
+     /*о екецвос аутос циметаи циа ма лгм циметаи аккацг йахокийоу*/
+     /*ME TO PROTO READ                                           */
+    IF ( SUBSTR(WS_KATH_OLD1,1,4) = '9319' ) THEN
+         SUBSTR(WS_KATH_OLD1,1,4) = SUBSTR(WS_KATH_NEW1,1,4)  ;
+
+    TOTAL_REC_KATHOLIKOY   = TOTAL_REC_KATHOLIKOY  + 1;
+
+    IF (SUBSTR(WS_KATH_OLD1,1,4) ^= SUBSTR(WS_KATH_NEW1,1,4)) THEN
+        CALL CHANGE_KATHOL;
+
+    MY_SYNOLO_KATHOLIKOY   = MY_SYNOLO_KATHOLIKOY  + T20POSON;
+
+     CALL FILL_TRIVIAL          ; /* ломо та еуйока  еды          */
+     CALL FILL_KATHOLIKO_10     ; /* то дейаьгжио йахокийо        */
+     CALL FILL_DESCR_KATHOLIKOY ; /* пеяицяажг йахокийоу          */
+     CALL FILL_CIDB_NUMBER      ; /* аяихлос   CIDB               */
+
+     IF  WS_CUSTOMER_FOUND = 0 THEN
+         CALL FILL_CUSTOMER_NAME; /* омолатепымуло пекатг         */
+
+     CALL FILL_RATE             ;   /* епитойио ейтойислоу          */
+     CALL FILL_TRAPEZIKH_MONADA ; /* тяапефIKH MONAда
+                                     паяайокоухгсгс коцаяиаслоу   */
+         CALL WRITE_ALM        ; /* еццяажг сто аявеио ALM       */
+   END; /*TELOS тоу оуте йупяос оуте аккг тяапефа*/
+
+     GO TO READ_FILE;   /*READ AGAIN*/
+  /**************************************************************
+  *  FILL_TRIVIAL             START                             *
+  *                                                             *
+  **************************************************************/
+     FILL_TRIVIAL           : PROC;
+
+     ALMREC = ''; /* CLEAR RECORD FOR WRITING */
+
+     WS_PIC9_ARLOG =    T20ARLOGTAM ;
+     ALMNUMBER     =    WS_PIC9_ARLOG ;
+
+     ALMBALANCE    =    T20POSON      ;
+     ALMBALUER     =    T20POSON      ;
+
+     ALMOVERD      =    T20OVERD;
+
+     IF T20POSON >= 0 THEN DO;
+       ALMSCB     = '2' ; /*пяосгло CURRENT BALANCE хетийо*/
+       ALMSCBE    = '2';  /*пяосгло CURRENT BALANCE EUR хетийо    */
+     END;
+     ELSE DO ;
+       ALMSCB     = '1' ; /*пяосгло CURRENT BALANCE аямгтийо */
+       ALMSCBE    = '1';  /*пяосгло CURRENT BALANCE EUR аямгтийо  */
+     END;
+
+     ALMCURCODE    =    'EUR'         ;
+     ALMBASIS      =    'D'           ;
+     ALMINSTRID    =    (40)' '       ;
+     ALMSAVGBAL    =    0             ;
+     ALMSAB        =    '2';
+
+     ALMUSERFL     =    (2)' '        ;
+
+     WS_PIC9_ARKATMA  = T20KATMA      ;
+
+     ALMBANK          =    WS_PIC9_ARKATMA  ; /*йыдийос йатастглатос*/
+     ALMBRANCH        =    WS_PIC9_ARKATMA  ; /*йыдийос йатастглатос*/
+     ALMCOST          =    WS_PIC9_ARKATMA  ; /*йыдийос йатастглатос*/
+
+     WS_PIC9_KATH_B   =    T20KATHO         ;
+     ALMSPRCODE       =    WS_PIC9_KATHOL   ;  /*тетяаьгжио йахокийо*/
+
+     ALMKAPEL         =    T20FN            ;  /*жусийо молийо*/
+
+     TODAY            =    DATETIME ;
+     ALMDATE          =  SDD!!SMM!!'20'!!SYY   ;/*FORMAT DDMMYYYY */
+
+     END  FILL_TRIVIAL          ;
+  /**************************************************************
+  *  FILL_TRIVIAL                    END                        *
+  **************************************************************/
+
+  /**************************************************************
+  *  FILL_KATHOLIKO_10      START                               *
+  *                                                             *
+  **************************************************************/
+     FILL_KATHOLIKO_10      : PROC;
+        DCL I      PIC  '99'  INIT (0);
+
+        ALMKATH    =(15)' ';   /*  йахокийо 10ЬГЖИО   */
+
+        DO I = 1 TO ORIO ;
+            IF WS_PIC9_KATH_B = SUBSTR(P1KATHOL(I),1,6)
+               THEN
+               ALMKATH  = SUBSTR(P1KATHOL(I),10,10);
+
+        END;
+
+     END  FILL_KATHOLIKO_10     ;
+  /**************************************************************
+  *  FILL_KATHOLIKO_10               END                        *
+  **************************************************************/
+
+
+  /**************************************************************
+  *  FILL_DESCR_KATHOLIKOY    START                             *
+  *                                                             *
+  **************************************************************/
+     FILL_DESCR_KATHOLIKOY  : PROC;
+        DCL I      PIC  '99'  INIT (0);
+
+        ALMDESCR   =(30)' ';       /*  пеяицяажг йахокийоу    */
+
+        DO I = 1 TO ORIO ;
+            IF WS_PIC9_KATH_B = SUBSTR( P1KATHOL(I),1,6)
+               THEN
+               ALMDESCR  = SUBSTR(P1KATHOL(I),21,30);
+               ALMDESCR  = TRANSLATE(ALMDESCR,GRE,LAT);
+        END;
+
+     END  FILL_DESCR_KATHOLIKOY ;
+  /**************************************************************
+  *  FILL_DESCR_KATHOLIKOY    END                               *
+  **************************************************************/
+
+  /**************************************************************
+  *  FILL_CIDB_NUMBER         START                             *
+  *                                                             *
+  **************************************************************/
+     FILL_CIDB_NUMBER       : PROC;
+
+       WPELATH = 0;                                                        05280
+
+       WS_CUSTOMER_FOUND   = 0;
+
+       T04CNV97.COD_PELATH = 0;
+
+       /* CREATE ACCOUNT NUMBER FOR T04CNV97 */
+
+       WCIDB    =  WS_PIC9_ARLOG!!(8)' '!!'01';
+
+       EXEC SQL
+            SELECT  COD_PELATH                                             05270
+            INTO :T04CNV97.COD_PELATH
+            FROM   T04CNV97                                                05290
+            WHERE  T04CNV97.COD_EFARM      = '70'   AND                    05300
+                   T04CNV97.NUM_AR_LOGAR   = :WCIDB                        05310
+            WITH UR;                                                       05320
+                                                                           05330
+       IF SQLCODE ^= 0   THEN  DO;
+    /*аУТЭР О ЙЧДИЙАР ЛПчЙЕ ПЯОСЫЯИМэ ЦИА МА ЙАКУЬЕИ ТА АЙУЯЫЛщМА*/
+            CNT_REC_PROCCED       = CNT_REC_PROCCED   - 1;
+            TOTAL_REC_KATHOLIKOY   = TOTAL_REC_KATHOLIKOY  - 1;
+            WS_CUSTOMER_FOUND = 1;
+            MY_SYNOLO_KATHOLIKOY   = MY_SYNOLO_KATHOLIKOY  - T20POSON;
+            GO TO READ_FILE;   /*READ AGAIN YPARXOYN SBYSMENA*/            05330
+          IF IS_TEST ^= 'YES' THEN DO;
+            CNT_REC_REJECT_T04CNV97 = CNT_REC_REJECT_T04CNV97 +1;
+            ERLIN2 = 'пяобкгла **** еуяесг пекатг стом т04CNV97 : '     !!
+                   !!' Aяихл.коцая. '
+                   !! WCIDB
+                   !!'  SQLCODE  : '!!SQLCODE;
+              WRITE FILE(PRT) FROM(ERLINE);
+          END;
+
+       END;
+
+       WPEL       =  T04CNV97.COD_PELATH ;                              05270000
+
+       ALMCIDBNUM = WPEL ;                                              05270000
+
+     END  FILL_CIDB_NUMBER      ;
+  /**************************************************************
+  *  FILL_CIDB_NUMBER         END                               *
+  **************************************************************/
+
+  /**************************************************************
+  *  FILL_CUSTOMER_NAME       START                             *
+  *                                                             *
+  **************************************************************/
+     FILL_CUSTOMER_NAME     : PROC;
+
+          EXEC SQL
+            SELECT
+                NOM_DENOM_SOCIAL
+
+            INTO :T04DBA01.NOM_DENOM_SOCIAL
+                FROM  T04DBA01
+                WHERE  COD_PERSONA      = :T04CNV97.COD_PELATH
+                       AND COD_EMPRESA  = '0012'
+                       AND FEC_BAJA       IS  NULL
+            WITH UR;                                                       05320
+
+       IF SQLCODE ^= 0   THEN DO;
+          CNT_REC_REJECT_T04DOM01 =   CNT_REC_REJECT_T04DOM01   + 1 ;
+          ERLIN2 = 'пяобк. стгм еуяесг ONOM.пек. стом т04DOM1 : '       !!
+      !!'COD_PERS:'!!T04CNV97.COD_PELATH !!' SQLCODE  : '!!SQLCODE;
+
+          IF IS_TEST ^= 'YES' THEN DO;
+                  WRITE FILE(PRT) FROM(ERLINE);
+          END;
+       ALMCUSNAME = '';
+       END;
+       ELSE  DO;
+           CNT_REC_PROCCED_RIGHT  = CNT_REC_PROCCED_RIGHT + 1;
+           ALMCUSNAME = SUBSTR(NOM_DENOM_SOCIAL   ,1,35);
+       END;
+
+
+     END  FILL_CUSTOMER_NAME    ;
+
+  /**************************************************************
+  *  FILL_CUSTOMER_NAME       END                               *
+  **************************************************************/
+
+  /**************************************************************
+  *  FILL_RATE              START                               *
+  *  Eды йакоумтаи ои яоутимес DKR002 ,DKR001                   *
+  *  поу епистяежоум то пистытийо,то вяеыстийо епитойио 1,      *
+  *  то вяеыстийо епитойио 2, йаи то йулаимолемо епитойио       *
+  **************************************************************/
+     FILL_RATE              : PROC;
+
+        ALMRATE    = 0;   /* KANONIKO EPITOKIO */
+        ALMK_EPIT  = 0.0; /*INITIALIZE йулаимолемо епитойио*/
+        ALM_X1     = 0.0; /*INITIALIZE вяеыстийо 1 епитойио*/
+        ALM_X2     = 0.0; /*INITIALIZE вяеыстийо 2 епитойио*/
+
+      IF (T20POSON ^= 0 ) THEN DO ;
+
+        /*START веияислос тым йахокийым 5060 йаи 5121 START*/
+         IF (T20KATHO = 506001 !
+             T20KATHO = 506002 !
+             T20KATHO = 506003 !
+             T20KATHO = 506004 !
+             T20KATHO = 506005 !
+             T20KATHO = 506006 !
+             T20KATHO = 506099 !
+             T20KATHO = 512101 !
+             T20KATHO = 512102 !
+             T20KATHO = 512103 !
+             T20KATHO = 512104 !
+             T20KATHO = 512199  )  THEN DO;
+
+             IF (T20KATEP = '*')   THEN DO; /*еам еимаи емтойос*/
+                /*KANONIKO EPITOKIO*/
+                CALL GET_RATES;
+                IF T20POSON > 0 THEN DO;
+                      /*епистяожг йулаимолемоу епитойиоу*/
+                        WS_ARLOG =  T20ARLOGTAM ;/*FROM 9 TO 8*/
+                        ALMK_EPIT=  DKR001(INDATE,WS_ARLOG);
+                END;
+             END;
+             ELSE DO;/*ATOKOS 5060,5121*/
+                IF T20POSON <  0 THEN DO;
+                     CALL GET_RATES;
+                END;
+                ELSE DO;
+                     ALMRATE = 0.0;
+                END;
+             END;    /*END OF  IF (T20KATEP = '*')      */
+         END;       /*END OF   IF (T20KATHO = 506001 !    */
+                  /*END   веияислос тым йахокийым 5060 йаи 5121 END  */
+         ELSE DO;/*Eды веияифоластE та упокоипа йахокийа*/
+                CALL GET_RATES;
+         END;/*TEкос веияислоу тым упокоипым йахокийым  */
+     END;/*END OF IF (T20POSON ^= 0 ) */
+
+     END  FILL_RATE ;
+
+  /**************************************************************
+  *  FILL_RATE              END                                 *
+  **************************************************************/
+  /**************************************************************
+  *  GET_RATES              START                               *
+  **************************************************************
+  *H PROCEDURE аутг йакеи тг яоутима DKR002
+   йаи целифеи та педиа
+   ALMRATE=пистытийо епитойио ALM_X1,ALM_X2 Xяеыстийа 1,2
+  ***************************************************************/
+   GET_RATES  : PROC;
+
+     /*йыдийос кахоус 1=кахос 0=сысто*/
+     DCL ERR_COD FIXED(1) INIT(0);
+
+     /* 31-03-2004 FETCH   DKR002;*/
+     ERR_COD = DKR002(T20KATHO, /*йахокийо 6 ьгжиа*//*INPUT*/
+                      MYDATE,   /*глеяолгмиа аYYMMDD опоу а=1*//*INP*/
+                      T20POSON, /*посом*/ /*INPUT*/
+                      T20OVERD, /*ояио оVERDRAFT коцаяиаслоу*//*INP*/
+                      EPITOKIO, /*пистытийо епитойио*//*OUTPUT*/
+                      ALM_X1,   /*вяеыстийо епитойио 1 *//*OUTPUT*/
+                      ALM_X2);  /*вяеыстийо епитойио 2*//*OUTPUT*/
+
+     ALMRATE=  EPITOKIO   ;
+
+     /* 31-03-2004 RELEASE DKR002;
+     IF (T20POSON <0 !T20OVERD >0) THEN DO;
+        ERLIN2 = ' ** START OF ARLOG '!!WS_PIC9_ARLOG;
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN2 = 'T20KATHO =  '!!T20KATHO!!' MYDATE ='!!MYDATE;
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN2 = 'T20POSON =  '!!T20POSON!!' OVERDR ='!!T20OVERD;
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN2 = ' T20KATEP = <'!!T20KATEP!!'>';
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN2 = 'ALMK_EPIT =  '!! ALMK_EPIT!!
+                                        ' ALMRATE =  '!! ALMRATE  ;
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN2 = 'ALM_X1 =  '!! ALM_X1!!' ALM_X2 = '!! ALM_X2  ;
+
+        WRITE FILE(PRT) FROM(ERLINE);
+        ERLIN2 = ' *************************'           ;
+        WRITE FILE(PRT) FROM(ERLINE);
+     END;
+       31-03-2004          */
+   END GET_RATES;
+  /**************************************************************
+  *  GET_RATES              END                                 *
+  **************************************************************/
+  /**************************************************************
+  *  FILL_TRAPEZIKH_MONADA   START                              *
+  *                                                             *
+  *  VSAM ------> DK.TRAP.EPIX                                  *
+  *                                                             *
+  *  еам  T20FN = 'N'  еимаи  молийо пяосыпо                    *
+  *  еам упаявеи сто VSAM       ALMTRAP = 1                     *
+  *  еам DEN упаявеи сто VSAM   ALMTRAP = 2                     *
+  *                                                             *
+  *  еам  T20FN дем еимаи = 'N' Eимаи  жусийо пяосыпо           *
+  *        TOTE   ALMTRAP = 5                                   *
+  *                                                             *
+  **************************************************************/
+     FILL_TRAPEZIKH_MONADA  : PROC;
+       /*TO BE USED IN UNPEC*/
+
+       IF T20FN = 'N' THEN
+       DO ; /*EAN EINAI ETAIREIA*/
+
+          /* целифы то йкеиди TOу VSAM */
+           DSA_ARLOG =  T20ARLOGTAM;
+
+           T_KER04 = '1111'B;  /*BALE F NA TOY BRISKETE*/
+           DSA_PARALHPTHS = 1 ;
+
+           READ FILE (ETAIRIE) INTO (DSA_REC) KEY (T_KEY) ;
+           IF FLAG = 0 THEN /* лецакг етаияиа  , упаявеи сто VSAM */
+           DO;
+                ALMTRAP = '1' ; /*MEцакым епивеиягсеым*/
+                CNT_REC_BIG_COMPANY  = CNT_REC_BIG_COMPANY  + 1;
+           END;
+           ELSE
+           DO;
+                ALMTRAP = '2' ; /*епивеиягсеым*/
+                CNT_REC_SMALL_COMPANY = CNT_REC_SMALL_COMPANY + 1;
+           END;
+
+           FLAG = 0 ; /* RESET FLAG */
+       END;
+       ELSE
+       DO;
+                ALMTRAP = '5'; /*Iдиытым*/
+                CNT_REC_FISICAL  = CNT_REC_FISICAL  + 1;
+       END;
+
+     END  FILL_TRAPEZIKH_MONADA ;
+
+  /**************************************************************
+  *       FILL_TRAPEZIKH_MONADA      END                        *
+  **************************************************************/
+
+  /**************************************************************
+  *  WRITE_ALM              : PROC;                             *
+  *                                                             *
+  **************************************************************/
+     WRITE_ALM              : PROC;
+
+
+       WRITE FILE(ALMFILE ) FROM(ALMREC);
+
+       CNT_REC_WRITTEN = CNT_REC_WRITTEN + 1;
+
+       ALMREC = ''; /* CLEAR RECORD  */
+
+     END  WRITE_ALM             ;
+
+  /**************************************************************
+  *  WRITE_ALM                   END                            *
+  **************************************************************/
+
+  /**************************************************************
+  *  CHANGE_KATHOL                                              *
+  *                                                             *
+  **************************************************************/
+    CHANGE_KATHOL         : PROC;
+
+      REC_COUNTER =  1;
+
+      ERLIN1 = '1'       ;
+      ERLIN2 = 'аяихлос    йахокийоу:'!!SUBSTR(WS_KATH_OLD1,1,4) ;
+
+      WRITE FILE(PRT) FROM(ERLINE);
+      /*Eды лафеуы та сумока йахокийоу йаи йатахесеым*/
+      SYNOLO_KATHOLIKOY = MY_SYNOLO_KATHOLIKOY;
+    TOT_KATH= TOT_KATH + SYNOLO_KATHOLIKOY;
+
+      ERLIN1 = ' '       ;
+      ERLIN2 = 'сум.посо йахокийоу:'!! SYNOLO_KATHOLIKOY !!
+               'сум.ецця йахокийоу:'!! TOTAL_REC_KATHOLIKOY-1 ;
+
+      WRITE FILE(PRT) FROM(ERLINE);
+
+      /* тыяа аккафы то пакио йахокийо ле то йаимоуяцио */
+
+      SUBSTR(WS_KATH_OLD1,1,4) = SUBSTR(WS_KATH_NEW1,1,4) ;
+
+      SYNOLO_KATHOLIKOY = 0 ;
+      MY_SYNOLO_KATHOLIKOY = 0 ;
+      TOTAL_REC_KATHOLIKOY = 1;
+    END CHANGE_KATHOL  ;
+
+  /**************************************************************
+  *  CHANGE_KATHOL              END                             *
+  **************************************************************/
+ /*                                                                  */
+
+  /**************************************************************
+  *  WRITE_ALM                   END                            *
+  **************************************************************/
+
+  TELOS:
+
+  /***********************************************/
+  /**   PRINT TOTALS     *************************/
+  /***********************************************/
+   ERLIN1    = '1';  /*SKIP LINE*/
+
+   ERLIN2 = '   ейтупысг сумокым тоу пяоцяаллатос *DKBALM*   ';
+   WRITE FILE(PRT) FROM(ERLINE);
+
+   ERLIN1    = ' ';
+   ERLIN2 = ' глеяолгмиа KAI ыяа яогс :  ' !!DATETIME ;
+   WRITE FILE(PRT) FROM(ERLINE);
+
+   ERLIN2 = 'сумоко еццяажым поу упаявоум сто тал20                :'!!
+   CNT_REC_READ                  ;
+   WRITE FILE(PRT) FROM(ERLINE);
+   ERLIN2 = 'сумокийо посом йатахесеым сто    тал20                :'!!
+               TOT_KATH;
+   WRITE FILE(PRT) FROM(ERLINE);
+
+   ERLIN2 = 'сумоко еццяажым Aккым тяапефым г йупяоу               :'!!
+   CNT_REC_REJECT_CYPR           ;
+   WRITE FILE(PRT) FROM(ERLINE);
+
+   ERLIN2 = 'сумоко еццяажым поу епенеяцасхгйам                    :'!!
+   CNT_REC_PROCCED               ;
+   WRITE FILE(PRT) FROM(ERLINE);
+
+   ERLIN2 = 'сумоко еццяажым поу дем упаяв.  сто T04CNV97          :'!!
+   CNT_REC_REJECT_T04CNV97       ;
+   WRITE FILE(PRT) FROM(ERLINE);
+
+   ERLIN2 = 'сумоко еццяажым поу дем упаяв.  сто T04DOM01          :'!!
+   CNT_REC_REJECT_T04DOM01       ;
+   WRITE FILE(PRT) FROM(ERLINE);
+
+   ERLIN2 = 'сумоко еццяажым поу EINAI сыстес йах ока              :'!!
+   CNT_REC_PROCCED_RIGHT         ;
+   WRITE FILE(PRT) FROM(ERLINE);
+
+   ERLIN2 = 'сумоко еццяажым поу цяажтгйам сто аявеио ALM          :'!!
+   CNT_REC_WRITTEN               ;
+   WRITE FILE(PRT) FROM(ERLINE);
+
+   ERLIN2 = 'сумоко коцаяиаслым поу амгйоум се жусийа пяосыпа   :   '!!
+   CNT_REC_FISICAL            ;
+   WRITE FILE(PRT) FROM(ERLINE);
+
+   ERLIN2 = 'сумоко коцаяиаслым поу амгйоум се MEцакес етаияеиес:   '!!
+   CNT_REC_BIG_COMPANY        ;
+   WRITE FILE(PRT) FROM(ERLINE);
+
+   ERLIN2 = 'сумоко коцаяиаслым поу амгйоум се MH MEцакес етаияеиес:'!!
+   CNT_REC_SMALL_COMPANY      ;
+   WRITE FILE(PRT) FROM(ERLINE);
+
+     CLOSE FILE(TAM20);
+     CLOSE FILE(ALMFILE);
+     CLOSE FILE(ETAIRIE) ;
+  TELOS2:
+
+ END DKBALM;
+ /* ---------------------------------------------------------------- */
+

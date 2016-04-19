@@ -1,0 +1,444 @@
+ /* PROCESS INCLUDE,GS,AG,A,M,MAP,MI(':'),NEST,S,NIS,OPT(2),X,OF;     */
+   /*---------------  AJ263EFO --------------------------*/             BK300090
+   /* AUTHOR: TSOMLEKTZOGLOY                          */                BK300100
+   /* KATArTArH EpIrTPOuHr EuOPIAr rTHN KINHrH KEuAk  */                BK300100
+   /* APXEIO cIA EXCEL                                */                BK300100
+   /*                                                 */
+   /*                                                 */
+   /* X.T.     11/2003                                */
+   /* LAST UPDATE                                     */
+   /*-------------------------------------------------*/                BK300120
+                                                                        BK300130
+ ARXH: PROCEDURE OPTIONS(MAIN);                                         BK300140
+                                                                        BK300230
+ DCL PRINT  FILE RECORD SEQUENTIAL OUTPUT ENV(F RECSIZE(133) CTLASA);
+ DCL INTAM  FILE RECORD INPUT SEQUENTIAL  ENV( FB RECSIZE(602) );
+ DCL OUTTAM FILE RECORD OUTPUT SEQUENTIAL ENV( FB RECSIZE(120) );
+ DCL READER  FILE RECORD INPUT  ENV(FB RECSIZE(80) );
+
+ DCL (SUBSTR,ADDR,TRANSLATE,STRING,VERIFY,DATE) BUILTIN;
+
+ DCL 1 RECCARD,
+     2  RECPER   CHAR (1),   /* PERIODOS       */
+     2  FILL1    CHAR (1),
+     2  RECAPO   CHAR (8),   /* HMEROMHNIA APO */
+     2  FILL2    CHAR (1),
+     2  RECEOS   CHAR (8),   /* HMEROMHNIA EVS */
+     2  FILL3    CHAR (1),
+     2  RECOXI   CHAR (3),   /* OXI ANALYTIKH EKTYPOSH */
+     2  FILL4    CHAR (57);
+ %PAGE;
+ % INCLUDE  AJSEGA ;
+ %PAGE;
+ DCL TFIOROOT PTR;
+ DCL TFIOSADD PTR;
+
+ DCL  1 LINE,                                                           BK300270
+      2  CTLCHR         CHAR(1)     INIT('1'),                          BK300280
+      2  GRAMH          CHAR(132)   INIT (' ');                         BK300290
+ DCL 1  WKATMA          PIC'99999' INIT(0);                             BKM00220
+ DCL 1  WWKATMA BASED(ADDR(WKATMA)),                                    BKM00220
+      2  WTRAP          PIC'9',                                         BKM00230
+      2  WKVD           PIC'9999';                                      BKM00230
+
+ DCL 1  IOAREA          CHAR(602) INIT(' ');
+ DCL 1  IOAREA1  BASED(ADDR(IOAREA)),
+     2  IOAREA3  CHAR(2),
+     2  IOAREA4  CHAR(600);
+
+ %PAGE;
+ DCL 1  OUTREC          CHAR(120) INIT(' ');
+ DCL 1  OUTREC1  BASED(ADDR(OUTREC)),
+     2  OUTREC_AA      PIC'(6)9',
+     2  OUTREC_FIL1    CHAR(1),
+     2  OUTREC_ENT     PIC'(13)9',
+     2  OUTREC_FIL2    CHAR(1),
+     2  OUTREC_AFM     PIC'(9)9',
+     2  OUTREC_FIL3    CHAR(1),
+     2  OUTREC_ONMT    CHAR(30),
+     2  OUTREC_FIL4    CHAR(1),
+     2  OUTREC_HMTS    CHAR(8),
+     2  OUTREC_FIL5    CHAR(1),
+     2  OUTREC_HMPLH   CHAR(8),
+     2  OUTREC_FIL6    CHAR(1),
+     2  OUTREC_WRPLH   PIC'(4)9',
+     2  OUTREC_FIL7    CHAR(1),
+     2  OUTREC_TAYPL   CHAR(7),
+     2  OUTREC_FIL8    CHAR(1),
+     2  OUTREC_POSO    PIC'(8)9',
+     2  OUTREC_FIL9    CHAR(1),
+     2  OUTREC_FIL     CHAR(16);
+     /*npk start changes for enterprice pli 21-05-2007
+     2  OUTREC_FIL     CHAR(19);
+      *npk end   changes for enterprice pli 21-05-2007*/
+
+ DCL 1 QINEOUT BASED(ADDR(GRAMH)),
+     2 QNAME     CHAR(15),
+     2 QFIL1     CHAR(1),
+     2 QDATE     CHAR(8),
+     2 QFIL2     CHAR(1),
+     2 QARALL    PIC 'ZZZZZ9',
+     2 QFIL3     CHAR(1),
+     2 QPOSALL   PIC 'Z.ZZZ.ZZZ.ZZ9V,99',
+     2 QFIL4     CHAR(1),
+     2 QARALL_P  PIC 'ZZZZZ9',
+     2 QFIL5     CHAR(1),
+     2 QPOSALL_P PIC 'Z.ZZZ.ZZZ.ZZ9V,99',
+     2 QFIL      CHAR(60);
+     /*npk start changes for enterprice pli 21-05-2007
+     2 QFIL      CHAR(61);
+      *npk end   changes for enterprice pli 21-05-2007*/
+
+ DCL JJ            PIC'(2)9'  INIT(0);                                  BK300800
+ DCL 1 TBLSHM (99),
+       2 ARDATE      FIXED(7),
+       2 ARALL       FIXED(9),
+       2 POSALL      FIXED(13,2),
+       2 ARALL_P     FIXED(9),
+       2 POSALL_P    FIXED(13,2);
+
+ %PAGE;
+
+    DCL  PALIA  CHAR(24)
+         INIT('ABcdEZHhIKkMNnOpPrTYuXwx');
+    DCL  NEA  CHAR(24)
+         INIT('¡¬√ƒ≈∆«»… ÀÃÕŒœ–—”‘’÷◊ÿŸ');
+
+ DCL 1  MINDATE         PIC '999999' INIT(999999);
+ DCL 1  MAXDATE         PIC '999999' INIT(0);
+ DCL 1  SSDATE          PIC '999999' INIT(0);
+ DCL 1  CDATE           CHAR(6)      INIT(' ');
+ DCL 1  XDATE           PIC '999999' ;
+ DCL 1  WSDATE          PIC '999999' INIT(0);
+ DCL 1  KEEPDATE        PIC '999999' INIT(0);
+ DCL 1  KEEPARLOG       PIC '(13)9' INIT(0);
+ DCL 1  WDATE BASED(ADDR(WSDATE)),                                      BKM00220
+     2   WYY       PIC '99'   INIT(0),                                  BKM00230
+     2   WMM       PIC '99'   INIT(0),                                  BKM00230
+     2   WDD       PIC '99'   INIT(0);                                  BKM00230
+ DCL 1  XSDATE          PIC '999999' INIT(0);
+ DCL 1  XXDATE BASED(ADDR(XSDATE)),                                     BKM00220
+     2   XYY       PIC '99'   INIT(0),                                  BKM00230
+     2   XMM       PIC '99'   INIT(0),                                  BKM00230
+     2   XDD       PIC '99'   INIT(0);                                  BKM00230
+ DCL WORG          CHAR(5)    INIT(' ');
+ DCL WESRARLOG     PIC'(13)9' INIT(0);
+ DCL FLAG_HEAD     PIC'(1)9' INIT(0);
+                                                                        BKM00260
+ DCL GINP          FIXED(09)  INIT(0); /* APIhMOr RECORDS pOY IKANOpI*/ BK300800
+ DCL GINP1         FIXED(09)  INIT(0); /* APIhMOr RECORDS pOY IKANOpI*/ BK300800
+ DCL GINP2         FIXED(09)  INIT(0); /* APIhMOr RECORDS pOY IKANOpI*/ BK300800
+ DCL GINP3         FIXED(09)  INIT(0); /* APIhMOr RECORDS pOY IKANOpI*/ BK300800
+ DCL GOUT          FIXED(09)  INIT(0); /* APIhMOr RECORDS pOY IKANOpI*/ BK300800
+ DCL REC_IN_DRX    FIXED(09)  INIT(0); /* APIhMOr RECORDS ApO INPUT*/   BK300800
+ DCL REC_IN_EUR    FIXED(09)  INIT(0); /* APIhMOr RECORDS ApO INPUT*/   BK300800
+ DCL PAGENO        FIXED(05)  INIT(0);                                  BK300800
+ DCL LINENO        FIXED(05)  INIT(0);                                  BK300800
+ DCL II            FIXED(05)  INIT(0);                                  BK300800
+ DCL POSO_IN_DRX   FIXED(15,2) INIT(0);                                 AA200210
+ DCL POSO_IN_EUR   FIXED(15,2) INIT(0);                                 AA200210
+ DCL ZPOSON        PIC 'ZZZ.ZZZ.ZZZ.ZZ9V,99';                           AA200210
+ DCL ZPOSON1       PIC 'ZZ.ZZZ.ZZ9V,99';                                AA200210
+ DCL GARALL        FIXED(11)  INIT(0);                                  BK300800
+ DCL GPOSALL       FIXED(15,2) INIT(0);                                 AA200210
+ DCL GARALL_P      FIXED(11)  INIT(0);                                  BK300800
+ DCL GPOSALL_P     FIXED(15,2) INIT(0);                                 AA200210
+
+
+ %PAGE;                                                                 BK300850
+                                                                        BK300860
+  ON ENDFILE(INTAM) GOTO TELOS;                                         BK301030
+  OPEN FILE(INTAM);
+  OPEN FILE(OUTTAM);
+  OPEN FILE(READER);
+
+  READ FILE(READER) INTO  (RECCARD);                                    BK301060
+  TBLSHM = '';
+  PAGENO = 0;
+  WSDATE = DATE;
+  TFIOROOT = ADDR(IOAREA4);                                             BK301060
+ RDTAIN:                                                                BK301050
+    READ FILE(INTAM) INTO  (IOAREA);                                    BK301060
+
+    GINP = GINP + 1;
+    IF GINP = 1 THEN DO;
+    /* CALL HEAD;  */
+    END;
+
+      IF ESRKWD ^= 3  THEN DO; /* PROCESS MONO EPITAGVN */
+         GINP1 = GINP1 + 1;
+         GOTO RDTAIN;
+      END;
+
+                   /* APORRIPTONTAI PLHRWMENES & ANTILOGISMENES*/
+      /*
+      IF ESROROI = 1   !   ESROROI = 4  THEN DO;
+         GINP2 = GINP2 + 1;
+         GOTO RDTAIN;
+      END;
+      */
+      /*
+      IF ESROROI ^= 1 THEN DO;
+         GINP2 = GINP2 + 1;
+         GOTO RDTAIN;
+      END;
+      */
+      IF SUBSTR(ESRONENT,1,5) ^= 'KEpYO' THEN DO;
+         GINP2 = GINP2 + 1;
+         GOTO RDTAIN;
+      END;
+
+    GINP3 = GINP3 + 1;
+    IF GINP3 = 1 THEN DO;
+       KEEPDATE = ESRHMTS;
+       KEEPARLOG= ESRARLOG;
+       GARALL    = 0;                                                   BK300800
+       GPOSALL   = 0;                                                   AA200210
+       GARALL_P  = 0;                                                   BK300800
+       GPOSALL_P = 0;                                                   AA200210
+    END;
+    /*
+    IF GINP3 ^= 1 THEN DO;
+       IF ESRARLOG <= KEEPARLOG THEN DO;
+          GRAMH = 'DUPLICATES KEY AP.ENTOkHr:'!!
+                   ESRARLOG!!' HMEP.EKdOrHr:'!!ESRHMTS;
+          WRITE FILE (PRINT) FROM (LINE);
+          KEEPARLOG= ESRARLOG;
+          GOTO RDTAIN;
+       END;
+    END;
+    */
+    KEEPARLOG= ESRARLOG;
+    IF KEEPDATE ^= ESRHMTS THEN DO;
+       JJ = JJ + 1;
+       ARDATE(JJ)   = KEEPDATE;
+       ARALL(JJ)    = GARALL;
+       POSALL(JJ)   = GPOSALL;
+       ARALL_P(JJ)  = GARALL_P;
+       POSALL_P(JJ) = GPOSALL_P;
+       KEEPDATE = ESRHMTS;
+       GARALL    = 0;                                                   BK300800
+       GPOSALL   = 0;                                                   AA200210
+       GARALL_P  = 0;                                                   BK300800
+       GPOSALL_P = 0;                                                   AA200210
+    END;
+    IF GINP3 = 1 THEN DO;
+    /*     IF FLAG_HEAD = 0 THEN DO;*/
+       CALL HEAD;
+       FLAG_HEAD = 1;
+    END;
+    GRAMH = '';
+    XSDATE  = ESRHMDUE;
+    IF ESREURO1 ^= 1 THEN DO;
+       REC_IN_DRX   = REC_IN_DRX + 1;
+       POSO_IN_DRX  = POSO_IN_DRX + ESRPOSDR;
+       ZPOSON1 = ESRPOSDR;
+       GRAMH = REC_IN_DRX!!' '!!
+               ESRARLOG!!' '!!SUBSTR(ESRONDIK,1,30)!!' '!!
+               XDD!!'.'!!XMM!!'.'!!XYY
+               !!' '!!ZPOSON1!!' dPX  ';
+    END;
+    IF ESREURO1 = 1 THEN DO;
+       REC_IN_EUR   = REC_IN_EUR + 1;
+       POSO_IN_EUR  = POSO_IN_EUR + ESRPOSO;
+       ZPOSON1 = ESRPOSO;
+       GRAMH = REC_IN_EUR!!' '!!
+               ESRARLOG!!' '!!SUBSTR(ESRONDIK,1,30)!!' '!!
+               XDD!!'.'!!XMM!!'.'!!XYY
+               !!' '!!ZPOSON1!!' EYPx ';
+    END;
+    IF RECOXI ^= 'OXI' THEN DO;
+       WRITE FILE (PRINT) FROM (LINE);
+       CTLCHR = '0';
+       LINENO = LINENO + 2;
+    END;
+                   /*    ASCII ARXEIO GIA EXCEL */
+    OUTREC = '';
+    WESRARLOG     = ESRARLOG;
+    OUTREC_AFM    = SUBSTR(WESRARLOG,5,9);
+    OUTREC_ENT    = ESRARLOG;
+    OUTREC_ONMT   = SUBSTR(ESRONDIK,1,30);
+    OUTREC_ONMT   = TRANSLATE(OUTREC_ONMT,NEA,PALIA);
+    IF ESRHMTS >= 701231 THEN DO;
+       SUBSTR(OUTREC_HMTS,5,2) = '19';
+    END;
+    ELSE DO;
+       SUBSTR(OUTREC_HMTS,5,2) = '20';
+    END;
+    IF ESRHMPLH >= 701231 THEN DO;
+       SUBSTR(OUTREC_HMPLH,5,2) = '19';
+    END;
+    ELSE DO;
+       SUBSTR(OUTREC_HMPLH,5,2) = '20';
+    END;
+    SUBSTR(OUTREC_HMTS,1,2) = SUBSTR(ESRHMTS,5,2);
+    SUBSTR(OUTREC_HMTS,3,2) = SUBSTR(ESRHMTS,3,2);
+    SUBSTR(OUTREC_HMTS,7,2) = SUBSTR(ESRHMTS,1,2);
+    SUBSTR(OUTREC_HMPLH,1,2) = SUBSTR(ESRHMPLH,5,2);
+    SUBSTR(OUTREC_HMPLH,3,2) = SUBSTR(ESRHMPLH,3,2);
+    SUBSTR(OUTREC_HMPLH,7,2) = SUBSTR(ESRHMPLH,1,2);
+    OUTREC_WRPLH  = ESRWRPLH;
+    OUTREC_TAYPL  = ESRSKAT3!!ESRSTER3!!ESRARTR3;
+    IF ESREURO1 ^= 1 THEN DO;
+       OUTREC_AA     = REC_IN_DRX;
+       OUTREC_POSO = ESRPOSDR;
+    END;
+    IF ESREURO1 = 1 THEN DO;
+       OUTREC_AA     = REC_IN_EUR;
+       OUTREC_POSO = ESRPOSO * 100;
+       GARALL  = GARALL + 1;                                            BK300800
+       GPOSALL = GPOSALL + ESRPOSO;                                     AA200210
+       IF ESROROI = 1 THEN DO;
+          GARALL_P  = GARALL_P + 1;                                     BK300800
+          GPOSALL_P = GPOSALL_P + ESRPOSO;                              AA200210
+       END;
+    END;
+    OUTREC_FIL1   = ';';
+    OUTREC_FIL2   = ';';
+    OUTREC_FIL3   = ';';
+    OUTREC_FIL4   = ';';
+    OUTREC_FIL5   = ';';
+    OUTREC_FIL6   = ';';
+    OUTREC_FIL7   = ';';
+    OUTREC_FIL8   = ';';
+    OUTREC_FIL9   = ';';
+    OUTREC_FIL    = SUBSTR(ESRAIT1,1,19);
+    OUTREC_FIL    = TRANSLATE(OUTREC_FIL,NEA,PALIA);
+    WRITE FILE (OUTTAM) FROM (OUTREC);
+
+    IF LINENO > 55 THEN DO;
+       CALL HEAD;
+    END;
+
+    GO TO RDTAIN;
+
+ HEAD: PROC;
+   LINENO = 0;
+   PAGENO = PAGENO + 1;
+   CTLCHR = '1';
+   GRAMH = 'EMpOPIKH TPApEZA' !! (70) ' ' !! '** AJ263EFO  **'!!
+            ' rEkIdA :' !! PAGENO;
+   WRITE FILE (PRINT) FROM (LINE);                                      BK301680
+   CTLCHR = '0';
+   GRAMH = (2) ' ' !!
+             'EpITAcEr EpIrTPOuHr uOPOY ApO KEpYO                  '
+              !! WDD!!'.'!!WMM!!'.'!!WYY;
+   CTLCHR = ' ';
+   GRAMH = ' ';
+   GRAMH = '          AA'!!
+         ' '!!'          ENTOkH'!!' dIKAIOYXOr                   '
+         !! '    EKdOrH ' !! '  p O r O';
+   WRITE FILE (PRINT) FROM (LINE);                                      BK301680
+   LINENO = 5;
+ END;
+ HEAD1: PROC;
+   LINENO = 0;
+   PAGENO = PAGENO + 1;
+   CTLCHR = '1';
+   GRAMH = 'EMpOPIKH TPApEZA' !! (70) ' ' !! '** AJ263EFO  **'!!
+            ' rEkIdA :' !! PAGENO;
+   WRITE FILE (PRINT) FROM (LINE);                                      BK301680
+   CTLCHR = '0';
+   GRAMH = (2) ' ' !!
+             'EpITAcEr EpIrTPOuHr uOPOY ApO KEpYO ANA HMEP.EKdOrHr '
+              !! WDD!!'.'!!WMM!!'.'!!WYY;
+   WRITE FILE (PRINT) FROM (LINE);                                      BK301680
+   GRAMH = (2) ' ' !!
+             '        r Y c K E N T P x T I K O r   pINAKAr        '
+              !! WDD!!'.'!!WMM!!'.'!!WYY;
+   WRITE FILE (PRINT) FROM (LINE);                                      BK301680
+   LINENO = 2;
+   CTLCHR = '0';
+   GRAMH = '+--HMEPOMHNIA EKdOrHr   +---EKdOhEIrEr ENTOkEr--+'!!
+           '---pkHPxMENEr ENTOkEr--+';
+   WRITE  FILE (PRINT) FROM (LINE);
+   CTLCHR = ' ';
+   GRAMH = '+-----------------------+-----------------------+'!!
+           '-----------------------+';
+   WRITE  FILE (PRINT) FROM (LINE);
+ END;
+
+ TELOS:                                                                 BK301650
+  JJ = JJ + 1;
+  ARDATE(JJ)   = KEEPDATE;
+  ARALL(JJ)    = GARALL;
+  POSALL(JJ)   = GPOSALL;
+  ARALL_P(JJ)  = GARALL_P;
+  POSALL_P(JJ) = GPOSALL_P;
+
+  CTLCHR = '1';
+  GRAMH = (2) ' ' !!
+            '                                                     '
+            !! WDD!!'.'!!WMM!!'.'!!WYY;
+  WRITE FILE (PRINT) FROM (LINE);                                       BK301680
+  CTLCHR = '0';
+  GRAMH = (10) ' ' !! 'dIABArE :'!!GINP;
+  WRITE FILE (PRINT) FROM (LINE);                                       BK301680
+  CTLCHR = '0';
+  GRAMH = (10) ' ' !! 'AcNOHrE :'!!GINP1;
+  WRITE FILE (PRINT) FROM (LINE);                                       BK301680
+  GRAMH = (10) ' ' !! 'AcNOHrE ANTIk H pkHP:'!!GINP2;
+  WRITE FILE (PRINT) FROM (LINE);                                       BK301680
+  CALL HEAD1;
+  DO JJ = 1  TO 25;
+     IF ARALL (JJ) > 0 THEN DO;
+        GRAMH = '';
+        QNAME = 'rYNOkA HMEPAr';
+        QDATE = ' ';
+        KEEPDATE   = ARDATE(JJ);
+        SUBSTR(QDATE,1,2) = SUBSTR(KEEPDATE,5,2);
+        SUBSTR(QDATE,3,1) = '.';
+        SUBSTR(QDATE,4,2) = SUBSTR(KEEPDATE,3,2);
+        SUBSTR(QDATE,6,1) = '.';
+        SUBSTR(QDATE,7,2) = SUBSTR(KEEPDATE,1,2);
+        QARALL     = ARALL(JJ);
+        QPOSALL    = POSALL(JJ);
+        QARALL_P   = ARALL_P(JJ);
+        QPOSALL_P  = POSALL_P(JJ);
+        WRITE  FILE (PRINT) FROM (LINE);
+        GRAMH = '+-----------------------+-----------------------+'!!
+                '-----------------------+';
+        WRITE  FILE (PRINT) FROM (LINE);
+        CTLCHR  = ' ';
+        ARALL(99) = ARALL(99) + ARALL(JJ);                              BK300800
+        POSALL(99) = POSALL(99) + POSALL(JJ);                           AA200210
+        ARALL_P(99) = ARALL_P(99) + ARALL_P(JJ);                        BK300800
+        POSALL_P(99) = POSALL_P(99) + POSALL_P(JJ);                     AA200210
+     END;
+  END;
+  GRAMH = '';
+  QNAME = 'cENIKA rYNOkA';
+  KEEPDATE   = WSDATE;
+  SUBSTR(QDATE,1,2) = SUBSTR(KEEPDATE,5,2);
+  SUBSTR(QDATE,3,1) = '.';
+  SUBSTR(QDATE,4,2) = SUBSTR(KEEPDATE,3,2);
+  SUBSTR(QDATE,6,1) = '.';
+  SUBSTR(QDATE,7,2) = SUBSTR(KEEPDATE,1,2);
+  QARALL     = ARALL(99);
+  QPOSALL    = POSALL(99);
+  QARALL_P   = ARALL_P(99);
+  QPOSALL_P  = POSALL_P(99);
+  WRITE  FILE (PRINT) FROM (LINE);
+
+  GRAMH = (7) ' ' !! 'EccPAuEr  dPX:'!!REC_IN_DRX;
+  WRITE FILE (PRINT) FROM (LINE);                                       BK301680
+  ZPOSON = POSO_IN_DRX;
+  GRAMH = (7) ' ' !! 'pOrO rE  dPX:'!!
+           ZPOSON ;
+  WRITE FILE (PRINT) FROM (LINE);                                       BK301680
+
+  GRAMH = (7) ' ' !! 'EccPAuEr EYPx:'!!REC_IN_EUR;
+  WRITE FILE (PRINT) FROM (LINE);                                       BK301680
+  ZPOSON = POSO_IN_EUR;
+  GRAMH = (7) ' ' !! 'pOrO rE EYPx:'!!
+           ZPOSON ;
+  WRITE FILE (PRINT) FROM (LINE);                                       BK301680
+  CTLCHR = '0';
+  GRAMH = (10) ' ' !! 'TEkOr pPOcPAMMATOr AJ263EFO            ';
+  WRITE FILE (PRINT) FROM (LINE);                                       BK301680
+
+  CLOSE FILE(INTAM);
+  CLOSE FILE(OUTTAM);
+  CLOSE FILE(READER);
+  END;                                                                  BK301800
+

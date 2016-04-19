@@ -1,0 +1,236 @@
+ /* PROCESS A,GOSTMT,ESD,MAP,NEST,OPT(TIME),AG,MI('$'),S,X,OF,INCLUDE;*/00010002
+ /********************************************************************/ 00020000
+ /*  SOURCE  NAME    : DK561                                        */  00030070
+ /*  CREATION DATE   : 12/04/2007                                   */  00040070
+ /*  PROGRAMMER      : хеяиайг йатеяима                             */  00050069
+ /*  LANGUAGE        : PLI                                          */  00060069
+ /*  пеяицяажг       : дглиоуяциа меоу VSAM аявеиоу DK.P.DM.KLADIK  */  00070069
+ /*ME REC=60 Aпо то пакио DK.P.DM.KLADIK поу еиве REC=30.           */  00071069
+ /*пяостехгйам сто аявеио дуо меа педиа:O коц/лос йаи г гл/миа кгнгс*/  00072069
+ /********************************************************************/ 00090000
+ /*NPK CHANGES FOR ENTERPRICE PLI 22-05-2007**************************/ 00091088
+ /********************************************************************/ 00092088
+                                                                        00100000
+ DK561: PROC OPTIONS (MAIN);                                            00250053
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');                    00260000
+ /*** MVS-MS DATE SIMULATION VARIABLES ***/                             00270000
+ DCL CZX3VDAT CHAR(6); FETCH CZXDATEP;                                  00280000
+ DCL CZXDATEP ENTRY OPTIONS(INTER,ASM) ;                                00290000
+ %INCLUDE DAYATNS;                                                      00291074
+ /***            END OF MVS-MS INSERT            ***/                   00300000
+                                                                        00301069
+ DCL ONCODE   BUILTIN;                                                  00310069
+ DCL ADDR     BUILTIN;                                                  00311069
+ DCL SUBSTR   BUILTIN ;                                                 00312069
+                                                                        00320010
+ /*=======  ANAкусг OLD VSAM RECORD  =======*/                          00880069
+ /*                                                                     00881082
+ DCL   OLD_VSAM_REC    CHAR(30);                                        00890065
+ DCL 1  WOLD_VSAM_REC   BASED(ADDR(OLD_VSAM_REC)),                      00920065
+      2 WORECORDNUM       PIC '(9)9'      INIT(0),                      00921065
+      2 WOAMOUNT          FIXED(11,2)     INIT(0),                      00922065
+      2 WOFLAG            PIC '(01)9'     INIT(0),                      00930065
+      2 WOPAYDATE         FIXED (7)       INIT(0),                      00960065
+      2 WOPAYIDENT        CHAR(07)        INIT(' '),                    01050065
+      2 FILER1            CHAR(03)        INIT(' ');                    01060065
+ */                                                                     01061082
+ DCL   OLD_VSAM_REC     CHAR(133) INIT(' ');                            01062084
+ DCL 1  WOLD_VSAM_REC   BASED(ADDR(OLD_VSAM_REC)),                      01063082
+      2 WORECORDNUM     PIC '(9)9'      INIT(0),                        01064087
+      2 WOAMOUNT        FIXED(11,2)     INIT(0),                        01065087
+      2 WOFLAG          PIC '(01)9'     INIT(0),                        01066087
+      2 WOPAYDATE       FIXED (7)       INIT(0),                        01067087
+      2 WOPAYIDENT      CHAR(07)        INIT(' '),                      01068087
+      2 FILER1          CHAR(106)        INIT(' ');                     01069087
+ /*=======  ANAкусг NEW VSAM RECORD  =======*/                          01070069
+ /*DCL   NEW_VSAM_REC    CHAR(60); */                                   01080078
+ DCL 1  WNEW_VSAM_REC,                                                  01090078
+      2 WARLOG          PIC '(8)9'      INIT(0),                        01100087
+      2 WRECORDNUM      PIC '(9)9'      INIT(0),                        01101087
+      2 WAMOUNT         FIXED(11,2)     INIT(0),                        01110087
+      2 WEXPDT          FIXED(7)        INIT(0),                        01111087
+      2 WFLAG           PIC '(01)9'     INIT(0),                        01120087
+      2 WPAYDATE        FIXED (7)       INIT(0),                        01130087
+      2 WPAYIDENT       CHAR(07)        INIT(' '),                      01140087
+      2 FILER2          CHAR(21)        INIT(' ');                      01150087
+                                                                        01470010
+ DCL 1 LINEOUT,                                                         01480000
+       2 LSKIP      CHAR(1)   INIT('0'),                                01490058
+       2 TEXT       CHAR(132) INIT((132)' ');                           01500058
+                                                                        01510000
+ DCL TOT_AMNT_FORMAT  PIC'ZZZ.ZZZV,ZZ'  INIT(0);                        01591038
+ DCL TOT_RECS_FORMAT  PIC'Z.ZZZ.ZZ9'  INIT(0);                          01592052
+ DCL TOT_READ         PIC '(07)9'     INIT(0) ;                         01600038
+ DCL TOT_WRITE        PIC '(07)9'     INIT(0) ;                         01601069
+ DCL INP_AMOUNT       FIXED(11,2)     INIT(0) ;                         01603069
+ DCL OUT_AMOUNT       FIXED(11,2)     INIT(0) ;                         01604069
+ DCL TOT_VSAM         PIC '(07)9'     INIT(0) ;                         01605069
+ DCL ERROR          PIC '(01)9'     INIT(0) ;                           01605169
+ DCL EXP_DATE       PIC '(06)9'     INIT(0) ;                           01605274
+                                                                        01605965
+ DCL LOGAR1   PIC'(8)9'   INIT(85059548); /* циа RECNUM апо 001 */      01606069
+ DCL LOGAR2   PIC'(8)9'   INIT(85409964); /* циа RECNUM апо 002 */      01608069
+                                                                        01660000
+ DCL SFILE  FILE RECORD INPUT ENV(VB RECSIZE(133));                     01670071
+ /* циа ма йамеи INSERT KAI се йемо ARXEIO ха пяепеи ма дгкыхеи         01703275
+    TO VSAM опыс паяайаты */                                            01703375
+ DCL KLADIK FILE RECORD SEQL OUTPUT KEYED ENV(VSAM);                    01703475
+ DCL KEY1   CHAR(17) INIT(' ') ; /* ая.коц/лоу + RECNUMBER*/            01703669
+ DCL MESSAGE  FILE RECORD SEQUENTIAL OUTPUT                             01710000
+     ENV(FB RECSIZE(133));                                              01720069
+                                                                        01730000
+ DATE: PROC IRREDUCIBLE RETURNS(CHAR(6)) ;                              01760000
+       CALL CZXDATEP          ( CZX3VDAT) ;                             01770000
+       RETURN (CZX3VDAT) ;                                              01780000
+       END DATE ;                                                       01790000
+                                                                        01800000
+ OPEN FILE(KLADIK), FILE(SFILE), FILE(MESSAGE);                         01930069
+                                                                        01940000
+      ON ENDFILE( SFILE )                                               01950028
+      BEGIN ;                                                           01960006
+         CALL EKTYP_TELOYS;                                             01990069
+         GOTO TELOS ;                                                   02000069
+      END ;                                                             02010006
+                                                                        02020006
+      ON KEY(KLADIK)                                                    02022028
+      BEGIN ;                                                           02023014
+        SELECT ( ONCODE );                                              02023143
+           WHEN ( 51 )  DO;                         /* KEY NOT FOUND */ 02023243
+              TEXT=' CANNOT FIND SPECIFIED KEY :' !! KEY1;              02023458
+              WRITE FILE(MESSAGE) FROM(LINEOUT);                        02023543
+              END;                                                      02023643
+           WHEN ( 52 )  DO;                         /* DUPLICATE KEY */ 02023843
+              TEXT=' DUPLICATE KEY :' !! KEY1;                          02023958
+              WRITE FILE(MESSAGE) FROM(LINEOUT);                        02024043
+              END;                                                      02024143
+           WHEN ( 53 )  DO;                          /*     KEY LESS */ 02024243
+              TEXT=' FOR SEQUENTIAL WRITE, KEY OUT OF SEQUENCE'!!       02024358
+                        ' FOR KEY:' !! KEY1;                            02024443
+              WRITE FILE(MESSAGE) FROM(LINEOUT);                        02024543
+              END;                                                      02024643
+           WHEN ( 55 )  DO;                          /* INVALID  KEY */ 02024843
+              TEXT=' INVALID KEY : '!! KEY1;                            02024958
+              WRITE FILE(MESSAGE) FROM(LINEOUT);                        02025143
+              END;                                                      02025243
+           OTHERWISE DO;                                                02025343
+              TEXT=' ERROR ON FILE KLADIK WITH CODE: '!!ONCODE !!       02025458
+                        ' FOR KEY:' !! KEY1;                            02025543
+              WRITE FILE(MESSAGE) FROM(LINEOUT);                        02025643
+              END;                                                      02025743
+        END; /* SELECT */                                               02025843
+                                                                        02025942
+        ERROR    = 1 ;                                                  02026069
+        GOTO TELOS ;                                                    02027069
+      END ;                                                             02030114
+                                                                        02030214
+      CALL WRITE_TITLOI ;                                               02031000
+      INP_AMOUNT = 0;                                                   02052070
+      OUT_AMOUNT = 0;                                                   02052170
+                                                                        02053043
+ A  : ;                                                                 02060011
+      CALL READ_OLD_FILE;                                               02070065
+      CALL WRITE_KLADIK;                                                02071066
+      GOTO A ;                                                          02410027
+                                                                        02430002
+ READ_OLD_FILE:PROC;                                                    02440065
+    OLD_VSAM_REC = '';                                                  02440183
+    READ FILE(SFILE) INTO(OLD_VSAM_REC);                                02440265
+    TOT_READ   = TOT_READ + 1;                                          02440369
+    INP_AMOUNT = INP_AMOUNT + WOAMOUNT;                                 02440469
+    IF SUBSTR(WORECORDNUM,1,3) = '001' THEN                             02440565
+       WARLOG = LOGAR1;                                                 02440665
+    IF SUBSTR(WORECORDNUM,1,3) = '002' THEN                             02440765
+       WARLOG = LOGAR2;                                                 02440865
+    WRECORDNUM = WORECORDNUM;                                           02440965
+    WAMOUNT    = WOAMOUNT;                                              02441065
+    WFLAG      = WOFLAG ;                                               02441165
+    WPAYDATE   = WOPAYDATE;                                             02441265
+    WPAYIDENT  = WOPAYIDENT;                                            02441365
+    WEXPDT     = 0;                                                     02441479
+                                                                        02442065
+   RETURN;                                                              02550055
+                                                                        02560059
+ END READ_OLD_FILE;                                                     03020065
+                                                                        03040011
+ WRITE_KLADIK:PROC;                                                     03041055
+    KEY1    = WARLOG !! WRECORDNUM;                                     03042067
+    WRITE FILE(KLADIK) FROM(WNEW_VSAM_REC) KEYFROM(KEY1);               03045579
+    TOT_WRITE  = TOT_WRITE + 1;                                         03045679
+    OUT_AMOUNT = OUT_AMOUNT + WAMOUNT;                                  03045779
+ END WRITE_KLADIK ;                                                     03045879
+                                                                        03046055
+ WRITE_TITLOI:PROC;                                                     03050000
+                                                                        03060070
+   DCL  EKDATE     CHAR (  6 );                                         03061070
+   DCL 1 EKDATEXX  BASED ( ADDR ( EKDATE ) ),                           03062070
+       2   YY1     PIC '99',     /* ETOR                       */       03063070
+       2   MM1     PIC '99',     /* MHNAR                      */       03064070
+       2   DD1     PIC '99';     /* HMEPA                      */       03065070
+   DCL WRKHM1      PIC '99';                                            03066070
+   DCL EKDATE1     CHAR(10);                                            03067070
+   DCL M_YY        CHAR(02) INIT(' ');                                  03067170
+                                                                        03068070
+     EKDATE      = DATE ;                                               03070000
+     WRKHM1      = YY1;                                                 03080000
+     YY1         = DD1;                                                 03090000
+     DD1         = WRKHM1;                                              03100000
+                                                                        03110000
+     IF YY1 <= 70 THEN M_YY = '20' ;                                    03120000
+                  ELSE M_YY = '19' ;                                    03130000
+     EKDATE1  =SUBSTR(EKDATE,1,2) !! '.' !! SUBSTR(EKDATE,3,2) !! '.'   03140069
+               !! M_YY !! SUBSTR(EKDATE,5,2) ;                          03150000
+                                                                        03160000
+     TEXT=(132)'*';                                                     03170069
+     WRITE FILE(MESSAGE) FROM(LINEOUT);                                 03190000
+     LSKIP = ' ';                                                       03190187
+     TEXT=' '!!' CONVERSION FILE DK.P.DM.KLADIK     '                   03190286
+               !!'          HM/NIA : ' !! EKDATE1 ;                     03190369
+     WRITE FILE(MESSAGE) FROM(LINEOUT);                                 03190469
+     TEXT=(132)'*';                                                     03190569
+     WRITE FILE(MESSAGE) FROM(LINEOUT);                                 03190669
+                                                                        03200000
+ END WRITE_TITLOI ;                                                     03210000
+                                                                        03220038
+                                                                        03230000
+ EKTYP_TELOYS:PROC;                                                     03240000
+                                                                        03250000
+     TEXT=(15)'*'!!' статистийа стоивеиа циа то CONVERSION '!!          03250569
+          (15)'*';                                                      03250669
+     WRITE FILE(MESSAGE) FROM(LINEOUT);                                 03250769
+                                                                        03250838
+     TOT_RECS_FORMAT  = TOT_READ;                                       03251038
+     TEXT=' '!!'сумокийа RECORDS    апо пакио VSAM аявеио :  '          03260085
+             !! TOT_RECS_FORMAT ;                                       03270038
+     WRITE FILE(MESSAGE) FROM(LINEOUT);                                 03280000
+                                                                        03280138
+     TOT_AMNT_FORMAT   = INP_AMOUNT;                                    03280269
+     TEXT=' '!!'сумокийо посо       апо пакио VSAM аявеио : '           03280385
+             !! TOT_AMNT_FORMAT;                                        03280469
+     WRITE FILE(MESSAGE) FROM(LINEOUT);                                 03280569
+                                                                        03280669
+     TOT_RECS_FORMAT  = 0;                                              03280738
+     TOT_RECS_FORMAT  = TOT_WRITE;                                      03280869
+     TEXT=' '!!'сумокийа RECORDS    сто  мео  VSAM аявеио :  '          03281085
+             !! TOT_RECS_FORMAT ;                                       03281138
+     WRITE FILE(MESSAGE) FROM(LINEOUT);                                 03283037
+                                                                        03283138
+     TOT_AMNT_FORMAT   = OUT_AMOUNT;                                    03283269
+     TEXT=' '!!'сумокийо посо       сто  мео  VSAM аявеио : '           03283385
+             !! TOT_AMNT_FORMAT;                                        03283469
+     WRITE FILE(MESSAGE) FROM(LINEOUT);                                 03283569
+                                                                        03287038
+     TEXT=(132)'*';                                                     03288058
+     WRITE FILE(MESSAGE) FROM(LINEOUT);                                 03289038
+                                                                        03290038
+   END  EKTYP_TELOYS ;                                                  03300000
+                                                                        03310000
+                                                                        03320075
+ TELOS :                                                                03330000
+     IF ERROR = 1 THEN DO;/*NPK ENTER-PLI 22-05-2007*/                  03331088
+       DCL NPK_1 FIXED(1) INIT(1);                                      03331188
+       ERROR = NPK_1 / 0 ;                                              03332088
+       END;                                                             03333088
+    CLOSE FILE(KLADIK), FILE(SFILE), FILE(MESSAGE);                     03340075
+                                                                        03350000
+ END DK561 ;                                                            03360053
+

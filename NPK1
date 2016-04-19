@@ -1,0 +1,19 @@
+ NPK1: PROC OPTIONS(FETCHABLE) RETURNS (CHAR(4));
+ DCL (ADDR,UNSPREC) BUILTIN;
+
+    DCL A1 POINTER;
+    DCL 1 A2   BASED (A1),
+          2 FILLER    CHAR (16),
+          2 A2PTR     POINTER;
+    DCL 1 A3   BASED (A2PTR),
+          2 FILLER    CHAR (196),
+          2 A4PTR     POINTER;
+    DCL 1 A5   BASED (A4PTR),
+          2 FILLER    CHAR (16),
+          2 MY_CHAR   CHAR (04);
+
+          UNSPEC (A1) = 0;
+
+          RETURN (MY_CHAR );
+ END NPK1;
+

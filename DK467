@@ -1,0 +1,201 @@
+ /* PROCESS A,GOSTMT,ESD,MAP,NEST,OPT(TIME),AG,MI('$'),S,X,OF,INCLUDE;*/
+ /* ---------------------------------------------------------------- */
+ /* DK467    METATPOpH APXEIOY TOKAPIhMxN Ap¼ 188 rE 240             */
+ /*                                                                  */
+ /*       c    TRANSLATE   GRREK CHARACTERS                          */
+ /*                                                 r.A.  30.06.2002 */
+ /* ---------------------------------------------------------------- */
+ /* AkkAcH TKRKENO -----> TKROVERD                  r.A.  18.06.2004 */
+ /* METABOkH MHKOYr APXEIOY                         r.A.  09.12.2005 */
+ /* AkkAcH pEPcPAuHr RECORD                         r.A.  14.07.2006 */
+ /* AkkAcH pEPcPAuHr RECORD                         r.A.  17.10.2006 */
+ /* ---------------------------------------------------------------- */
+
+ DK467  : PROCEDURE  OPTIONS(MAIN);
+ /*****       VSE/MVS TRANSLATION PROCESSED BY MVS-MS       *****/
+ /*****          SATURDAY  96/05/11  AT  23.02.38           *****/
+ /*** PL/1 OPTIMIZER EXECUTION TIME OPTIONS ***/
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+
+   DCL   TOKARTM FILE  RECORD   INPUT ENV( FB    RECSIZE(188) );
+   DCL   TOKARIR FILE  RECORD  OUTPUT ENV( FB    RECSIZE(240) );
+   DCL   MSSGEF  FILE  RECORD  OUTPUT ENV( FB    RECSIZE(133) CTLASA);
+   /* 09.12.2005
+   DCL   TOKARIR FILE  RECORD  OUTPUT ENV( FB    RECSIZE(140) );  */
+
+ % INCLUDE  TOKARTM  ;
+
+
+
+         /*----------------------------------------------------*   Ã
+          I RECORD  APXEIOY  TOKxN KAI TOKAPIhMxN KATAhErExN   I
+          I RECORD SIZE = 140 , BLOCK SIZE =     0             I
+          I                       TEkEYTAIA AkkAcH : 29.01.01  I
+          I                       TEkEYTAIA AkkAcH : 15.06.04  I
+          I RECORD SIZE = 240                      08.12.2005  I
+          *----------------------------------------------------*/
+ DCL      TKOREC    CHAR(240)           ;
+ DCL  1   TKORECR   BASED(ADDR(TKOREC)) ,
+       2  TKOTRAP   PIC '(01)9'         ,  /* TPApEZA                */
+       2  TKOKATMA  FIXED(03,0)         ,  /* KATArTHMA              */
+       2  TKOKATOL  FIXED(07,0)         ,  /* MEPIdA KAhOkIKOY       */
+       2  TKOARLOG  FIXED(09,0)         ,  /* APIhMOr kOcAPIArMOY    */
+       2  TKOPERID  PIC '(01)9'         ,  /* ENdEInH pEPIOdOY 1 - 4 */
+       2  TKOPTKR1  FIXED(15,0)         ,  /* TOKAPIhMOI pIrTxTIKOI 1*/
+       2  TKOPTOK1  FIXED(15,0)         ,  /* TOKOI      pIrTxTIKOI 1*/
+       2  TKOPTKR2  FIXED(15,0)         ,  /* TOKAPIhMOI pIrTxTIKOI 2*/
+       2  TKOPTOK2  FIXED(15,0)         ,  /* TOKOI      pIrTxTIKOI 2*/
+       2  TKOPTKR3  FIXED(15,0)         ,  /* TOKAPIhMOI pIrTxTIKOI 3*/
+       2  TKOPTOK3  FIXED(15,0)         ,  /* TOKOI      pIrTxTIKOI 3*/
+       2  TKOXTKR1  FIXED(15,0)         ,  /* TOKAPIhMOI XPExrTIKOI 1*/
+       2  TKOXTOK1  FIXED(15,0)         ,  /* TOKOI      XPExrTIKOI 1*/
+       2  TKOXTKR2  FIXED(15,0)         ,  /* TOKAPIhMOI XPExrTIKOI 2*/
+       2  TKOXTOK2  FIXED(15,0)         ,  /* TOKOI      XPExrTIKOI 2*/
+       2  TKOEDFR   FIXED(15,0)         ,  /* EIdIKOr uOPOr          */
+       2  TKOPSAF   FIXED(15,2)         ,  /* pOrO EpOM.pEP.(AuETHP) */
+       2  TKONEOS   PIC '(01)9'         ,  /* = 1 ---> NEOr EnAMHNOY */
+       2  TKOTAXES  FIXED(15,0)         ,  /* pOrO EuOPIAr           */
+       2  TKOKATEP  CHAR (01)           ,  /* 1 -> kOc.ME EpITOKIO   */
+       2  TKOHMPER  FIXED(05,0)         ,  /* HMEPEr pEPIOdOY29.01.01*/
+       2  TKOE3000  FIXED(05,0)         ,  /* EuTE 5078 ME XPHrH XEp2*/
+       2  TKODATE   FIXED(07)           ,  /* kHnH EKTOKIrMOY 8.12.99*/
+       2  TKOCOPEN  CHAR (01)           ,  /* S=rYNAdEkuOI    8.12.99*/
+       2  TKONOMIS  CHAR (01)           ,  /* E=EYPx,SP.=dPX 29.01.01*/
+       2  TKOMESYP  FIXED(15,2)         ,  /* MErO YpOkOIpO pEPIOdOY */
+       2  TKOOVERD  PIC '(01)9' ,     /* FLAG cIA OVERDRAFT 15.06.04 */
+       2  TKOFIL1   CHAR (48)   ,     /* KENO                        */
+       2  TKOKATAX  FIXED(15,2)         ,  /* TOKOr pOY KATAXxPHhHKE */
+       2  TKOKATP   FIXED(15,2)         ,  /* pIrT.KATAX.TOKOr(MIS)  */
+       2  TKOKATX   FIXED(15,2)         ,  /* XPExrT.KATAX.TOKOr(MIS)*/
+       2  TKOKATF   FIXED(15,2)         ,  /* KATAXxPHhEIr uOPOr     */
+       2  TKOFIL2   CHAR (20)   ;     /* KENO  17.10.2006            */
+  /*   2  TKOFIL2   CHAR (28)   ;        KENO  14.07.2006            */
+       /* 14.07.2006
+       2  TKOFIL2   CHAR (44)   ;        KENO                        */
+ /*    2  TKOKENON  CHAR (01)           ;     K E N O        29.01.01*/
+ DCL  1   TKOBKATM  BASED(ADDR(TKOKATMA)),
+       2  TKOBKAT0  BIT  (12)            ,
+       2  TKOBKAT1  BIT  (04)            ;
+ DCL  1   TKOBKTLQ  BASED(ADDR(TKOKATOL)),
+       2  TKOBKTL0  BIT  (28)            ,
+       2  TKOBKTL1  BIT  (04)            ;
+ DCL  1   TKOBARLG  BASED(ADDR(TKOARLOG)),
+       2  TKOBLOG0  BIT  (36)            ,
+       2  TKOBLOG1  BIT  (04)            ;
+ DCL      TKOPTKR1C FIXED(15,2)  BASED(ADDR(TKOPTKR1)) ; /* pOrA  ME */
+ DCL      TKOPTOK1C FIXED(15,2)  BASED(ADDR(TKOPTOK1)) ;
+ DCL      TKOPTKR2C FIXED(15,2)  BASED(ADDR(TKOPTKR2)) ;
+ DCL      TKOPTOK2C FIXED(15,2)  BASED(ADDR(TKOPTOK2)) ; /* dEKAdIKA */
+ DCL      TKOPTKR3C FIXED(15,2)  BASED(ADDR(TKOPTKR3)) ;
+ DCL      TKOPTOK3C FIXED(15,2)  BASED(ADDR(TKOPTOK3)) ; /* cIA      */
+ DCL      TKOXTKR1C FIXED(15,2)  BASED(ADDR(TKOXTKR1)) ;
+ DCL      TKOXTOK1C FIXED(15,2)  BASED(ADDR(TKOXTOK1)) ; /* EYPx KAI */
+ DCL      TKOXTKR2C FIXED(15,2)  BASED(ADDR(TKOXTKR2)) ;
+ DCL      TKOXTOK2C FIXED(15,2)  BASED(ADDR(TKOXTOK2)) ;
+ DCL      TKOEDFRC  FIXED(15,2)  BASED(ADDR(TKOEDFR))  ;
+ DCL      TKOTAXESC FIXED(15,2)  BASED(ADDR(TKOTAXES)) ; /* KYpPO    */
+
+   DCL    MSSGER      CHAR(133) INIT(' '); /* RECORD APXEIOY MSSGEF  */
+
+   DCL 1  COUNTERS                     , /* METPHTEr                 */
+        2 SINPTKR   FIXED(12,0) INIT(0),
+        2 SOUTTKR   FIXED(12,0) INIT(0);
+
+   DCL   SWEOFTKR  FIXED(9,0) INIT(0);
+
+   DCL   ADDR      BUILTIN ;
+
+ %PAGE;
+ /*         P  R  O  C  E  D  U  R  E                                */
+
+   OPEN  FILE(TOKARTM),FILE(TOKARIR),
+         FILE(MSSGEF) ;
+   MSSGER = '1************************************************' !!
+            '*****************';
+   WRITE  FILE(MSSGEF)  FROM(MSSGER);
+   MSSGER = ' pPOcPAMMA DK467 - METATPOpH APXEIOY TOKAPIhMxN ' !!
+            'ApO 188 rE 240';
+   /*       'ApO 188 rE 140';    09.12.2005 */
+   WRITE  FILE(MSSGEF)  FROM(MSSGER);
+   MSSGER = ' ************************************************' !!
+            '*****************';
+   WRITE  FILE(MSSGEF)  FROM(MSSGER);
+
+   ON  ENDFILE(TOKARTM)   GOTO TELOS;
+
+
+ RDTKR :
+   READ  FILE(TOKARTM)  INTO(TKRREC);
+
+   SINPTKR = SINPTKR + 1;
+
+   TKOREC = '';
+
+   TKOTRAP  = TKRTRAP;
+   TKOKATMA = TKRKATMA;
+   TKOKATOL = TKRKATOL;
+   TKOARLOG = TKRARLOG;
+   TKOPERID = TKRPERID;
+
+   TKOPTKR1 = TKRPTKR1 +
+              TKRPTKR2 +
+              TKRPTKR3 +
+              TKRPTKR4 +
+              TKRPTKR5 +
+              TKRPTKR6 ;
+
+   TKOPTOK1 = TKRPTOK1 +
+              TKRPTOK2 +
+              TKRPTOK3 +
+              TKRPTOK4 +
+              TKRPTOK5 +
+              TKRPTOK6 ;
+
+   TKOPTKR2 = 0;
+   TKOPTOK2 = 0;
+   TKOPTKR3 = 0;
+   TKOPTOK3 = 0;
+
+   TKOXTKR1  = TKRXTKR1 ;
+   TKOXTOK1  = TKRXTOK1 ;
+   TKOXTKR2  = TKRXTKR2 ;
+   TKOXTOK2  = TKRXTOK2 ;
+   TKOEDFR   = TKREDFR  ;
+   TKOPSAF   = TKRPSAF  ;
+   TKONEOS   = TKRNEOS  ;
+   TKOTAXES  = TKRTAXES ;
+   TKOKATEP  = TKRKATEP ;
+   TKOHMPER  = TKRHMPER ;
+   TKOE3000  = TKRE3000 ;
+   TKODATE   = TKRDATE  ;
+   TKOCOPEN  = TKRCOPEN ;
+   TKONOMIS  = TKRNOMIS ;
+   TKOMESYP  = TKRMESYP ;
+   TKOOVERD  = TKROVERD ;
+   TKOFIL1   = ' '      ;           /* 09.12.2005 */
+   TKOFIL2   = ' '      ;
+   TKOKATAX  = 0        ;
+   TKOKATP   = 0        ;            /* 14.07.2006 */
+   TKOKATX   = 0        ;
+   TKOKATF   = 0        ;            /* 17.10.2006 */
+ /*TKOKENON  = TKRKENON ;              18.06.2004 */
+
+   WRITE  FILE(TOKARIR)  FROM(TKOREC);
+   SOUTTKR = SOUTTKR + 1 ;
+   GOTO  RDTKR ;
+
+ /*
+       E N D   O F   M A I N   P R O G R A M
+                                                                     */
+ %PAGE;
+
+ /******/
+ TELOS:
+ /******/
+   MSSGER='-* INPUT  RECORDS ARXEIOY TOKAPIhMxN - 188  = ' !! SINPTKR;
+   WRITE  FILE(MSSGEF)  FROM(MSSGER);
+   MSSGER=' * OUTPUT RECORDS TOKAPIhMxN - 240          = ' !! SOUTTKR;
+   WRITE  FILE(MSSGEF)  FROM(MSSGER);
+   CLOSE FILE(TOKARTM),FILE(TOKARIR),FILE(MSSGEF) ;
+ END  DK467 ;
+

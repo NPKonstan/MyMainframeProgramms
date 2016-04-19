@@ -1,0 +1,1485 @@
+%PROCESS XOPTS(DLI);
+ DK553:   PROCEDURE OPTIONS(MAIN);
+ /********************************************************************/
+ /* пяоцяалла DB2 KAI IMS                                            */
+ /********************************************************************/
+ /*                        DB  йатахесеым                            */
+ /********************************************************************/
+ /* Input :                                                          */
+ /*      AЯВЕъО 1  сыяеутийо      DK.P.XS.TRLOIPSN                   */
+ /*      аЯВЕъО 2  лгма (FTP)     DK.P.XS.TRLOIPFN    лГМИАъО        */
+ /*      аЯВЕъО 3  йАТАКОЦИСХщМТЕР тЭЙОИсТА ЕНэЛГМА (иОЩКГ цЕМэЯГ)   */
+ /*                                            DK.P.XS.DKTKRKC.EUR   */
+ /*      аЯВЕъО 4  йАТАКОЦИСХщМТЕР тЭЙОИ ЛчМА  DK.P.XS.TKRKAM.EUR    */
+ /*                                                                  */
+ /*                                                                  */
+ /*  Output:                                                         */
+ /*         лЕэКО тam20 400 byte     DK.P.XS.TAM20BIG                */
+ /*         еЦЦЯАЖч СТОМ ПъМАЙА CTISDK01                             */
+ /********************************************************************/
+ /*    ****************************************************          */
+ /*      пЕЯИЦЯАЖч пЕДъЫМ ТОУ ПъМАЙА CTISDK01 ЦИА ТО MIS             */
+ /*    ****************************************************          */
+ /*                                                                  */
+ /* KEY_ACCN1    аЯИХЛЭР кОЦАЯИАСЛОЩ   йКЕИДъ                        */
+ /* KEY_YEAR     еТОР аМАЖОЯэР         йКЕИДъ                        */
+ /* KEY_MONTH    лчМАР аМАЖОЯэР        йКЕИДъ                        */
+ /* NUM_VDAVGBL  лщСО бАКЕЯИАЙЭ вЯЕЫСТИЙЭ уПЭКОИПО лчМА              */
+ /* NUM_VCAVGBL  лщСО бАКЕЯИАЙЭ пИСТЫТИЙЭ уПЭКОИПО лчМА              */
+ /* NUM_VDSAVGBL лщСО бАКЕЯИАЙЭ вЯЕЫСТИЙЭ уПЭКОИПО лчМА сЫЯЕУТИЙЭ    */
+ /* NUM_VCSAVGBL лщСО бАКЕЯИАЙЭ пИСТЫТИЙЭ уПЭКОИПО лчМА сЫЯЕУТИЙЭ    */
+ /* NUM_DMINTRST вЯЕЫСТИЙОъ тЭЙОИ лчМА                               */
+ /* NUM_CMINTRST пИСТЫТИЙОъ тЭЙОИ лчМА                               */
+ /* NUM_DCINTRST вЯЕЫСТИЙОъ тЭЙОИ лчМА ONLINE йКЕИСИЛэТЫМ            */
+ /* NUM_CCINTRST пИСТЫТИЙОъ тЭЙОИ лчМА ONLINE йКЕИСИЛэТЫМ            */
+ /* NUM_DKATALOG вЯЕЫСТИЙОъ тЭЙОИ йАТАКОЦИСХщМТЕР                    */
+ /* NUM_CKATALOG пИСТЫТИЙОъ тЭЙОИ йАТАКОЦИСХщМТЕР                    */
+ /********************************************************************/
+ /*           PROGRAM NAME: DK553      LOAD MODULE: DK553            */
+ /********************************************************************/
+ /* 02-03-2006 NPK                                                   */
+ /********************************************************************/
+ /********************************************************************/
+ /* 07-11-2007 NPK WS_YEAR FROM 3 TO 5  ????????                     */
+ /********************************************************************/
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+ DCL CZX3VDAT CHAR(6); FETCH CZXDATEP;
+ DCL CZXDATEP ENTRY OPTIONS(INTER,ASM) ;
+ DCL   NULL      BUILTIN;
+ DATE: PROC IRREDUCIBLE RETURNS(CHAR(6)) ;
+         CALL CZXDATEP          ( CZX3VDAT) ;
+         RETURN (CZX3VDAT) ;
+         END DATE ;
+ % INCLUDE  KSDBMAP ;
+
+
+ DCL     BITKATEP     BASED(ADDR(KSCKATEP))  BIT (80);
+ DCL     BIT_LOG      BASED(ADDR(KSRKLOG))   BIT(8);
+ DCL     KSRKATPIC    PIC'999' BASED(ADDR(KSMSKAT));
+
+ DCL     (KFIOROOT,KFIOSADD) POINTER;
+
+ DCL     PRT FILE     SEQUENTIAL OUTPUT ENV(FB RECSIZE(133) CTLASA);
+ DCL     LINE                CHAR (133);
+ DCL 1   LNX                 BASED(ADDR(LINE)),
+      2  CTLCHR              CHAR(1)      INIT('1'),
+      2  GRAMH               CHAR(132)    INIT(' ');
+
+ DCL 1   ERLINE              ,
+      2  ERLIN1       CHAR(1)      INIT('1'),
+      2  ERLIN2       CHAR(132)    INIT(' ');
+
+ DCL     WS_MSG              CHAR (132);
+ /********************************************************************/
+ /*омола йаи пеяицяаж╧ INPUT           аяве╨ым*/
+ /********************************************************************/
+ /* сЫЯЕУТИЙЭ      DK.P.XS.TRLOIPSN     */
+ DCL   INFILE1 FILE  SEQUENTIAL INPUT  ENV(FB RECSIZE(188));
+ /* лчМА (FTP)     DK.P.XS.TRLOIPFN     */
+ DCL   INFILE2 FILE  SEQUENTIAL INPUT  ENV(FB RECSIZE(188));
+ /* йАТАКОЦИСХщМТЕР ТЭЙОИ ЕНАЛчМОУ    DK.P.XS.DKTKRKC.EUR */
+ DCL   INFILE3 FILE  SEQUENTIAL INPUT  ENV(FB RECSIZE(240));
+ /* пЯОБКЕЖХщМТЕР   ТЭЙОИ лчМОР       DK.P.XS.TKRKAM.EUR*/
+ DCL   INFILE4 FILE  SEQUENTIAL INPUT  ENV(FB RECSIZE(240));
+ /********************************************************************/
+ /*омола йаи пеяицяаж╧ OUTPUT          аявеIOY*/
+ /********************************************************************/
+ /* MEGALO TAM20   DK.P.XS.XXXXXXXX     */
+ DCL   OUTFILE FILE  SEQUENTIAL OUTPUT ENV(FB RECSIZE(417));
+ /********************************************************************/
+
+ % INCLUDE  TOKARTM ;
+ DCL 1 IN_REC2 LIKE TKRRECR ;
+ DCL 1 IN_REC1 LIKE TKRRECR ;
+ /********************************************************************/
+ /*              аЯВЕъО дЕДОУКЕУЛщМЫМ тЭЙЫМ                          */
+ /********************************************************************/
+ /**   пЯОСОВч - пЯОСОВч - пЯОСОВч                                 **/
+ /********************************************************************/
+ /* тО record АУТЭ СТГМ ПЯАЦЛАТИЙЭТГТА ЕИМАИ АУТЭ ПОУ ПЕЯИЦЯэЖЕТАИ СТО
+   CBG.PROD.PLICOP(TOKARIR) ( record Length 240 ),
+   ТО АМТщЦЯАЬА ЕДЧ ЦИАТъ ЕВЕИ ТО ъДИО ЭМОЛА
+   ЛЕ ТО record ПОУ ПЕЯИЦЯэЖЕТАИ СТО
+   CBG.PROD.PLICOP(TOKARTM) ( record Length 188 )
+ /********************************************************************/
+ /*NPK 23-03-2006 */
+ /********************************************************************/
+ /* DCL      MY_TKRREC    CHAR(240)      ;
+ DCL  1   IN_REC3   BASED(ADDR(MY_TKRREC)) , */
+ DCL  1   IN_REC3                          ,
+       2  TKRTRAP   PIC '(01)9'         ,  /* TPApEZA                */
+       2  TKRKATMA  FIXED(03,0)         ,  /* KATArTHMA              */
+       2  TKRKATOL  FIXED(07,0)         ,  /* MEPIdA KAhOkIKOY       */
+       2  TKRARLOG  FIXED(09,0)         ,  /* APIhMOr kOcAPIArMOY    */
+       2  TKRPERID  PIC '(01)9'         ,  /* ENdEInH pEPIOdOY 1 - 4 */
+       2  TKRPTKR1  FIXED(15,0)         ,  /* TOKAPIhMOI pIrTxTIKOI 1*/
+       2  TKRPTOK1  FIXED(15,0)         ,  /* TOKOI      pIrTxTIKOI 1*/
+       2  TKRPTKR2  FIXED(15,0)         ,  /* TOKAPIhMOI pIrTxTIKOI 2*/
+       2  TKRPTOK2  FIXED(15,0)         ,  /* TOKOI      pIrTxTIKOI 2*/
+       2  TKRPTKR3  FIXED(15,0)         ,  /* TOKAPIhMOI pIrTxTIKOI 3*/
+       2  TKRPTOK3  FIXED(15,0)         ,  /* TOKOI      pIrTxTIKOI 3*/
+       2  TKRXTKR1  FIXED(15,0)         ,  /* TOKAPIhMOI XPExrTIKOI 1*/
+       2  TKRXTOK1  FIXED(15,0)         ,  /* TOKOI      XPExrTIKOI 1*/
+       2  TKRXTKR2  FIXED(15,0)         ,  /* TOKAPIhMOI XPExrTIKOI 2*/
+       2  TKRXTOK2  FIXED(15,0)         ,  /* TOKOI      XPExrTIKOI 2*/
+       2  TKREDFR   FIXED(15,0)         ,  /* EIdIKOr uOPOr          */
+       2  TKRPSAF   FIXED(15,2)         ,  /* pOrO EpOM.pEP.(AuETHP) */
+       2  TKRNEOS   PIC '(01)9'         ,  /* = 1 ---> NEOr EnAMHNOY */
+       2  TKRTAXES  FIXED(15,0)         ,  /* pOrO EuOPIAr           */
+       2  TKRKATEP  CHAR (01)           ,  /* 1 -> kOc.ME EpITOKIO   */
+       2  TKRHMPER  FIXED(05,0)         ,  /* HMEPEr pEPIOdOY29.01.01*/
+       2  TKRE3000  FIXED(05,0)         ,  /* EuTE 5078 ME XPHrH XEp2*/
+       2  TKRDATE   FIXED(07)           ,  /* kHnH EKTOKIrMOY 8.12.99*/
+       2  TKRCOPEN  CHAR (01)           ,  /* S=rYNAdEkuOI    8.12.99*/
+       2  TKRNOMIS  CHAR (01)           ,  /* E=EYPx,SP.=dPX 29.01.01*/
+       2  TKRMESYP  FIXED(15,2)         ,  /* MErO YpOkOIpO pEPIOdOY */
+       2  TKROVERD  PIC '(01)9' ,     /* FLAG cIA OVERDRAFT 15.06.04 */
+       2  TKRFIL1   CHAR (48)   ,     /* KENO                        */
+       2  TKRKATAX  FIXED(15,2)         ,  /* TOKOr pOY KATAXxPHhHKE */
+       2  TKRKATP   FIXED(15,2)         ,  /* пистытийос тойос лис  */
+       2  TKRKATX   FIXED(15,2)         ,  /* вяеыстийос тойос лис   */
+       2  TKRFIL2   CHAR (28)   ;     /* KENO                        */
+
+ DCL  1   IN_REC4   LIKE IN_REC3 ;
+
+ DCL FILE1_FLAG FIXED (1) INIT(0);
+ DCL FILE2_FLAG FIXED (1) INIT(0);
+ DCL FILE3_FLAG FIXED (1) INIT(0);
+ DCL FILE4_FLAG FIXED (1) INIT(0);
+
+ DCL FILE1_EOF  FIXED (1) INIT(0);
+ DCL FILE2_EOF  FIXED (1) INIT(0);
+ DCL FILE3_EOF  FIXED (1) INIT(0);
+ DCL FILE4_EOF  FIXED (1) INIT(0);
+
+ % INCLUDE  DAYATNS ;
+ DCL     SEGNAME             CHAR(8);
+ DCL     WRKAREA             CHAR(417);
+ DCL     RETCODE             FIXED BIN(31);
+ DCL     BINZROS             CHAR(4) INIT(' ') ;
+ DCL     MHDEN               BIT(32) BASED(ADDR(BINZROS)) ;
+
+ DCL  F1_RECS  FIXED(15) INIT(0);
+ DCL  F2_RECS  FIXED(15) INIT(0);
+ DCL  F3_RECS  FIXED(15) INIT(0);
+ DCL  F4_RECS  FIXED(15) INIT(0);
+ DCL  DB2_RECS FIXED(15) INIT(0);
+ DCL  F1_REJECTED_RECS FIXED(15) INIT(0);
+ DCL  F2_REJECTED_RECS FIXED(15) INIT(0);
+ DCL  F3_REJECTED_RECS FIXED(15) INIT(0);
+ DCL  F4_REJECTED_RECS FIXED(15) INIT(0);
+ DCL  PIC_IMS_POSO  PIC'SZZZ.ZZZ.ZZZ.ZZ9V,99' INIT(0);
+ DCL 1   REC_COUNTERS,
+      2  REC_APO             FIXED (15)  INIT(0),
+      2  REC_CNT             FIXED (15)  INIT(0),
+      2  REC_ROOT            FIXED (15)  INIT(0),
+      2  REC_TOT             FIXED (15)  INIT(0),
+      2  REC_ERROR           FIXED (15)  INIT(0),
+      2  REC_CONTROL         FIXED (15)  INIT(0),
+      2  TOT_NORMAL_REC      FIXED (15)  INIT(0);
+
+ DCL     TODAY               PIC '99.99.9999' INIT(0);
+ DCL     WREC                PIC 'ZZZ.ZZZ.ZZZ.ZZZ.ZZ9' INIT(0);
+ DCL     WPOSO               PIC 'ZZZ.ZZZ.ZZZ.ZZZ,V99-' INIT(0);
+ DCL     II                  PIC '99'    INIT(0);
+ DCL     I                   PIC '99'    INIT(0);
+ DCL     J                   PIC '99'    INIT(0);
+
+ DCL     MY_DATETIME         CHAR (17)         ;
+ DCL     MY_DATE             PIC '(7)9' INIT(0);
+ DCL 1   MY_DATEX            BASED(ADDR(MY_DATE)),
+      2  MY_CENTURY         CHAR(01),
+      2  MY_YEAR            CHAR(02),
+      2  MY_MONTH           PIC '99',
+      2  MY_DAY             CHAR(02);
+
+ /*лчМАР еТОР аМАЖОЯэР -сУМчХЫР О ПЯОГЦОЩЛЕМОР ЛчМАР ТОУ ЛчМА ЯОчР*/
+ DCL   WS_MNTH       FIXED DEC(2,0)   INIT(0);
+ DCL   WS_YEAR       FIXED DEC(5,0)   INIT(0);
+ DCL   WS_LIT_MNTH   CHAR(15);
+ /*леса лгмиаиа бакеяиайа упокоипа лгма вяеыстийа-пистытийа*/
+ DCL TOT_XRE_VDAVGBL      PIC'S(12)9V,99' INIT(0);
+ DCL TOT_PIST_VCAVGBL     PIC'S(12)9V,99' INIT(0);
+ /*леса лгмиаиа бакеяиайа упокоип лгма вяеыстийа-пистытийа (сыяеутийа)*/
+ DCL TOT_XRE_VDSAVGBL     PIC'S(12)9V,99' INIT(0);
+ DCL TOT_PIST_VCSAVGBL    PIC'S(12)9V,99' INIT(0);
+ /*вЯЕЫСТИЙОъ пИСТЫТИЙОъ йАТАКОЦИСХщМТЕР ТЭЙОИ лГМЭР*/
+ DCL TOT_XRE_DMINTRST     PIC'S(12)9V,99' INIT(0);
+ DCL TOT_PIST_CMINTRST    PIC'S(12)9V,99' INIT(0);
+
+ /*вЯЕЫСТИЙОъ пИСТЫТИЙОъ йАТАКОЦИСХщМТЕР ТЭЙОИ EНАЛчМОУ*/
+ DCL TOT_XRE_DKATALOG     PIC'S(12)9V,99' INIT(0);
+ DCL TOT_PIST_CKATALOG    PIC'S(12)9V,99' INIT(0);
+
+ /* вяеыстийои тойои лгма ONLINE йкеисилатым */
+ DCL  WS_DCINTRST PIC'S(13)9V,99' INIT(0);
+ /* пистытийои тойои лгма ONLINE йкеисилатым */
+ DCL  WS_CCINTRST PIC'S(13)9V,99' INIT(0);
+
+ DCL 1 INPUT_AMOUNTS,
+   /*леса лгмиаиа бакеяиайа упокоипа лгма вяеыстийа-пистытийа*/
+   2  SUM_XRE_VDAVGBL        PIC'S(12)9V,99' ,
+   2  SUM_PIST_VCAVGBL       PIC'S(12)9V,99' ,
+   /*леса  бакеяиайа упокоипа вя-пис(сыяеутийа)*/                       */
+   2  SUM_XRE_VDSAVGBL       PIC'S(12)9V,99' ,
+   2  SUM_PIST_VCSAVGBL      PIC'S(12)9V,99' ,
+   /*вЯЕЫСТИЙОъ пИСТЫТИЙОъ йАТАКОЦИСХщМТЕР ТЭЙОИ лГМЭР*/
+   2  SUM_XRE_DMINTRST       PIC'S(12)9V,99' ,
+   2  SUM_PIST_CMINTRST      PIC'S(12)9V,99' ,
+   /*вЯЕЫСТИЙОъ пИСТЫТИЙОъ йАТАКОЦИСХщМТЕР ТЭЙОИ EНАЛчМОУ*/
+   2  SUM_XRE_DKATALOG       PIC'S(12)9V,99' ,
+   2  SUM_PIST_CKATALOG      PIC'S(12)9V,99' ,
+   /* вяеыстийои тойои лгма ONLINE йкеисилатым */
+   2  SUM_DCINTRST PIC'S(13)9V,99' ,
+   /* пистытийои тойои лгма ONLINE йкеисилатым */
+   2  SUM_CCINTRST PIC'S(13)9V,99' ;
+   INPUT_AMOUNTS  = '';
+ DCL 1 INPUT_AMOUNTS_DB2,
+   /*леса лгмиаиа бакеяиайа упокоипа лгма вяеыстийа-пистытийа*/
+   2  DB2_XRE_VDAVGBL        PIC'S(12)9V,99' ,
+   2  DB2_PIST_VCAVGBL       PIC'S(12)9V,99' ,
+   /*леса  бакеяиайа упокоипа вя-пис(сыяеутийа)*/                       */
+   2  DB2_XRE_VDSAVGBL       PIC'S(12)9V,99' ,
+   2  DB2_PIST_VCSAVGBL      PIC'S(12)9V,99' ,
+   /*вЯЕЫСТИЙОъ пИСТЫТИЙОъ йАТАКОЦИСХщМТЕР ТЭЙОИ лГМЭР*/
+   2  DB2_XRE_DMINTRST       PIC'S(12)9V,99' ,
+   2  DB2_PIST_CMINTRST      PIC'S(12)9V,99' ,
+   /*вЯЕЫСТИЙОъ пИСТЫТИЙОъ йАТАКОЦИСХщМТЕР ТЭЙОИ EНАЛчМОУ*/
+   2  DB2_XRE_DKATALOG       PIC'S(12)9V,99' ,
+   2  DB2_PIST_CKATALOG      PIC'S(12)9V,99' ,
+   /* вяеыстийои тойои лгма ONLINE йкеисилатым */
+   2  DB2_DCINTRST PIC'S(13)9V,99' ,
+   /* пистытийои тойои лгма ONLINE йкеисилатым */
+   2  DB2_CCINTRST PIC'S(13)9V,99' ;
+   INPUT_AMOUNTS_DB2 = '';
+
+ DCL SUM_X     PIC'S(13)9V,99' INIT(0);
+ DCL SUM_P     PIC'S(13)9V,99' INIT(0);
+
+ /*сЩМОКО гЛЕЯЧМ пЯОГЦОЩЛЕМОУ лчМА АПО лчМА яОчР*/
+ DCL MY_HMPER      FIXED DEC(6,0) INIT(0);
+ /*сЩМОКО гЛЕЯЧМ АПО 31-12 пЯОГЦОЩЛЕМОУ щТОУР щЫР ТГМ ТЕКЕУТАъА
+   ГЛщЯА ТОУ пЯОГЦОЩЛЕМОУ лчМА АПО ТЭМ лчМА яОчР*/
+ DCL MY_HMPER_SUM  FIXED DEC(6,0) INIT(0);
+
+ DCL TODAYX      CHAR(8);
+ DCL  1 SYSDATE  BASED(ADDR(TODAYX)),
+             2 SYSYY  CHAR(4),
+             2 SYSMM  CHAR(2),
+             2 SYSDD  CHAR(2);
+ DCL  1 PICDATE  BASED(ADDR(SYSDATE)),
+             2 PICYY  PIC'(4)9',
+             2 PICMM  PIC'(2)9',
+             2 PICDD  PIC'(2)9';
+
+ DCL     SUBSTR    BUILTIN;
+ DCL     ADDR      BUILTIN;
+ DCL     ABS       BUILTIN;
+ DCL     DIVIDE    BUILTIN;
+ DCL     ROUND     BUILTIN;
+ DCL     DATETIME  BUILTIN;
+ /*-богхгтийос пимайас циа то лис ------------------*/
+ EXEC SQL                                                               01460000
+          INCLUDE CTISDK01;                                             01510300
+                                                                        01510400
+ /*- пимайас йимгсеым   ---------------------------*/
+ EXEC SQL                                                               01460000
+          INCLUDE CTBKANTI;                                             01510300
+                                                                        01510400
+ EXEC SQL                                                               01510500
+            INCLUDE SQLCA;                                              01510600
+
+ %PAGE;
+
+      ON ENDFILE(INFILE1)
+           BEGIN ;
+            FILE1_FLAG = 1;
+            FILE1_EOF  = 1;
+           END;
+      ON ENDFILE(INFILE2)
+           BEGIN ;
+            FILE2_FLAG = 1;
+            FILE2_EOF  = 1;
+           END;
+      ON ENDFILE(INFILE3)
+           BEGIN ;
+            FILE3_FLAG = 1;
+            FILE3_EOF  = 1;
+           END;
+
+      ON ENDFILE(INFILE4)
+           BEGIN ;
+            FILE4_FLAG = 1;
+            FILE4_EOF  = 1;
+           END;
+
+    /*----------------------------------------------------------*/
+    /*                    MAIN  PROGRAM                         */
+    /*----------------------------------------------------------*/
+    CALL ARXIKES_ENERGEIES ;
+
+
+ NXTKAT:                         /* дIABAсMA EпOMENOY SEGMENT */
+         EXEC DLI
+              GN      USING PCB(2)
+              INTO    (WRKAREA);
+
+         IF DIBSTAT='GB'    THEN GOTO EXIT1;
+
+         IF DIBSTAT^=' ' & DIBSTAT^='GA' & DIBSTAT^='GK' THEN DO;
+                 GRAMH = ' ERROR READ D/B KAT ' !! KSRARLOG !! ' '
+                                                !! DIBSTAT ;
+                 WRITE FILE (PRT) FROM (LINE);
+                 REC_ERROR = REC_ERROR + 1;
+
+                 GOTO NXTKAT;
+         END;
+
+         REC_TOT=REC_TOT+1;
+         IF  DIBSEGM='KROOTSEG'     THEN DO;
+             REC_ROOT=REC_ROOT+1;
+             IF  (KSRARLOG=999999999 ) !     /* CONTROL RECORD  */
+                 ( BIT_LOG ='00000000'B )    /* SAFETIES  */
+                 THEN DO;
+                      REC_CONTROL=REC_CONTROL+1;
+              END;
+              ELSE DO;
+                      TOT_NORMAL_REC =  TOT_NORMAL_REC +1;
+                      PIC_IMS_POSO=
+                                  PIC_IMS_POSO +(KSRDYPOL + KSREKKRE);
+                      CALL NORMAL_ACC;
+              END;
+         END;
+
+         GOTO NXTKAT;
+
+ /**************************************************************
+ *   ARXIKES_ENERGEIES              START                      *
+ **************************************************************/
+  ARXIKES_ENERGEIES        :PROC ;
+
+     /*IMS POSITIONING                           */
+     /*ейтупысг аявийгс цяаллгс пяоцяаллатос     */
+     KFIOROOT = ADDR(WRKAREA);
+     KFIOSADD = ADDR(WRKAREA);
+     TODAY = DAYA6S8(DATE);
+     CTLCHR = ' ';
+     REC_COUNTERS = '';
+     MHDEN     = (32)'0'B ;
+     REC_CNT   = REC_CNT + 1;
+     OPEN  FILE(PRT);
+     GRAMH = '1  SEQUENTIAL  SEARCH  DB йатахесеым  '!!TODAY!!
+             (30)' '!!'DK553';
+     WRITE FILE (PRT)       FROM(LINE);
+     GRAMH=' '!!(100)'-';
+     WRITE FILE (PRT)       FROM(LINE);
+     CTLCHR=' ';
+      MY_DATETIME = DATETIME();
+
+     /*упокоцислос глеяым пяогцоулемоу лгма      */
+     TODAYX            = '20'!!
+                          SUBSTR(DATE,1,2) !! /*ETOS */
+                          SUBSTR(DATE,3,2) !! /*MHNAS*/
+                          SUBSTR(DATE,5,2) ;/*HMERA*/
+
+
+   CTLCHR = '1';
+   GRAMH = '* глеяолгмиа апо JCL ( DATE )    '!!DATE;
+   WRITE FILE (PRT) FROM (LINE);
+   CTLCHR = ' ';
+   GRAMH = '* TODAYX                         '!!TODAYX;
+   WRITE FILE (PRT) FROM (LINE);
+   GRAMH = '* DATETIME                       '!!MY_DATETIME;
+   WRITE FILE (PRT) FROM (LINE);
+     /*
+     PUT SKIP LIST('DATE = ' ,DATE);
+     PUT SKIP LIST('TODAYX = '!! TODAYX);
+     PUT SKIP LIST('DATETIME = '!! MY_DATETIME);
+     */
+     CALL CALC_DATES_MONTH ;/*глеяес пяогцоулемоу лгмос*/
+     CALL CALC_DATES_YEAR  ;/*глеяес апо 01-01 еыс то текос пя.лгма*/
+     /*бяес тHм пеяиодо амажояас лгма етос       */
+     CALL GET_PERIOD_REFER ;
+
+     /*диабасе то пя©то RECORD апо ╪ка та аявеиа */
+     /*циа ма цимеи екецвос оти евоуле та сыста аявеиа  */
+
+     READ FILE(INFILE1)       INTO(IN_REC1);
+     READ FILE(INFILE2)       INTO(IN_REC2);
+     READ FILE(INFILE3)       INTO(IN_REC3);
+     READ FILE(INFILE4)       INTO(IN_REC4);
+     /*****    екецвос глеяолгмиас аявеиым     **********/
+     /* та аявеиа,ажояоум том пяогцоулемо лгма ;        */
+     /***************************************************/
+     MY_DATE = IN_REC1.TKRDATE ;
+     IF( WS_MNTH ^= MY_MONTH) & ( FILE1_FLAG = 0  ) THEN DO;
+       WS_MSG = 'кахос: асулжымиа сто DK.P.XS.TRLOIPSN '!!
+                ' лгмас  аявеиоу '!!MY_MONTH!!
+                ' лгмас яогс '!!WS_MNTH;
+       /*CALL ERROR(WS_MSG); кахос пяыто аявеио */
+       ERLIN2=WS_MSG;
+       WRITE FILE(PRT) FROM(ERLINE);
+     END;
+
+     MY_DATE = IN_REC2.TKRDATE ;
+     IF( WS_MNTH ^= MY_MONTH) & ( FILE2_FLAG = 0  ) THEN DO;
+       WS_MSG = 'кахос асулжымиа сто DK.P.XS.TRLOIPFN '!!
+                ' лгмас  аявеиоу '!!MY_MONTH!!
+                ' лгмас  яогс '!!WS_MNTH;
+       /*CALL ERROR(WS_MSG); кахос DEYTE.аявеио */
+       ERLIN2=WS_MSG;
+       WRITE FILE(PRT) FROM(ERLINE);
+     END;
+
+     MY_DATE = IN_REC3.TKRDATE ;
+     IF( WS_MNTH ^= MY_MONTH) & ( FILE3_FLAG = 0  ) THEN DO;
+            WS_MSG = 'кахос асулжымиа сто DK.P.XS.DKTKRKC.EUR '!!
+                   ' лгмас  аявеиоу '!!MY_MONTH!!
+                   ' лгмас  яогс '!!WS_MNTH;
+       /*CALL ERROR(WS_MSG); *кахос тяито аявеио */
+       ERLIN2=WS_MSG;
+       WRITE FILE(PRT) FROM(ERLINE);
+     END;
+
+     MY_DATE = IN_REC4.TKRDATE ;
+     IF( WS_MNTH ^= MY_MONTH) & ( FILE4_FLAG = 0  ) THEN DO;
+            WS_MSG = 'кахос :асулжымиа сто  DK.P.XS.TKRKAM.EUR '!!
+                   ' лгмас  аявеиоу '!!MY_MONTH!!
+                   ' глгмас яогс '!!WS_MNTH;
+       ERLIN2=WS_MSG;
+       WRITE FILE(PRT) FROM(ERLINE);
+       /*CALL ERROR(WS_MSG); кахос тетаято аявеио */
+     END;
+
+  END  ARXIKES_ENERGEIES;
+  /**************************************************************
+  *   ARXIKES_ENERGEIES              END                        *
+  **************************************************************/
+  /**************************************************************
+  *  NORMAL_ACC               START                             *
+  **************************************************************/
+     NORMAL_ACC             : PROC;
+
+         IF FILE1_EOF  = 0 THEN
+              CALL CHECK_FILE1;
+         IF FILE2_EOF  = 0 THEN
+              CALL CHECK_FILE2;
+         IF FILE3_EOF  = 0 THEN
+              CALL CHECK_FILE3;
+         IF FILE4_EOF  = 0 THEN
+              CALL CHECK_FILE4;
+
+         IF FILE1_FLAG = 0 THEN
+                CALL AV_BALANCE_SUM      ;
+         IF FILE2_FLAG = 0 THEN
+                CALL FILL_AV_BALANCE ;
+         IF FILE3_FLAG = 0 THEN
+                CALL FILL_WORK_INT_6M ;
+         IF FILE4_FLAG = 0 THEN
+                CALL FILL_WORK_INT_1M ;
+
+   /***********************************************************/
+   /* еэМ О КОЦАЯИАСЛЭР ЕъМАИ ЙКЕИСЛщМОР                      */
+   /* ЙАИ эМ ГЛЕЯОЛГМъА ЙКЕИСъЛАТОР ЕъМАИ СТОМ ЛчМА АМАЖОЯэР  */
+   /* бЯъСЙОУЛЕ ТОУР ONLINE ТЭЙОУР (вЯЕЫСТИЙОЩР - пИСТЫТИЙОЩР)*/
+   /***********************************************************/
+         CALL GET_ONLINE_INTEREST ;
+
+         /*пяепеи йати ма е╨маи сысто ,пяим то ця╒ьоуле стг басг*
+         IF FILE2_FLAG = 0 ! FILE3_FLAG = 0 !
+            FILE1_FLAG = 0 ! FILE4_FLAG = 0   THEN DO; */
+              CALL INSERT_ROW   ;
+              SUBSTR(WRKAREA,401,17) = MY_DATETIME;
+              WRITE FILE (OUTFILE)   FROM(WRKAREA);
+       /* END;
+         ELSE DO;
+
+         CALL ERROR('дем бяехгйам оуте тойаяихлои,оуте сумока
+                       ая.коцаяиаслоу : '!!KSRARLOG );
+         END; */
+
+
+         IF FILE1_FLAG = 0 THEN DO;
+                F1_RECS = F1_RECS + 1;
+                READ FILE(INFILE1)       INTO(IN_REC1);
+         END;
+         IF FILE2_FLAG = 0 THEN DO;
+                F2_RECS = F2_RECS + 1;
+                READ FILE(INFILE2)       INTO(IN_REC2);
+         END;
+         IF FILE3_FLAG = 0 THEN DO ;
+                F3_RECS = F3_RECS + 1;
+                READ FILE(INFILE3)       INTO(IN_REC3);
+         END;
+         IF FILE4_FLAG = 0 THEN DO ;
+                F4_RECS = F4_RECS + 1;
+                READ FILE(INFILE4)       INTO(IN_REC4);
+         END;
+         /*
+         IF FILE1_EOF  = 1 &
+            FILE2_EOF  = 1 &
+            FILE3_EOF  = 1 &
+            FILE4_EOF  = 1 THEN do ;GO TO EXIT1; end; */
+     END NORMAL_ACC           ;
+  /**************************************************************
+  *  NORMAL_ACC               END                               *
+  **************************************************************/
+  /**************************************************************
+  *  CHECK_FILE1              START                             *
+  **************************************************************/
+     CHECK_FILE1            : PROC;
+        /*екецвос пяытоу   аявеиоу аявг*/
+        IF KSROOTDS.KSRARLOG = IN_REC1.TKRARLOG  THEN DO;
+            FILE1_FLAG = 0 ;
+        END;
+        ELSE DO;/*RECORD NOT FOUND BUT DONT WORRY*/
+            IF KSROOTDS.KSRARLOG < IN_REC1.TKRARLOG  THEN DO;
+                FILE1_FLAG = 1 ;
+            END;
+            ELSE DO;/*KSROOTDS.KSRARLOG > IN_REC1.TKRARLOG   */
+                    /*RECORD NOT FOUND,BUT IT SHOULD :ERROR  */
+                    /*FILE MUST BE UNSORTED OR йати веияотеяо*/
+           PUT SKIP LIST('KSRARLOG > IN_REC1.TKRARLOG');
+           PUT SKIP LIST('KSRARLOG  ',KSRARLOG        );
+           PUT SKIP LIST('IN_REC1.TKRARLOG ',IN_REC1.TKRARLOG        );
+                  DO WHILE (
+                         (KSROOTDS.KSRARLOG > IN_REC1.TKRARLOG ) &
+                         (FILE1_EOF  = 0)
+                              ) ;
+                               F1_RECS = F1_RECS + 1;
+                               F1_REJECTED_RECS = F1_REJECTED_RECS + 1;
+                               READ FILE(INFILE1) INTO(IN_REC1);
+                  END; /*DO WHILE END*/
+                  IF KSROOTDS.KSRARLOG = IN_REC1.TKRARLOG THEN DO;
+                           FILE1_FLAG = 0 ;
+                  END;
+                  IF KSROOTDS.KSRARLOG < IN_REC1.TKRARLOG THEN DO;
+                         FILE1_FLAG = 1 ;
+                  END;
+                     /*тЕКОР аЯВЕъОУ ЙАИ
+                       KSROOTDS.KSRARLOG < IN_REC1.TKRARLOG         */
+                     /*
+                     IF (FILE1_EOF  = 1) THEN;
+                            CALL UNSORTED_FILE('DK.P.XS.TRLOIPSN'); */
+            END;
+        END;
+        /*екецвос пяытоу   аявеиоу TELOS*/
+
+     END CHECK_FILE1 ;
+  /**************************************************************
+  *  CHECK_FILE1              END                               *
+  **************************************************************/
+
+  /**************************************************************
+  *  CHECK_FILE2              START                             *
+  **************************************************************/
+     CHECK_FILE2            : PROC;
+        /*екецвос деутеяоу аявеиоу аявг*/
+        IF KSROOTDS.KSRARLOG = IN_REC2.TKRARLOG  THEN DO;
+            FILE2_FLAG = 0 ;
+        END;
+        ELSE DO;/*RECORD NOT FOUND BUT DONT WORRY*/
+            IF KSROOTDS.KSRARLOG < IN_REC2.TKRARLOG  THEN DO;
+                FILE2_FLAG = 1 ;
+            END;
+            ELSE DO;/*KSROOTDS.KSRARLOG > IN_REC2.TKRARLOG */
+                    /*RECORD NOT FOUND,BUT IT SHOULD :ERROR  */
+                    /*FILE MUST BE UNSORTED OR йати веияотеяо*/
+           PUT SKIP LIST('KSRARLOG > IN_REC2.TKRARLOG');
+           PUT SKIP LIST('KSRARLOG  ',KSRARLOG        );
+           PUT SKIP LIST('IN_REC2.TKRARLOG ',IN_REC2.TKRARLOG        );
+                     DO WHILE (
+                         (KSROOTDS.KSRARLOG > IN_REC2.TKRARLOG ) &
+                         (FILE2_EOF  = 0)
+                              ) ;
+                               F2_RECS = F2_RECS + 1;
+                               F2_REJECTED_RECS = F2_REJECTED_RECS + 1;
+                               READ FILE(INFILE2) INTO(IN_REC2);
+                     END; /*DO WHILE END*/
+                 IF KSROOTDS.KSRARLOG = IN_REC2.TKRARLOG  THEN DO ;
+                        FILE2_FLAG = 0 ;
+              END;
+                 IF KSROOTDS.KSRARLOG < IN_REC2.TKRARLOG THEN DO ;
+                         FILE2_FLAG = 1 ;
+              END;
+
+                     /*тЕКОР аЯВЕъОУ ЙАИ
+                       KSROOTDS.KSRARLOG < IN_REC2.TKRARLOG         */
+                 /*  IF (FILE2_EOF  = 1) THEN;
+                          CALL UNSORTED_FILE('DK.P.XS.TRLOIPFN');*/
+              END;
+          END;
+        /*екецвос деутеяоу аявеиоу TELOS*/
+
+     END CHECK_FILE2 ;
+  /**************************************************************
+  *  CHECK_FILE2              END                               *
+  **************************************************************/
+  /**************************************************************
+  *  CHECK_FILE3              START                             *
+  **************************************************************/
+     CHECK_FILE3            : PROC;
+        /*екецвос тяитоу   аявеиоу аявг*/
+        IF KSROOTDS.KSRARLOG = IN_REC3.TKRARLOG  THEN DO;
+            FILE3_FLAG = 0 ;
+        END;
+        ELSE DO;/*RECORD NOT FOUND BUT DONT WORRY*/
+            IF KSROOTDS.KSRARLOG < IN_REC3.TKRARLOG  THEN DO;
+                FILE3_FLAG = 1 ;
+            END;
+            ELSE DO;/*KSROOTDS.KSRARLOG > IN_REC3.TKRARLOG */
+                    /*RECORD NOT FOUND,BUT IT SHOULD :ERROR  */
+                    /*FILE MUST BE UNSORTED OR йати веияотеяо*/
+           PUT SKIP LIST('KSRARLOG > IN_REC3.TKRARLOG');
+           PUT SKIP LIST('KSRARLOG  ',KSRARLOG        );
+           PUT SKIP LIST('IN_REC3.TKRARLOG ',IN_REC3.TKRARLOG        );
+                     DO WHILE (
+                         (KSROOTDS.KSRARLOG > IN_REC3.TKRARLOG ) &
+                         (FILE3_EOF  = 0)
+                              ) ;
+                               F3_RECS = F3_RECS + 1;
+                               F3_REJECTED_RECS = F3_REJECTED_RECS + 1;
+                               READ FILE(INFILE3) INTO(IN_REC3);
+                     END; /*DO WHILE END*/
+                     IF KSROOTDS.KSRARLOG = IN_REC3.TKRARLOG  THEN ;
+                           FILE3_FLAG = 0 ;
+                     IF KSROOTDS.KSRARLOG < IN_REC3.TKRARLOG THEN ;
+                         FILE3_FLAG = 1 ;
+
+                     /*тЕКОР аЯВЕъОУ ЙАИ
+                       KSROOTDS.KSRARLOG < IN_REC3.TKRARLOG         */
+                   /*IF (FILE3_EOF  = 1) THEN;
+                          CALL UNSORTED_FILE('DK.P.XS.DKTKRKC.EUR');*/
+              END;
+          END;
+        /*екецвос TRITOY   аявеиоу TELOS*/
+
+     END CHECK_FILE3 ;
+  /**************************************************************
+  *  CHECK_FILE3              END                               *
+  **************************************************************/
+  /**************************************************************
+  *  CHECK_FILE4              START                             *
+  **************************************************************/
+     CHECK_FILE4            : PROC;
+        /*екецвос тЯъТОУ   аявеиоу аявг*/
+        IF KSROOTDS.KSRARLOG = IN_REC4.TKRARLOG  THEN DO;
+            FILE4_FLAG = 0 ;
+        END;
+        ELSE DO;/*RECORD NOT FOUND BUT DONT WORRY*/
+            IF KSROOTDS.KSRARLOG < IN_REC4.TKRARLOG  THEN DO;
+                FILE4_FLAG = 1 ;
+            END;
+            ELSE DO;/*KSROOTDS.KSRARLOG > IN_REC4.TKRARLOG */
+                    /*RECORD NOT FOUND,BUT IT SHOULD :ERROR  */
+                    /*FILE MUST BE UNSORTED OR йати веияотеяо*/
+           PUT SKIP LIST('KSRARLOG > IN_REC4.TKRARLOG');
+           PUT SKIP LIST('KSRARLOG  ',KSRARLOG        );
+           PUT SKIP LIST('IN_REC4.TKRARLOG ',IN_REC4.TKRARLOG        );
+                     DO WHILE (
+                         (KSROOTDS.KSRARLOG > IN_REC4.TKRARLOG ) &
+                         (FILE4_EOF  = 0)
+                              ) ;
+                               F4_RECS = F4_RECS + 1;
+                               F4_REJECTED_RECS = F4_REJECTED_RECS + 1;
+                               READ FILE(INFILE4) INTO(IN_REC4);
+                     END; /*DO WHILE END*/
+                IF KSROOTDS.KSRARLOG = IN_REC4.TKRARLOG  THEN DO;
+                           FILE4_FLAG = 0 ;
+                 END;
+                IF KSROOTDS.KSRARLOG < IN_REC4.TKRARLOG THEN DO;
+                         FILE4_FLAG = 1 ;
+                 END;
+
+                     /*тЕКОР аЯВЕъОУ ЙАИ
+                       KSROOTDS.KSRARLOG < IN_REC4.TKRARLOG         */
+                 /*  IF (FILE4_EOF  = 1) THEN;
+                    CALL UNSORTED_FILE('DK.P.XS.TKRKAM.EUR');*/
+              END;
+          END;
+        /*екецвос тETARTOY аявеиоу TELOS*/
+
+     END CHECK_FILE4 ;
+  /**************************************************************
+  *  CHECK_FILE4              END                               *
+  **************************************************************/
+  /**************************************************************
+  *  FILL_WORK_INT_6M         START                             *
+  **************************************************************/
+     FILL_WORK_INT_6M       : PROC;
+
+        DCL MY_X    FIXED(15,2) INIT (0);
+        DCL MY_P    FIXED(15,2) INIT (0);
+
+            TOT_XRE_DKATALOG  = 0;
+            TOT_PIST_CKATALOG = 0;
+
+      /*вяеыстийои пистытийои йАТАКОЦИСХщМТЕР тойои еНАЛчМОУ */
+            TOT_PIST_CKATALOG =       IN_REC3.TKRKATP ;
+            TOT_XRE_DKATALOG  =       IN_REC3.TKRKATX ;
+
+            SUM_XRE_DKATALOG  = SUM_XRE_DKATALOG  +TOT_XRE_DKATALOG ;
+            SUM_PIST_CKATALOG = SUM_PIST_CKATALOG +TOT_PIST_CKATALOG;
+
+     END FILL_WORK_INT_6M       ;
+  /**************************************************************
+  *   FILL_WORK_INT_6M                                         *
+  **************************************************************/
+  /**************************************************************
+  *  FILL_WORK_INT_1M         START                             *
+  **************************************************************/
+     FILL_WORK_INT_1M       : PROC;
+        DCL PISTOSH FIXED(15) INIT (0);
+        DCL XREOSH  FIXED(15) INIT (0);
+
+        DCL AB      FIXED(15,2) INIT (0);
+        DCL CD      FIXED(15,2) INIT (0);
+
+       /*вяеыстийои пистытийои йАТАКОЦИСХщМТЕР тойои лгма  */
+
+            PISTOSH =      IN_REC4.TKRPTOK1  +
+                           IN_REC4.TKRPTOK2  +
+                           IN_REC4.TKRPTOK3  ;
+
+            XREOSH  =      IN_REC4.TKRXTOK1  +
+                           IN_REC4.TKRXTOK2  ;
+
+            /*вяеыстийои пистытийои йАТАКОЦИСХщМТЕР тойои лгма  */
+            AB  = DIVIDE(XREOSH, 100      ,15,3);
+            CD  = DIVIDE(PISTOSH,100      ,15,3);
+
+            TOT_XRE_DMINTRST  = 0;
+            TOT_PIST_CMINTRST = 0;
+
+            TOT_XRE_DMINTRST  = ROUND(AB ,2);
+            TOT_PIST_CMINTRST = ROUND(CD ,2);
+
+            SUM_XRE_DMINTRST  =SUM_XRE_DMINTRST    +TOT_XRE_DMINTRST;
+            SUM_PIST_CMINTRST =SUM_PIST_CMINTRST   +TOT_PIST_CMINTRST;
+
+     END FILL_WORK_INT_1M       ;
+  /**************************************************************
+  *   FILL_WORK_INT_1M                                         *
+  **************************************************************/
+  /**************************************************************
+  *  GET_ONLINE_INTEREST      START                             *
+  ***************************************************************
+  *   еэМ О КОЦАЯИАСЛЭР ЕъМАИ ЙКЕИСЛщМОР                        *
+  *   ЙАИ эМ ГЛЕЯОЛГМъА ЙКЕИСъЛАТОР ЕъМАИ СТОМ ЛчМА АМАЖОЯэР    *
+  *   бЯъСЙОУЛЕ ТОУР ONLINE ТЭЙОУР (вЯЕЫСТИЙОЩР - пИСТЫТИЙОЩР)  *
+  **************************************************************/
+     GET_ONLINE_INTEREST    : PROC;
+
+     DCL MY_KSRHMTS      PIC'(6)9' ;
+     DCL MY_CLOSING_DATE PIC'(8)9' ;
+     DCL 1   MY_CLOSING_DATEX     BASED(ADDR(MY_CLOSING_DATE)),
+           2  MYHH            CHAR(2)   ,
+           2  MYMM            PIC'99'   ,
+           2  MYXX            CHAR(4)   ;
+
+   /* вяеыстийои тойои лгма ONLINE йкеисилатым */
+         WS_DCINTRST  = 0;
+   /* пистытийои тойои лгма ONLINE йкеисилатым */
+         WS_CCINTRST  = 0;
+
+         IF KSRAKYR = '1'  THEN  DO; /*еъМАИ аЙУЯЫЛщОР ;*/
+           MY_KSRHMTS   = KSRHMTS ;
+           MY_CLOSING_DATE =    DAYA6S8 (MY_KSRHMTS);
+
+           IF MYMM  = WS_MNTH &   /*г ГЛЕЯОЛГМъА ЙКЕИСъЛАТОР ЕИМАИ*/
+              MYXX  = WS_YEAR THEN DO;/*СТЭМ ПЯОГЦОЩЛЕМО ЛчМА */
+   /* вяеыстийои тойои лгма ONLINE йкеисилатым
+         PUT SKIP LIST (' INSIDE INTEREST  Aйуяылемг TH SOSTH PERIODO');
+         PUT SKIP LIST (' MY_KSRHMTS : ',MY_KSRHMTS      );
+         PUT SKIP LIST (' MY_CLOSING_DATE : ',MY_CLOSING_DATE);
+         PUT SKIP LIST (' MYMM            : ',MYMM           );
+         PUT SKIP LIST (' MYXX            : ',MYXX           );
+         PUT SKIP LIST (' WS_MNTH         : ',WS_MNTH        );
+         PUT SKIP LIST (' WS_YEAR         : ',WS_YEAR        ); */
+               WS_DCINTRST  = 0;
+               BKANTI.KEY_COD_ARLOG  = KSRARLOG;
+               BKANTI.KEY_DAT_HMNIA  = SUBSTR(MY_KSRHMTS,5,2) !!'.'!!
+                                       SUBSTR(MY_KSRHMTS,3,2) !!
+                                       '.20'!!
+                                       SUBSTR(MY_KSRHMTS,1,2) ;
+
+                   /*
+
+         PUT SKIP LIST ('BKANTI.KEY_COD_ARLOG ', BKANTI.KEY_COD_ARLOG);
+         PUT SKIP LIST ('BKANTI.KEY_DAT_HMNIA ', BKANTI.KEY_DAT_HMNIA);
+                                        */
+
+               EXEC SQL
+                SELECT NUM_XREWSH
+                INTO  :BKANTI.NUM_XREWSH
+                FROM  CTBKANTI
+                WHERE
+                KEY_COD_ARLOG  =: BKANTI.KEY_COD_ARLOG AND
+                KEY_DAT_HMNIA  =: BKANTI.KEY_DAT_HMNIA AND
+                KEY_NUM_SEIRA =  2 AND
+                CHR_TRANID = 'ййк1' AND
+                KEY_TIMESTAMP  =
+                ( SELECT
+                  MAX(KEY_TIMESTAMP)
+                  FROM  CTBKANTI
+                  WHERE
+                  KEY_COD_ARLOG  =: BKANTI.KEY_COD_ARLOG AND
+                  KEY_DAT_HMNIA  =: BKANTI.KEY_DAT_HMNIA AND
+                  KEY_NUM_SEIRA  =  2                      AND
+                  CHR_TRANID = 'ййк1' );
+
+                 IF SQLCODE = 0 THEN DO;
+                 /* PUT SKIP LIST('еПИТУВъА: XЯЕЫСТИЙОъ ONLINE тЭЙОИ :'
+                                     !!char(key_cod_arlog));
+                     CTISDK01.NUM_DCINTRST = BKANTI.NUM_XREWSH; */
+                     WS_DCINTRST           = BKANTI.NUM_XREWSH;
+                     SUM_DCINTRST = SUM_DCINTRST + WS_DCINTRST;
+                 END;
+
+
+
+   /* пИСТЫТИЙОъ тойои лгма ONLINE йкеисилатым */
+               WS_CCINTRST  = 0;
+
+               EXEC SQL
+                SELECT NUM_PISTWSH
+                INTO  :BKANTI.NUM_PISTWSH
+                FROM  CTBKANTI
+                WHERE
+                KEY_COD_ARLOG  =: BKANTI.KEY_COD_ARLOG AND
+                KEY_DAT_HMNIA  =: BKANTI.KEY_DAT_HMNIA AND
+                KEY_NUM_SEIRA =  1 AND
+                CHR_TRANID = 'ййк1' AND
+                KEY_TIMESTAMP  =
+                ( SELECT
+                  MAX(KEY_TIMESTAMP)
+                  FROM  CTBKANTI
+                  WHERE
+                  KEY_COD_ARLOG  =: BKANTI.KEY_COD_ARLOG AND
+                  KEY_DAT_HMNIA  =: BKANTI.KEY_DAT_HMNIA AND
+                  KEY_NUM_SEIRA  =  1                      AND
+                  CHR_TRANID = 'ййк1' );
+
+                 IF SQLCODE = 0 THEN DO;
+                  /*PUT SKIP LIST('еПИТУВъА: пИСТЫТИЙОъ Online тЭЙОИ :'
+                                     !!char(key_cod_arlog)); */
+                    WS_CCINTRST = BKANTI.NUM_PISTWSH;
+                    SUM_CCINTRST = SUM_CCINTRST + WS_CCINTRST;
+
+                 END;
+
+           END;/*END OF MYMM  = WS_MNTH... */
+
+         END;/*END OF KSRAKYR = '1' */
+
+      END GET_ONLINE_INTEREST  ;
+  /**************************************************************
+  *   GET_ONLINE_INTEREST                                      *
+  **************************************************************/
+
+  /**************************************************************
+  *  INSERT_ROW               START                             *
+  **************************************************************/
+     INSERT_ROW             : PROC;
+
+       CTISDK01 = '';
+
+       DB2_RECS = DB2_RECS   + 1 ;
+
+       /* аяихлос коцаяиаслоу                    */
+       CTISDK01.KEY_ACCN1    =  KSRARLOG     ;
+       /* етос амажояас                          */
+       CTISDK01.KEY_YEAR     =  WS_YEAR      ;
+       /* лгмас амажояас (пяогцоулемос лгмас апо лгма яогс) */
+       CTISDK01.KEY_MONTH    =  WS_MNTH      ;
+
+       /* аПЭ ТО АЯВЕъО TRLOIPSN FILE1*/
+       /* лесо бакеяиайо вяеыстийо упокоипо лгма  (сыяеутийо)*/
+       CTISDK01.NUM_VDSAVGBL = TOT_XRE_VDSAVGBL;
+       /* лесо бакеяиайо пистытийо упокоипо лгма  (сыяеутийо)*/
+       CTISDK01.NUM_VCSAVGBL = TOT_PIST_VCSAVGBL ;
+
+       /* аПЭ ТО АЯВЕъО TRLOIPFN FILE2*/
+       /* лесо бакеяиайо вяеыстийо упокоипо лгма */
+       CTISDK01.NUM_VDAVGBL  = TOT_XRE_VDAVGBL ;
+       /* лесо бакеяиайо пистытийо упокоипо лгма */
+       CTISDK01.NUM_VCAVGBL  = TOT_PIST_VCAVGBL ;
+
+       /* аПЭ ТО АЯВЕъО TKRKAM   FILE4*/
+       /* вяеыстийои тойои лгма  йАТАКОЦИСХЕМТЕР */
+       CTISDK01.NUM_DMINTRST = TOT_XRE_DMINTRST;
+       /* пистытийои тойои лгма  йАТАКОЦИСХщМТЕР */
+       CTISDK01.NUM_CMINTRST = TOT_PIST_CMINTRST;
+
+       /* аПЭ ТО АЯВЕъО DKTKRKC   FILE3*/
+       /* вяеыстийои тойои лгма  йАТАКОЦИСХЕМТЕР еНАЛчМОУ*/
+       CTISDK01.NUM_DKATALOG = TOT_XRE_DKATALOG;
+       /* пистытийои тойои лгма  йАТАКОЦИСХщМТЕР еНАЛчМОУ*/
+       CTISDK01.NUM_CKATALOG = TOT_PIST_CKATALOG;
+
+       /* аПЭ db2 TABLE                   */
+       /* вяеыстийои тойои лгма ONLINE йкеисилатым */
+         CTISDK01.NUM_DCINTRST  = WS_DCINTRST ;
+       /* пистытийои тойои лгма ONLINE йкеисилатым */
+          CTISDK01.NUM_CCINTRST = WS_CCINTRST ;
+ /*тупысе ломо осоус коцаяиаслоус кгцоум се 123 циа екецво*/
+ /*************************************
+ IF SUBSTR( CHAR( CTISDK01.KEY_ACCN1) ,10 ,3) = '123' THEN DO;
+ GRAMH = '****************************************************** ';
+       WRITE FILE (PRT) FROM (LINE);
+ GRAMH = 'A.A. Eццяажгс :     ' !! CHAR( DB2_RECS          )     ;
+       WRITE FILE (PRT) FROM (LINE);
+ GRAMH = 'аяихлос коцаяиаслоу  ' !! CHAR( CTISDK01.KEY_ACCN1)     ;
+       WRITE FILE (PRT) FROM (LINE);
+ GRAMH = 'етос амажояас        ' !! CHAR(CTISDK01.KEY_YEAR  )    ;
+       WRITE FILE (PRT) FROM (LINE);
+ GRAMH = 'лгмас амажояас       ' !! CHAR(CTISDK01.KEY_MONTH )    ;
+       WRITE FILE (PRT) FROM (LINE);
+ GRAMH = 'лесо бак.вя лгма сыя ' !! CHAR(CTISDK01.NUM_VDSAVGBL)  ;
+       WRITE FILE (PRT) FROM (LINE);
+ GRAMH = 'лесо бак пс лгма Sыя ' !! CHAR(CTISDK01.NUM_VCSAVGBL)  ;
+       WRITE FILE (PRT) FROM (LINE);
+ GRAMH = 'лесо бак.вя лгма     ' !!CHAR( CTISDK01.NUM_VDAVGBL)  ;
+       WRITE FILE (PRT) FROM (LINE);
+ GRAMH = 'лесо бак пс лгма     ' !!CHAR(CTISDK01.NUM_VCAVGBL)  ;
+       WRITE FILE (PRT) FROM (LINE);
+ GRAMH = 'вя.той.лгма.йАТ.     ' !!CHAR(CTISDK01.NUM_DMINTRST)  ;
+       WRITE FILE (PRT) FROM (LINE);
+ GRAMH = 'п .той.лгма.йАТ.     ' !!CHAR(CTISDK01.NUM_CMINTRST)  ;
+       WRITE FILE (PRT) FROM (LINE);
+ GRAMH = 'вя.той.еналгмо.йАТ.  ' !!CHAR(CTISDK01.NUM_DKATALOG)  ;
+       WRITE FILE (PRT) FROM (LINE);
+ GRAMH = 'п .той.еналгмо.йАТ.  ' !!CHAR(CTISDK01.NUM_CKATALOG)  ;
+       WRITE FILE (PRT) FROM (LINE);
+ GRAMH = 'вя.ONLINE            ' !!CHAR(CTISDK01.NUM_DCINTRST)  ;
+       WRITE FILE (PRT) FROM (LINE);
+ GRAMH = 'п .ONLINE            ' !!CHAR(CTISDK01.NUM_CCINTRST)  ;
+       WRITE FILE (PRT) FROM (LINE);
+ END;
+  */
+    EXEC SQL INSERT INTO CTISDK01
+             (
+                KEY_ACCN1  ,
+                KEY_YEAR   ,
+                KEY_MONTH  ,
+                NUM_VDSAVGBL ,
+                NUM_VCSAVGBL ,
+                NUM_VDAVGBL,
+                NUM_VCAVGBL,
+                NUM_DMINTRST ,
+                NUM_CMINTRST ,
+                NUM_DCINTRST ,
+                NUM_CCINTRST ,
+                NUM_DKATALOG ,
+                NUM_CKATALOG
+             )
+          VALUES
+             (
+                :CTISDK01.KEY_ACCN1  ,
+                :CTISDK01.KEY_YEAR   ,
+                :CTISDK01.KEY_MONTH  ,
+                :CTISDK01.NUM_VDSAVGBL,
+                :CTISDK01.NUM_VCSAVGBL,
+                :CTISDK01.NUM_VDAVGBL,
+                :CTISDK01.NUM_VCAVGBL,
+                :CTISDK01.NUM_DMINTRST ,
+                :CTISDK01.NUM_CMINTRST ,
+                :CTISDK01.NUM_DCINTRST ,
+                :CTISDK01.NUM_CCINTRST ,
+                :CTISDK01.NUM_DKATALOG ,
+                :CTISDK01.NUM_CKATALOG
+             );
+
+        IF SQLCODE ^= 0 THEN DO;
+            DB2_RECS = DB2_RECS   - 1 ;
+        END;
+
+        TOT_XRE_VDSAVGBL  = 0;
+        TOT_PIST_VCSAVGBL = 0;
+        TOT_XRE_VDAVGBL   = 0;
+        TOT_PIST_VCAVGBL  = 0;
+        TOT_XRE_DMINTRST  = 0;
+        TOT_PIST_CMINTRST = 0;
+        TOT_XRE_DKATALOG  = 0;
+        TOT_PIST_CKATALOG = 0;
+        WS_DCINTRST       = 0;
+        WS_CCINTRST       = 0;
+
+     END INSERT_ROW;
+  /**************************************************************
+  *  INSERT_ROW               END                               *
+  **************************************************************/
+
+  /**************************************************************
+  *  UNSORTED_FILE            START                             *
+  **************************************************************/
+     UNSORTED_FILE : PROC (FNAME);
+
+     DCL FNAME    CHAR  (44)  ;
+         WS_MSG = FNAME;
+         CALL ERROR(WS_MSG);
+     END UNSORTED_FILE ;
+  /**************************************************************
+  *  UNSORTED_FILE            END                               *
+  **************************************************************/
+ /**************************************************************
+ *   GET_PERIOD_REFER               START                      *
+ **************************************************************/
+  GET_PERIOD_REFER :PROC ;
+
+     WS_YEAR  = 0 ;
+     WS_MNTH = 0 ;
+     /* о пЯОГЦОЩЛЕМОР лчМАР АПО ТГМ ГЛЕЯОЛГМъА ЯОчР*/
+     IF ( PICMM = 1 ) THEN DO;
+       WS_YEAR  = PICYY - 1;
+       WS_MNTH = 12 ;
+     END;
+     ELSE DO;
+       WS_YEAR  = PICYY ;
+       WS_MNTH = PICMM - 1;
+     END;
+     PUT SKIP LIST('цИА гЛЕЯОЛГМъА яОчР : ',TODAYX);
+     PUT SKIP LIST('гЛЕЯОЛГМъА AМАЖОЯэР еТОР: ',char(ws_year),
+                   ' лчМАР ',char(ws_mnth));
+    WS_LIT_MNTH ='';
+    SELECT(WS_MNTH);
+    WHEN (1)  WS_LIT_MNTH  = ' IANOYAяиос  ';
+    WHEN (2  ) WS_LIT_MNTH = ' жебяоуаяиос ';
+    WHEN (3  ) WS_LIT_MNTH = ' лаятгс      ';
+    WHEN (4  ) WS_LIT_MNTH = ' апяикгс     ';
+    WHEN (5  ) WS_LIT_MNTH = ' лагс        ';
+    WHEN (6  ) WS_LIT_MNTH = ' иоумгс      ';
+    WHEN (7  ) WS_LIT_MNTH = ' иоукгс      ';
+    WHEN (8  ) WS_LIT_MNTH = ' ауцоустос   ';
+    WHEN (9  ) WS_LIT_MNTH = ' септелбягс  ';
+    WHEN (10 ) WS_LIT_MNTH = ' ойтыбягс    ';
+    WHEN (11 ) WS_LIT_MNTH = ' моелбягс    ';
+    WHEN (12 ) WS_LIT_MNTH = ' дейелбягс   ';
+    OTHER      WS_LIT_MNTH = ' кахос лгмас ';
+    END;
+   END  GET_PERIOD_REFER ;
+  /**************************************************************
+  *   GET_PERIOD_REFER               END                        *
+  **************************************************************/
+ /**************************************************************
+ *  ERROR                           START                      *
+ **************************************************************/
+ ERROR        :PROC (MSG     ) ;
+    DCL MSG      CHAR  (132)  ;
+
+    DCL WS_BOOM   FIXED(1) INIT(1);
+    DCL WS_ZERO   FIXED(1) INIT(0);
+
+
+       ERLIN1='1';
+       ERLIN2='***************************************************';
+       WRITE FILE(PRT) FROM(ERLINE);
+       ERLIN1='0';
+
+       ERLIN2=' * DK553  глеяа яогс         = '!!DATE ();
+       WRITE FILE(PRT) FROM(ERLINE);
+
+       ERLIN2='пяобкгла сто пяоцяалла DK553 то пяоцяалла ха сйасеи';
+       WRITE FILE(PRT) FROM(ERLINE);
+
+       ERLIN2=MSG;
+       WRITE FILE(PRT) FROM(ERLINE);
+
+       ERLIN2='***************************************************';
+       WRITE FILE(PRT) FROM(ERLINE);
+
+       WS_BOOM = WS_BOOM /  WS_ZERO  ; /*JUST CRASH*/
+
+   END ERROR        ;
+  /**************************************************************
+  *  ERROR                           END                        *
+  **************************************************************/
+
+  /**************************************************************
+  *  CALC_DATES_MONTH       : PROC;                             *
+  *                                                             *
+  **************************************************************/
+     CALC_DATES_MONTH      : PROC;
+      DCL 1 WW_DATE_APO,
+           2   WS_DD_APO PIC '(2)9',
+           2   F1                  CHAR(1)              INIT('.'),
+           2   WS_MM_APO PIC '(2)9',
+           2   F2                  CHAR(1)              INIT('.'),
+           2   WS_YY_APO PIC '(4)9';
+      DCL WS_DATE_APO CHAR(10) BASED(ADDR(WW_DATE_APO));
+      DCL 1 WW_DATE_EOS,
+           2   WS_DD_EOS PIC '(2)9' ,
+           2   F1                  CHAR(1)              INIT('.'),
+           2   WS_MM_EOS PIC '(2)9',
+           2   F2                  CHAR(1)              INIT('.'),
+           2   WS_YY_EOS PIC '(4)9';
+      DCL WS_DATE_EOS CHAR(10) BASED(ADDR(WW_DATE_EOS));
+
+           /*H пяытг йаи тым дуо лгмым*/
+           WS_DD_APO = 1;
+           WS_DD_EOS = 1;
+
+           IF PICMM = 1 THEN DO; /*EAN O Tяевым лгмас еимаи иамоуаяиос*/
+               WS_MM_APO = 12;
+               WS_YY_APO = PICYY - 1; /*пяогцоулемо етос*/
+               WS_MM_EOS = PICMM;
+               WS_YY_EOS = PICYY ;
+           END;
+           ELSE DO;
+               WS_MM_APO = PICMM - 1;
+               WS_YY_APO = PICYY    ;
+               WS_MM_EOS = PICMM ;
+               WS_YY_EOS = PICYY ;
+
+           END;
+
+               EXEC SQL
+                SELECT DAYS(:WS_DATE_EOS) - DAYS(:WS_DATE_APO)
+                       INTO :MY_HMPER
+                   FROM SYSIBM.SYSDUMMY1
+               ;
+
+   GRAMH = '* SYSYY                          '!!SYSYY      ;
+   WRITE FILE (PRT) FROM (LINE);
+   GRAMH = '* SYSDD                          '!!SYSDD      ;
+   WRITE FILE (PRT) FROM (LINE);
+   GRAMH = '* SYSMM                          '!!SYSMM      ;
+   WRITE FILE (PRT) FROM (LINE);
+   GRAMH = '* WS_DATE_EOS                    '!!WS_DATE_EOS;
+   WRITE FILE (PRT) FROM (LINE);
+   GRAMH = '* WS_DATE_APO                    '!!WS_DATE_APO;
+   WRITE FILE (PRT) FROM (LINE);
+   GRAMH = '* сумоко глеяым лгма амажояас    '!!MY_HMPER   ;
+   WRITE FILE (PRT) FROM (LINE);
+               /*
+               PUT SKIP LIST('DIAFORA HMERON ЛчМА = ', MY_HMPER);
+               PUT SKIP LIST('SYSYY          = ', SYSYY      );
+               PUT SKIP LIST('SYSDD          = ', SYSDD      );
+               PUT SKIP LIST('SYSMM          = ', SYSMM      );
+               PUT SKIP LIST('WS_DATE_EOS    = ', WS_DATE_EOS);
+               PUT SKIP LIST('WS_DATE_APO    = ', WS_DATE_APO);
+               PUT SKIP LIST('DIAFORA HMERON ЛчМА = ', MY_HMPER);
+               */
+     END  CALC_DATES_MONTH      ;
+  /**************************************************************
+  *  CALC_DATES_MONTH            END                            *
+  **************************************************************/
+  /**************************************************************
+  *  CALC_DATES_YEAR        : PROC;                             *
+  *                                                             *
+  **************************************************************/
+     CALC_DATES_YEAR       : PROC;
+      DCL 1 WW_DATE_APO,
+           2   WS_DD_APO PIC '(2)9',
+           2   F1                  CHAR(1)              INIT('.'),
+           2   WS_MM_APO PIC '(2)9',
+           2   F2                  CHAR(1)              INIT('.'),
+           2   WS_YY_APO PIC '(4)9';
+      DCL WS_DATE_APO CHAR(10) BASED(ADDR(WW_DATE_APO));
+      DCL 1 WW_DATE_EOS,
+           2   WS_DD_EOS PIC '(2)9' ,
+           2   F1                  CHAR(1)              INIT('.'),
+           2   WS_MM_EOS PIC '(2)9',
+           2   F2                  CHAR(1)              INIT('.'),
+           2   WS_YY_EOS PIC '(4)9';
+      DCL WS_DATE_EOS CHAR(10) BASED(ADDR(WW_DATE_EOS));
+
+           /*H пяытг йаи тым дуо лгмым*/
+           WS_DD_APO = 1;
+           WS_DD_EOS = 1;
+           IF PICMM = 1  THEN DO;
+             WS_MM_APO = 1;
+             WS_MM_EOS = 1     ;
+             WS_YY_APO = PICYY -1 ;
+             WS_YY_EOS = PICYY ;
+           END;
+           ELSE DO;
+             WS_MM_APO = 1;
+             WS_MM_EOS = PICMM ;
+             WS_YY_APO = PICYY    ;
+             WS_YY_EOS = PICYY ;
+           END;
+
+
+               EXEC SQL
+                SELECT DAYS(:WS_DATE_EOS) - DAYS(:WS_DATE_APO)
+                       INTO :MY_HMPER_SUM
+                   FROM SYSIBM.SYSDUMMY1
+               ;
+
+   GRAMH = '* SYSYY                          '!!SYSYY      ;
+   WRITE FILE (PRT) FROM (LINE);
+   GRAMH = '* SYSDD                          '!!SYSDD      ;
+   WRITE FILE (PRT) FROM (LINE);
+   GRAMH = '* SYSMM                          '!!SYSMM      ;
+   WRITE FILE (PRT) FROM (LINE);
+   GRAMH = '* WS_DATE_EOS                    '!!WS_DATE_EOS;
+   WRITE FILE (PRT) FROM (LINE);
+   GRAMH = '* WS_DATE_APO                    '!!WS_DATE_APO;
+   WRITE FILE (PRT) FROM (LINE);
+   GRAMH = '* сумоко глеяым апо аявг етоус   '!!MY_HMPER_SUM;
+   WRITE FILE (PRT) FROM (LINE);
+              /*
+               PUT SKIP LIST('SYSYY          = ', SYSYY      );
+               PUT SKIP LIST('SYSDD          = ', SYSDD      );
+               PUT SKIP LIST('SYSMM          = ', SYSMM      );
+               PUT SKIP LIST('WS_DATE_EOS    = ', WS_DATE_EOS);
+               PUT SKIP LIST('WS_DATE_APO    = ', WS_DATE_APO);
+               PUT SKIP LIST('сЩМОКО гЛЕЯЧМ АПО АЯВч щТОУР = ',
+               MY_HMPER_SUM);
+              */
+     END  CALC_DATES_YEAR       ;
+  /**************************************************************
+  *  CALC_DATES_YEAR             END                            *
+  **************************************************************/
+  /**************************************************************
+  *  FILL_AV_BALANCE          START                             *
+  *  еды упокоцифомтаи та :                                     *
+  *           лгмиаиа сумока лесым бакеяиайым упокоипым         *
+  **************************************************************/
+     FILL_AV_BALANCE        : PROC;
+
+
+        DCL PISTOSH FIXED(15) INIT (0);
+        DCL XREOSH  FIXED(15) INIT (0);
+
+        DCL AB      FIXED(15,2) INIT (0);
+        DCL CD      FIXED(15,2) INIT (0);
+
+        DCL INT_X   FIXED(15) INIT (0);
+        DCL INT_P   FIXED(15) INIT (0);
+
+        TOT_XRE_VDAVGBL  = 0;
+        TOT_PIST_VCAVGBL = 0;
+
+        SUM_P    = 0;
+        SUM_X    = 0;
+
+        PISTOSH =      IN_REC2.TKRPTKR1  +
+                       IN_REC2.TKRPTKR2  +
+                       IN_REC2.TKRPTKR3  +
+                       IN_REC2.TKRPTKR4  +
+                       IN_REC2.TKRPTKR5  +
+                       IN_REC2.TKRPTKR6  ;
+
+        XREOSH  =      IN_REC2.TKRXTKR1  +
+                       IN_REC2.TKRXTKR2  ;
+
+            /*лгмиаиа сумока лесым бакеяиайым упокоипым  */
+            AB  = DIVIDE(XREOSH, MY_HMPER ,15,3);
+            CD  = DIVIDE(PISTOSH,MY_HMPER ,15,3);
+
+            TOT_XRE_VDAVGBL  = ROUND(AB ,2);
+            TOT_PIST_VCAVGBL = ROUND(CD ,2);
+
+            SUM_XRE_VDAVGBL  = SUM_XRE_VDAVGBL +    TOT_XRE_VDAVGBL  ;
+            SUM_PIST_VCAVGBL = SUM_PIST_VCAVGBL+    TOT_PIST_VCAVGBL ;
+
+
+     END FILL_AV_BALANCE ;
+  /**************************************************************
+  *  FILL_AV_BALANCE          END                               *
+  *                                                             *
+  **************************************************************/
+
+  /**************************************************************
+  *  AV_BALANCE_SUM           START                             *
+  *  еды упокоцифомтаи та :                                     *
+  *  сыяеутийа сумока лесым бакеяиайым упокоипым                *
+  *                                                             *
+  **************************************************************/
+     AV_BALANCE_SUM         : PROC;
+
+        DCL PISTOSH FIXED(15) INIT (0);
+        DCL XREOSH  FIXED(15) INIT (0);
+
+        DCL AB      FIXED(15,2) INIT (0);
+        DCL CD      FIXED(15,2) INIT (0);
+
+        DCL INT_X   FIXED(15) INIT (0);
+        DCL INT_P   FIXED(15) INIT (0);
+
+ /*леса лгмиаиа бакеяиайа упокоип лгма вяеыстийа-пистытийа (сыяеутийа)*/
+        TOT_XRE_VDSAVGBL  = 0;
+        TOT_PIST_VCSAVGBL = 0;
+
+        SUM_P    = 0;
+        SUM_X    = 0;
+
+        PISTOSH =      IN_REC1.TKRPTKR1  +
+                       IN_REC1.TKRPTKR2  +
+                       IN_REC1.TKRPTKR3  +
+                       IN_REC1.TKRPTKR4  +
+                       IN_REC1.TKRPTKR5  +
+                       IN_REC1.TKRPTKR6  ;
+
+        XREOSH  =      IN_REC1.TKRXTKR1  +
+                       IN_REC1.TKRXTKR2  ;
+        /*лгмиаиа сумока лесым бакеяиайым упокоипым (сыяеутийа) */
+            AB  = DIVIDE(XREOSH, MY_HMPER_SUM ,15,3);
+            CD  = DIVIDE(PISTOSH,MY_HMPER_SUM ,15,3);
+
+            TOT_XRE_VDSAVGBL  = ROUND(AB ,2);
+            TOT_PIST_VCSAVGBL = ROUND(CD ,2);
+
+            SUM_XRE_VDSAVGBL  = SUM_XRE_VDSAVGBL  +  TOT_XRE_VDSAVGBL  ;
+            SUM_PIST_VCSAVGBL = SUM_PIST_VCSAVGBL +  TOT_PIST_VCSAVGBL ;
+
+
+     END AV_BALANCE_SUM      ;
+  /**************************************************************
+  *  AV_BALANCE_SUM           END                               *
+  *                                                             *
+  **************************************************************/
+
+
+ EXIT1:
+   CTLCHR = '1';
+   GRAMH =' *сумока пяоцяаллатос DK553 *';
+   WRITE FILE(PRT) FROM(LINE);
+   CTLCHR = ' ';
+
+   GRAMH =' *глеяа йаи ыяа яогс :  '!!MY_DATETIME;
+   WRITE FILE(PRT) FROM(LINE);
+
+   GRAMH =' *H яог ажояа то лгма :'!! WS_LIT_MNTH !!
+          ' TOY ETOYс : '!!CHAR(WS_YEAR);
+   WRITE FILE(PRT) FROM(LINE);
+
+   WREC = REC_TOT;
+   GRAMH = '**сумокийа диабасхгйам апо IMS   '!! WREC;
+   WRITE FILE (PRT) FROM (LINE);
+
+   WREC = REC_ROOT;
+   GRAMH = '**ROOT SEGMENTS            '!! WREC;
+   WRITE FILE (PRT) FROM (LINE);
+
+   WREC = REC_CONTROL;
+   GRAMH = '**ROOT CONTROL RECORD      '!! WREC;
+   WRITE FILE (PRT) FROM (LINE);
+
+   WREC = TOT_NORMAL_REC ;
+   GRAMH = ' сумоко RECORD лецакоу тал20 '!! WREC;
+   WRITE FILE (PRT) FROM (LINE);
+
+   GRAMH  = 'сумокийо посом йатахесеым стг басг    : '!!
+                PIC_IMS_POSO;
+   WRITE FILE(PRT) FROM(LINE);
+
+   WREC =  DB2_RECS ;
+   GRAMH = 'сумокIKA цяажтгйам стом DB2 пимайа  '!! WREC;
+   WRITE FILE (PRT) FROM (LINE);
+
+   WREC = TOT_NORMAL_REC ;
+   GRAMH = ' цяажтгйам сто лецако тал20 '!! WREC;
+   WRITE FILE (PRT) FROM (LINE);
+
+   WREC =  F1_RECS ;
+   GRAMH = 'сумоко диабасхемтым апо DK.P.XS.TRLOISFN    '!! WREC;
+   WRITE FILE (PRT) FROM (LINE);
+   WREC =  F1_REJECTED_RECS ;
+   GRAMH = 'дем упаявоум стгм илс акка сто DK.P.XS.TRLOIPFN '!! WREC;
+   WRITE FILE (PRT) FROM (LINE);
+
+   WREC =  F2_RECS ;
+   GRAMH = 'сумоко диабасхемтым апо DK.P.XS.TRLOIPSN    '!! WREC;
+   WRITE FILE (PRT) FROM (LINE);
+   WREC =  F2_REJECTED_RECS ;
+   GRAMH = 'дем упаявоум стгм илс акка сто DK.P.XS.TRLOIPFN '!! WREC;
+   WRITE FILE (PRT) FROM (LINE);
+
+   WREC =  F3_RECS ;
+   GRAMH = 'сумоко диабасхемтым апо DK.P.XS.DKTKRKC.EUR '!! WREC;
+   WRITE FILE (PRT) FROM (LINE);
+   WREC =  F3_REJECTED_RECS ;
+   GRAMH = 'дем упаяв.стгм илс акка сто DK.P.XS.DKTKRKC.EUR '!!WREC;
+   WRITE FILE (PRT) FROM (LINE);
+
+   WREC =  F4_RECS ;
+   GRAMH = 'сумоко диабасхемтым апо DK.P.XS.TKRKAM.EUR  '!! WREC;
+   WRITE FILE (PRT) FROM (LINE);
+   WREC =  F4_REJECTED_RECS ;
+   GRAMH = 'дем упаяв. стгм илс акка сто DK.P.XS.TKRKAM.EUR '!!WREC;
+   WRITE FILE (PRT) FROM (LINE);
+
+   GRAMH =
+    ' сумоко лесым лHмиаиым бакеяиайа упокоипым  вяеыстийым '!!
+      SUM_XRE_VDAVGBL ;
+   WRITE FILE (PRT) FROM (LINE);
+
+   GRAMH =
+    ' сумоко лесым лHмиаиым бакеяиайа упокоипым  пистытийым ' !!
+      SUM_PIST_VCAVGBL ;
+   WRITE FILE (PRT) FROM (LINE);
+
+   GRAMH =' сумоко лесым бакеяиайым упокоипым (сыяеутийа) вяеыстийым '!!
+            SUM_XRE_VDSAVGBL ;
+   WRITE FILE (PRT) FROM (LINE);
+
+   GRAMH =' сумоко лесым бакеяиайым упокоипым (сыяеутийа) пистытийым '!!
+            SUM_PIST_VCSAVGBL  ;
+   WRITE FILE (PRT) FROM (LINE);
+
+   GRAMH =' сумоко Xяеыстийым тойым лгмос  '!!
+           SUM_XRE_DMINTRST ;
+   WRITE FILE (PRT) FROM (LINE);
+
+   GRAMH =' сумоко пистытийым тойым лгмос  '!!
+            SUM_PIST_CMINTRST ;
+   WRITE FILE (PRT) FROM (LINE);
+
+   GRAMH =' сумоко KATAкоцисхемтым вяеыстийым тойым еналгмоу '!!
+          SUM_XRE_DKATALOG     ;
+   WRITE FILE (PRT) FROM (LINE);
+
+   GRAMH =' сумоко KATAкоцисхемтым пистытийым тойым еналгмоу '!!
+           SUM_PIST_CKATALOG ;
+   WRITE FILE (PRT) FROM (LINE);
+
+   GRAMH =' сумоко ONLINE вяеыстийым тойым (йкеислемым) '!!
+           SUM_DCINTRST;
+   WRITE FILE (PRT) FROM (LINE);
+
+   GRAMH =' сумоко ONLINE пистытийым тойым (йкеислемым) '!!
+      SUM_CCINTRST  ;
+   WRITE FILE (PRT) FROM (LINE);
+
+  END  DK553;
+ /*
+
+ EXEC SQL DECLARE CTISDK01 TABLE
+           ( KEY_ACCN1                      DECIMAL(9,0) NOT NULL,
+             KEY_YEAR                       DECIMAL(5,0) NOT NULL,
+             KEY_MONTH                      DECIMAL(3,0) NOT NULL,
+             NUM_VDAVGBL                    DECIMAL(15,2) NOT NULL,
+             NUM_VCAVGBL                    DECIMAL(15,2) NOT NULL,
+             NUM_VDSAVGBL                   DECIMAL(15,2) NOT NULL,
+             NUM_VCSAVGBL                   DECIMAL(15,2) NOT NULL,
+             NUM_DMINTRST                   DECIMAL(13,2) NOT NULL,
+             NUM_CMINTRST                   DECIMAL(13,2) NOT NULL,
+             NUM_DCINTRST                   DECIMAL(13,2) NOT NULL,
+             NUM_CCINTRST                   DECIMAL(13,2) NOT NULL
+           ) ;
+ DCL 1 CTISDK01,
+      5 KEY_ACCN1     DEC FIXED(9,0),
+      5 KEY_YEAR      DEC FIXED(5,0),
+      5 KEY_MONTH     DEC FIXED(3,0),
+      5 NUM_VDAVGBL   DEC FIXED(15,2),
+      5 NUM_VCAVGBL   DEC FIXED(15,2),
+      5 NUM_VDSAVGBL  DEC FIXED(15,2),
+      5 NUM_VCSAVGBL  DEC FIXED(15,2),
+      5 NUM_DMINTRST  DEC FIXED(13,2),
+      5 NUM_CMINTRST  DEC FIXED(13,2),
+      5 NUM_DCINTRST  DEC FIXED(13,2),
+      5 NUM_CCINTRST  DEC FIXED(13,2);
+
+       2  TKRPTOK1  FIXED(15,0)         ,     TOKOI      pIrTxTIKOI 1
+       2  TKRPTOK2  FIXED(15,0)         ,     TOKOI      pIrTxTIKOI 2
+       2  TKRPTOK3  FIXED(15,0)         ,     TOKOI      pIrTxTIKOI 3
+       2  TKRPTOK4  FIXED(15,0)         ,     TOKOI      pIrTxTIKOI 4
+       2  TKRPTOK5  FIXED(15,0)         ,     TOKOI      pIrTxTIKOI 5
+       2  TKRPTOK6  FIXED(15,0)         ,     TOKOI      pIrTxTIKOI 6
+       2  TKRXTOK1  FIXED(15,0)         ,     TOKOI      XPExrTIKOI 1
+       2  TKRXTOK2  FIXED(15,0)         ,     TOKOI      XPExrTIKOI 2
+ */
+

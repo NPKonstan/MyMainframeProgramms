@@ -1,0 +1,503 @@
+ WBOTPMIS:  PROCEDURE OPTIONS(MAIN);
+ /********************************************************************/
+ /* ÐÑÏÃÑÁÌÌÁ PLI DB2 BATCH                                          */
+ /********************************************************************/
+ /*  Ðñüãñáììá ãéá ðáñï÷Þ áñ÷åßïõ óôï MIS                           */
+ /*  Äçìéïõñãßá áñ÷åßïõ ðñïìçèåéþí ãéá åöáñìïãÞ OTP                 */
+ /********************************************************************/
+ /* INPUT  : DB2 CTWBOTP2                                            */
+ /* OUTPUT : MISFILE Áñ÷åßï                                          */
+ /*          PRT   Åêôýðùóç                                          */
+ /********************************************************************/
+ /*           PROGRAM NAME: WBOTPMIS   LOAD MODULE: WBOTPMIS         */
+ /********************************************************************/
+ /* 14-11-2011 NPK                                                   */
+ /* 21-11-2011 NPK êëÞóç ñïõôßíáò RISBPD2A   ìå CIDB                 */
+ /* 19-01-2012 NPK ðñïóèÞêç WS-POSO                                  */
+ /********************************************************************/
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+ /*                                                              */
+ /*-*-*-*-*-*-*- Routines Declarations   *-*-*-*-*-*-*-*-*-*-*-*-*/
+ /*                                                              */
+ DCL CZX3VDAT CHAR(6); FETCH CZXDATEP;
+ DCL CZXDATEP ENTRY OPTIONS(INTER,ASM) ;
+ DATE: PROC IRREDUCIBLE RETURNS(CHAR(6)) ;
+         CALL CZXDATEP          ( CZX3VDAT) ;
+         RETURN (CZX3VDAT) ;
+         END DATE ;
+
+ % INCLUDE  RISBP2AF ;
+ DCL RISBPD2A ENTRY (PTR) ; FETCH RISBPD2A TITLE('RISBPD2A');
+ /*                                                              */
+ /*-*-*-*-*-*-*-   File Declarations   *-*-*-*-*-*-*-*-*-*-*-*-*-*/
+ /*                                                              */
+ DCL MISFILE FILE RECORD OUTPUT   ENV(FB RECSIZE(250) );                00180002
+ DCL ERRFILE FILE RECORD OUTPUT   ENV(FB RECSIZE(150) );                00180002
+ DCL PRT     FILE RECORD OUTPUT   ENV(FB RECSIZE(133) CTLASA);
+
+ /*                                                              */
+ /*-*-*-*-*-*-*-*-  DB2 Declarations   *-*-*-*-*-*-*-*-*-*-*-*-*-*/
+ /*                                                              */
+ EXEC SQL INCLUDE CTWBOTP2; /* ÐÉÍÁÊÁÓ ÃÉÁ ÔÏ OTP */                    01460000
+ EXEC SQL INCLUDE T04CNV97;
+ EXEC SQL INCLUDE SQLCA;                                                01510500
+                                                                        01510400
+ /*                                                              */
+ /*-*-*-*-*-*-*-*-  Fields Declarations   -*-*-*-*-*-*-*-*-*-*-*-*/
+ /*                                                              */
+ DCL     LINE        CHAR (133);
+ DCL 1   LNX         BASED(ADDR(LINE)),
+      2  CTLCHR      CHAR(1)      INIT('1'),
+      2  GRAMH       CHAR(132)    INIT(' ');
+
+ DCL 1   ERLINE              ,
+      2  ERLIN1      CHAR(1)      INIT('1'),
+      2  ERLIN2      CHAR(132)    INIT(' ');
+
+ DCL  ERRREC         CHAR(150);
+
+ DCL   WS_MSG        CHAR (132);
+ DCL   EOC           BIT(1)    INIT('0'B);
+ DCL   ERROR_FLG     FIXED(1)  INIT(0);
+ DCL   TOT_FETCHED   PIC'ZZZ.ZZZ.ZZ9'      INIT(0);
+ DCL   WS_POSO       PIC 'ZZZ.ZZZ.ZZZ.ZZ9' INIT (0);
+ /*DCL   TODAY       PIC '99.99.9999' INIT(0); */
+ DCL   WREC          PIC 'ZZZ.ZZZ.ZZZ.ZZZ.ZZ9' INIT(0);
+ DCL   II            PIC '99'    INIT(0);
+ DCL   J             PIC '99'    INIT(0);
+
+
+   /* DATA FROM RISPB2AF */
+  DCL 1  FROM_RISBP2AF,
+       2 WS_CIDB      FIXED (9,0),
+       2 WS_CIDB_NEW  FIXED (9,0),
+       2 WS_CUSTNAME  CHAR(40),
+       2 WS_RESPCENT  CHAR(12),
+       2 WS_CUSTCATEG CHAR(1),
+       2 WS_CUSTSUBC  CHAR(1),
+       2 WS_CUSTSEGM  CHAR(2);
+
+ DCL 1 MISREC ,
+ 2 MIS_APPLIC_CODE           CHAR(02)  ,/*ÊÙÄÉÊ¼Ó ÅÖÁÑÌÏÃ¹Ó      */
+ 2 MIS_BRANCH                CHAR(04)  ,/*ÊÙÄÉÊ¼Ó ÊÁÔÁÓÔ¹ÌÁÔÏÓ   */
+ 2 MIS_TRANS_BRANCH          CHAR(04)  ,/*ÊÙÄ.ÊÁÔ/ÔÏÓ ÓÕÍÁËËÁÃ¹Ó */
+ 2 MIS_TRANS_ATM             CHAR(01)  ,/*ÊÙÄÉÊ¼Ó ÁÔÌ            */
+ 2 MIS_CUSTOMER_CODE         PIC'(09)9',/*ÊÙÄÉÊ¼Ó CIDB           */
+ 2 MIS_CUSTOMER_NAME         CHAR(40)  ,/*ÅÐÙÍÕÌºÁ ÐÅË¢ÔÇ        */
+ 2 MIS_CUST_CATEGORY         CHAR(01)  ,/*ÊÁÔÇÃ¼ÑÉÁ ÐÅË¢ÔÇ       */
+ 2 MIS_CUST_SUB_CATEGORY     CHAR(01)  ,/*ÕÐÏÊÁÔÇÃ¼ÑÉÁ ÐÅË¢ÔÇ    */
+ 2 MIS_RESPONS_CENTRE        CHAR(12)  ,/*ÊÙÄÉÊ. Ê¸ÍÔÑÏÕ ÅÕÈ¾ÍÇÓ */
+ 2 MIS_CUST_SUB_SEGMENT      CHAR(02)  ,/*ÐÅËÁÔÅÉÁÊ¹ ÏÌ¢ÄÁ       */
+ 2 MIS_ACCOUNT               CHAR(25)  ,/*ÁÑÉÈÌ¼Ó ËÏÃÁÑÉÁÓÌÏ¾    */
+ 2 MIS_CURRENCY              CHAR(03)  ,/*ÊÙÄÉÊ¼Ó ÍÏÌºÓÌÁÔÏÓ     */
+ 2 MIS_PRODUCT               CHAR(04)  ,/*ÊÙÄ.ÐÑÏÉ¼ÍÔÏÓ ÅÖÁÑÌÏÃ. */
+ 2 MIS_FEE_TYPE              CHAR(04)  ,/*ÊÙÄ.ÐÑÏÌ¹ÈÅÉÁÓ ÅÖÁÑÌÏÃ.*/
+ 2 MIS_FEE_RP          PIC'S(13)9V.99',/*Ó¾ÍÏËÏ ÐÏÓÏ¾ ÐÑÏÌÇÈÅÉ¿Í
+                                           (ãéá ôï óõãêåêñéìÝíï ôýðï) */
+ 2 MIS_FEE_CALCULATED  PIC'S(13)9V.99',/*Ó¾ÍÏËÏ ÐÑÏÌÇÈÅÉ¿Í ÐÏÕ
+                                       õðïëïãßóôçêáí áðü ôçí åöáñìïãÞ */
+ 2 MIS_FEE_WAIVED      PIC'S(13)9V.99',/*ÐÏÓ¼ ÁÍÔÉËÏÃ.ÐÑÏÌÇÈÅÉ¿Í*/
+ 2 MIS_FEE_RP_ACT      PIC'(10)9'     ,/*10Ø¹ÖÉÏ ÃÅÍÉÊ.ÊÁÈÏËÉÊÏ¾*/
+ 2 MIS_FEE_RP_CENTRE         CHAR(04)       ,/*ÊÙÄÉÊ¼Ó ËÏÃÉÓÔ.Ê¸ÍÔÑÏÕ */
+ 2 MIS_FEE_RP_ACCOUNT_APPLIC  CHAR(03)      ,/*ÊÙÄ.ËÏÃÉÓÔÉÊ.ÅÖÁÑÌÏÃ¹Ó */
+ 2 MIS_SERV_RENDER_VOLUME    PIC'S(09)9'    ,/*ÐË¹ÈÏÓ ÐÁÑÅ×¼ÌÅÍÇÓ ÕÐÇÑ*/
+ 2 MIS_SERV_RENDER_AMOUNT    PIC'S(13)9V.99',/*ÁÎºÁ ÐÁÑÅ×¼ÌÅÍÇÓ ÕÐÇÑÅÓ*/
+ 2 MIS_EXTR_DATE             CHAR(08)       ,/*ÇÌÅÑ.Ô¸Ë.Ì¹ÍÁ HHMMEEEE */
+ 2 MIS_FEE_COM_FILL1         CHAR(35)       ;/*KENA                   */
+
+ DCL 1 COUNTERS ,
+      2 CNT_REC_READ         PIC 'ZZZ.ZZZ.ZZ9' ,
+      2 CNT_REC_ERRORS       PIC 'ZZZ.ZZZ.ZZ9' ,
+      2 CNT_REC_WRIGHT       PIC 'ZZZ.ZZZ.ZZ9' ;
+
+  COUNTERS = '';
+
+ /*------------------------------------------------------------------*/
+ /*Ì¹ÍÁÓ ÅÔÏÓ ÁÍÁÖÏÑ¢Ó -ÓÕÍ¹ÈÙÓ Ï ÐÑÏÇÃÏ¾ÌÅÍÏÓ Ì¹ÍÁÓ ÔÏÕ Ì¹ÍÁ ÑÏ¹Ó   */
+ /*------------------------------------------------------------------*/
+ DCL WS_MONTH        PIC'(2)9'        INIT(0);
+ DCL WS_YEAR         PIC'(4)9'        INIT(0);
+ DCL WS_LAST_DATE_X  CHAR(10) INIT('');
+ DCL WS_DATE_FROM    CHAR(10) INIT('');
+ DCL WS_DATE_TO      CHAR(10) INIT('');
+ DCL WS_EXTRACT_DATE CHAR(8)  INIT('');
+ DCL TODAYX          CHAR(8);
+ DCL 1 PICDATE       BASED(ADDR(TODAYX)),
+         2 PICYY  PIC'(4)9',
+         2 PICMM  PIC'(2)9',
+         2 PICDD  PIC'(2)9';
+ DCL DATEX CHAR(6); DATEX = DATE();
+ DCL TODAY      CHAR(17);
+ DCL  1 SYSDATE  BASED(ADDR(TODAY)),
+             2 SYSYY1 CHAR(2),
+             2 SYSYY2 CHAR(2),
+             2 SYSMM  CHAR(2),
+             2 SYSDD  CHAR(2);
+
+ DCL (ONFILE,ONCODE,ONKEY,PRIORITY,TIME,VERIFY)   BUILTIN;
+ DCL (DATETIME,SUBSTR,NULL,ADDR,UNSPEC,TRANSLATE) BUILTIN;
+ DCL (ABS ,DIVIDE,ROUND,CHAR)                     BUILTIN ;
+
+ /*                                                              */
+ /*-*-*-*-*-*-*-*-  On Conditions   -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*/
+ /*                                                              */
+ ON ERROR BEGIN;
+     ON ERROR SYSTEM;
+     PUT SKIP LIST('ESKASE TO WBOTPMIS');
+ END;
+ /*                                                              */
+ /*-*-*-*-*-*-*-*-  Start Program  *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*/
+ /*                                                              */
+  CALL START ;
+  CALL DECLARE_CUR;
+  CALL OPEN_CUR;
+  CALL FETCH_ROWS;
+  DO WHILE(^EOC);
+     CALL FETCH_ROWS;
+  END; /*DO WHILE END*/
+ TELOS:;
+  CALL FINAL     ;
+
+ /*  ---------------------------------------------  */
+  START            : PROC;
+       PUT SKIP LIST ('START PROGRAMM WBOTPMIS');
+       OPEN FILE(MISFILE);
+       OPEN FILE(ERRFILE);
+       OPEN FILE(PRT) ;
+       MISREC = '';
+
+       TODAY = DATETIME();
+       CALL FIND_PERIOD_REFER ;
+       WS_DATE_TO      =  FIND_LAST_DAY(WS_YEAR,WS_MONTH) ;
+       WS_DATE_FROM    =  '01.'!!WS_MONTH!!'.'!!WS_YEAR   ;
+       WS_EXTRACT_DATE =
+       REPATTERN(WS_DATE_TO   ,'DDMMYYYY','DD.MM.YYYY',1950);
+   END  START   ;
+ /*  ---------------------------------------------  */
+     FIND_PERIOD_REFER: PROC;
+    PUT SKIP LIST('FIND_PERIOD_REFER                  ');
+
+     WS_YEAR   = 0 ;
+     WS_MONTH  = 0 ;
+     /*Çìåñïìçíßá ÑïÞò Áðü ôçí DATE JCL          */
+     TODAYX            = '20'!!
+                          SUBSTR(DATE,1,2) !! /*ETOS */
+                          SUBSTR(DATE,3,2) !! /*MHNAS*/
+                          SUBSTR(DATE,5,2) ;  /*HMERA*/
+     /* Ï Ðñïçãïýìåíïò ÌÞíáò áðï ôçí çìåñïìçíßá ñïÞò*/
+     IF ( PICMM = 1 ) THEN DO;
+       WS_YEAR      = PICYY - 1;
+       WS_MONTH = 12 ;
+     END;
+     ELSE DO;
+       WS_YEAR      = PICYY ;
+       WS_MONTH = PICMM - 1;
+     END;
+     /*
+     PUT SKIP LIST('Ãéá Çìåñïìçíßá ÑïÞò : ',TODAYX);
+     PUT SKIP LIST('Çìåñïìçíßá AíáöïñÜò Åôïò: ',char(WS_YEAR),
+                   ' ÌÞíáò ',char(WS_MONTH));*/
+     END  FIND_PERIOD_REFER;
+ /*  ---------------------------------------------  */
+ /*  ---------------------------------------------  */
+   FIND_LAST_DAY :PROC (YEAR,MONTH)   RETURNS(CHAR(10));
+     DCL  YEAR        PIC '(4)9'   ;
+     DCL  MONTH       PIC '(2)9'   ;
+     /* */
+      DCL 1 WW_DATE_APO,
+           2   WS_DD_APO PIC '(2)9',
+           2   F1                  CHAR(1)              INIT('.'),
+           2   WS_MM_APO PIC '(2)9',
+           2   F2                  CHAR(1)              INIT('.'),
+           2   WS_YY_APO PIC '(4)9';
+      DCL WS_DATE_APO CHAR(10) BASED(ADDR(WW_DATE_APO));
+
+      WS_DD_APO  = 1;
+      WS_MM_APO  = MONTH;
+      WS_YY_APO  = YEAR;
+           EXEC SQL
+                    SELECT LAST_DAY(:WS_DATE_APO)
+                       INTO :WS_LAST_DATE_X
+                FROM SYSIBM.SYSDUMMY1 ;
+                IF SQLCODE = 0 THEN DO;
+                   PUT SKIP LIST('LAST DAY IS ',WS_LAST_DATE_X);
+                END;
+                ELSE DO;
+                   PUT SKIP LIST('***     DB2 ERROR    ***');
+                   PUT SKIP LIST('ERROR SQLCODE   ',SQLCODE);
+                   PUT SKIP LIST('ERROR MONTH --> ',MONTH);
+                   PUT SKIP LIST('ERROR YEAR  --> ',YEAR);
+                   WS_LAST_DATE_X = '';
+                   CALL PLIRETC(1000);
+                END;
+
+         RETURN (WS_LAST_DATE_X);
+   END  FIND_LAST_DAY       ;
+ /* ----------------------------------------------- */
+ DECLARE_CUR:     PROC;
+
+    EXEC SQL
+    DECLARE CUR CURSOR WITH HOLD FOR SELECT
+      COD_PELATH       ,
+      COD_KATMA        ,
+      KEY_ARLOG        ,
+      DEC_AA           ,
+      CHR_NAME         ,
+      AMT_POSO         ,
+      DAT_FILE         ,
+      DAT_VALEUR       ,
+      COD_STATUS       ,
+      KEY_TIMESTAMP    ,
+      CHR_STATUS_DESCR
+    FROM  CTWBOTP2
+    WHERE
+    COD_STATUS         = 'S'           AND
+    DAT_VALEUR        >= :WS_DATE_FROM AND
+    DAT_VALEUR        <= :WS_DATE_TO
+    WITH UR;
+
+ END DECLARE_CUR;
+ /* ----------------------------------------------- */
+ OPEN_CUR:     PROC;
+    EXEC SQL OPEN CUR;
+    IF SQLCODE ^= 0 THEN DO;
+       ERLIN1= '1';
+       ERLIN2= ' ERROR OPENING CURSOR CUR SQLCODE= '!!SQLCODE;
+       WRITE FILE(PRT) FROM(ERLINE);
+       GOTO TELOS;
+    END;
+ END OPEN_CUR;
+ /*  ---------------------------------------------  */
+ FETCH_ROWS: PROC;
+       ERROR_FLG = 0;
+       EXEC SQL FETCH CUR INTO
+         :CTWBOTP2.COD_PELATH            ,
+         :CTWBOTP2.COD_KATMA             ,
+         :CTWBOTP2.KEY_ARLOG             ,
+         :CTWBOTP2.DEC_AA                ,
+         :CTWBOTP2.CHR_NAME              ,
+         :CTWBOTP2.AMT_POSO              ,
+         :CTWBOTP2.DAT_FILE              ,
+         :CTWBOTP2.DAT_VALEUR            ,
+         :CTWBOTP2.COD_STATUS            ,
+         :CTWBOTP2.KEY_TIMESTAMP         ,
+         :CTWBOTP2.CHR_STATUS_DESCR      ;
+
+    IF ( SQLCODE ^= 0 ) & ( SQLCODE ^= 100) THEN DO;
+       ERLIN1= ' ';
+       ERLIN2= ' ERROR FETCHING CURSOR CUR SQLCODE= '!!SQLCODE;
+       WRITE FILE(PRT) FROM(ERLINE);
+       GOTO TELOS;
+    END;
+    ELSE DO;
+        IF SQLCODE = 100 THEN DO;
+           EOC='1'B;
+           CALL CLOSE_CUR;
+           RETURN;
+        END;
+        ELSE   DO;
+             CNT_REC_READ = CNT_REC_READ+ 1;
+             CALL FIND_KATMA_PELATH;
+             IF (ERROR_FLG = 0) THEN DO;
+                CALL CALL_RISBPD2A;
+                CALL WRITE_MISFILE;
+             END;
+        END;
+   END;
+ END FETCH_ROWS;
+ /*  ---------------------------------------------  */
+ CLOSE_CUR:     PROC;
+    EXEC SQL  CLOSE CUR;
+    IF SQLCODE ^= 0 THEN DO;
+       ERLIN1= ' ';
+       ERLIN2= ' ERROR CLOSING CURSOR CUR SQLCODE= '!!SQLCODE;
+       WRITE FILE(PRT) FROM(ERLINE);
+       GOTO TELOS;
+    END;
+ END CLOSE_CUR;
+ /*  ---------------------------------------------  */
+     CALL_RISBPD2A    : PROC;
+      DCL  INP_CALLING_APPL CHAR(02) INIT('28');
+      DCL  INP_MM           PIC'(2)9'   ;
+      DCL  INP_EEEE         PIC'(4)9'   ;
+      DCL  INP_NUM_AR_LOGAR CHAR(16)    ;
+      DCL  PIC_LOGAR        PIC'(8)9'   ;
+      DCL  CHAR_LOGAR       CHAR(12)     ;
+      DCL  INP_COD_EFARM    CHAR(02) INIT('28');
+      DCL  INP_KATMA1       CHAR(4);
+      DCL  INP_KATMA2       CHAR(4);
+      DCL  INP_SERVICE_TYPE CHAR(01) INIT(' ');
+
+      INP_MM           = WS_MONTH;
+      INP_EEEE         = WS_YEAR;
+      CHAR_LOGAR       = CTWBOTP2.KEY_ARLOG ;
+      INP_NUM_AR_LOGAR = CHAR_LOGAR!! (4)' ';
+      INP_KATMA1       = T04CNV97.COD_KATMA;
+      INP_KATMA2       = T04CNV97.COD_KATMA;
+
+
+
+
+      /*ÊËÇÓÇ ÌÅ ×ÑÇÓÇ ÊÙÄÉÊÏÕ ÐÅËÁÔÇ ÊÁÉ Ï×É ËÏÃÁÑÉÁÓÌ¼   ;*/
+      RISBP2AF_REC                     = '';
+      RISBP2AF_REC_R.I_CALLING_APPL    = '28' ;
+      RISBP2AF_REC_R.I_NUM_YEAR        = INP_EEEE;
+      RISBP2AF_REC_R.I_NUM_MONTH       = INP_MM;
+      RISBP2AF_REC_R.I_COD_PERSONA     = T04CNV97.COD_PELATH ;
+      /*RISBP2AF_REC_R.I_COD_EFARM       = '28' ;*/
+      /*RISBP2AF_REC_R.I_NUM_AR_LOGAR    = INP_NUM_AR_LOGAR;*/
+      /*RISBP2AF_REC_R.I_NUM_PARTICIP    = '01';*/
+      RISBP2AF_REC_R.I_COD_EFARM       = '' ;
+      RISBP2AF_REC_R.I_NUM_PARTICIP    = '';
+      RISBP2AF_REC_R.I_NUM_AR_LOGAR    = '';
+      RISBP2AF_REC_R.I_ACCOUNT_BRANCH  = INP_KATMA1 ;
+      RISBP2AF_REC_R.I_TRANS_BRANCH    = INP_KATMA2 ;
+      RISBP2AF_REC_R.I_SERVICE_TYPE    = '1';
+      ERLIN1= ' ';
+
+      CALL RISBPD2A(ADDR(RISBP2AF_REC));
+      FROM_RISBP2AF = '';
+      IF RISBP2AF_REC_R.O_RETV    ^= 0 !
+         RISBP2AF_REC_R.O_SQLCODE ^= 0 !
+         RISBP2AF_REC_R.O_STATUS ^= '' THEN DO;
+         ERLIN1= ' ';
+         ERLIN2=   'CIDB = '     !!RISBP2AF_REC_R.I_COD_PERSONA
+                 !!' YEAR  = '   !!RISBP2AF_REC_R.I_NUM_YEAR
+                 !!' MONTH = '   !!RISBP2AF_REC_R.I_NUM_MONTH
+                 !!' RETV = '    !!RISBP2AF_REC_R.O_RETV
+                 !!' SQLCODE = ' !!RISBP2AF_REC_R.O_SQLCODE
+                 !!' STATUS = '  !!RISBP2AF_REC_R.O_STATUS;
+           WRITE FILE(PRT) FROM(ERLINE);
+     END;
+     ELSE DO;
+        FROM_RISBP2AF.WS_RESPCENT =
+        RISBP2AF_REC_R.O_RESP_CENTER;
+        FROM_RISBP2AF.WS_CUSTCATEG =
+        RISBP2AF_REC_R.O_IND_TIPO_PERSONA;
+        FROM_RISBP2AF.WS_CUSTSUBC =
+        RISBP2AF_REC_R.O_IND_SEUDONIMOS;
+        FROM_RISBP2AF.WS_CUSTSEGM =
+        RISBP2AF_REC_R.O_COD_SEGMENT_G;
+     END;
+     END  CALL_RISBPD2A;
+ /*  ---------------------------------------------  */
+     WRITE_ERRFILE          : PROC;
+        ERRREC ='ÄÅÍ ÂÑÅÈÇÊÅ ÅÃÃÑÁÖÇ ÌÅ INPUT ÔÏÍ ËÏÃÁÑÉÁÓÌÏ '!!
+                 CHAR(CTWBOTP2.KEY_ARLOG)!!
+                ' KÙÄÉÊÏ ÅÖÁÑÌÏÃÇÓ '     !!
+                 T04CNV97.COD_EFARM      !!
+                ' ËÏÃÁÑÉÁÓÌÏ (18)  '     !!
+                 T04CNV97.NUM_AR_LOGAR   ;
+
+        WRITE FILE(ERRFILE) FROM(ERRREC);
+        CNT_REC_ERRORS  = CNT_REC_ERRORS + 1 ;
+
+     END WRITE_ERRFILE ;
+ /*  ---------------------------------------------  */
+     WRITE_MISFILE          : PROC;
+
+        MIS_APPLIC_CODE        = '28';
+        MIS_BRANCH             = '';
+        MIS_TRANS_BRANCH       = T04CNV97.COD_KATMA;
+        MIS_TRANS_ATM          = ''  ;
+        MIS_CUSTOMER_CODE      = T04CNV97.COD_PELATH ;
+        MIS_CUSTOMER_NAME      = CTWBOTP2.CHR_NAME;
+        MIS_CUST_CATEGORY      = FROM_RISBP2AF.WS_CUSTCATEG ;
+        MIS_CUST_SUB_CATEGORY  = FROM_RISBP2AF.WS_CUSTSUBC  ;
+        MIS_RESPONS_CENTRE     = FROM_RISBP2AF.WS_RESPCENT  ;
+        MIS_CUST_SUB_SEGMENT   = FROM_RISBP2AF.WS_CUSTSEGM  ;
+        MIS_ACCOUNT            = ''  ;
+        MIS_CURRENCY           = ''  ;
+        MIS_PRODUCT            = '7995'  ;
+        MIS_FEE_TYPE           = ''  ;
+        MIS_FEE_RP             = CTWBOTP2.AMT_POSO;
+        WS_POSO = WS_POSO + MIS_FEE_RP;
+        MIS_FEE_CALCULATED     = ''  ;
+        MIS_FEE_WAIVED         = ''  ;
+        MIS_FEE_RP_ACT         = '7498800322';
+        MIS_FEE_RP_CENTRE      = '0001';
+        MIS_FEE_RP_ACCOUNT_APPLIC = 'OP';
+        MIS_SERV_RENDER_VOLUME = 1   ;
+        MIS_SERV_RENDER_AMOUNT = ''  ;
+        MIS_EXTR_DATE          = WS_EXTRACT_DATE;
+        MIS_FEE_COM_FILL1      = ''  ;
+        WRITE FILE(MISFILE) FROM(MISREC);
+
+        CNT_REC_WRIGHT = CNT_REC_WRIGHT+ 1 ;
+
+     END  WRITE_MISFILE         ;
+ /*  ---------------------------------------------  */
+   FINAL            : PROC;
+      ERLIN1    = '1';  /*SKIP LINE*/
+      ERLIN2 = ' ÅÊÔÕÐÙÓÇ ÓÕÍÏËÙÍ ÔÏÕ ÐÑÏÃÑÁÌÌÁÔÏÓ *WBOTPMIS*   ';
+      WRITE FILE(PRT) FROM(ERLINE);
+      ERLIN1    = ' ';
+      ERLIN2 = ' ÇÌÅÑÏÌÇÍÉÁ KAI ÙÑÁ ÑÏÇÓ :  ' !!DATETIME ;
+      WRITE FILE(PRT) FROM(ERLINE);
+      ERLIN2 = 'ÅÊÔÕÐÙÓÇ ÓÕÍÏËÙÍ ÃÉÁ ÔÏ ÄÉÁÓÔÇÌÁ '
+            !! 'ÁÐÏ : '!!WS_DATE_FROM !!' ÅÙÓ : '!!WS_DATE_TO ;
+      WRITE FILE(PRT) FROM(ERLINE);
+      ERLIN2 = 'ÄÉÁÂÁÓÔÇÊÁÍ ÁÐÏ DB2   : '!!CNT_REC_READ ;
+      WRITE FILE(PRT) FROM(ERLINE);
+      ERLIN2 = 'ÃÑÁÖÔÇÊÁÍ ÓÔÏ MISFILE : '!!CNT_REC_WRIGHT;
+      WRITE FILE(PRT) FROM(ERLINE);
+      ERLIN2 = 'ÓÕÍÏËÉÊÏ ÐÏÓÏ         : '!!WS_POSO       ;
+      WRITE FILE(PRT) FROM(ERLINE);
+      ERLIN2 = 'ÃÑÁÖÔÇÊÁÍ ÓÔÏ ERRFILE : '!!CNT_REC_ERRORS;
+      WRITE FILE(PRT) FROM(ERLINE);
+      CLOSE FILE(MISFILE);
+      CLOSE FILE(ERRFILE);
+   END  FINAL   ;
+ /*  ---------------------------------------------  */
+ /*   ÅÕÑÅÓÇ ÊÁÔÁÓÔÇÌÁÔÏÓ ËÏÃÁÑÉÁÓÌÏÕ,CIDB ÐÅËÁÔÇ-  */
+ /*  ---------------------------------------------  */
+ FIND_KATMA_PELATH    : PROC;
+
+ DCL PIC_LOGAR   PIC '(8)9' INIT(0);
+ DCL CHR_LOGAR   CHAR (08)  INIT(' ');
+
+  PIC_LOGAR = CTWBOTP2.KEY_ARLOG ;
+  CHR_LOGAR = PIC_LOGAR;
+
+  IF(PIC_LOGAR > 79999999 ) THEN DO;
+    T04CNV97.COD_EFARM    = '70';
+    T04CNV97.NUM_AR_LOGAR = CHR_LOGAR!!'        01';
+  END;
+  ELSE DO;
+    T04CNV97.COD_EFARM     = '90';
+    T04CNV97.NUM_AR_LOGAR  = '0'!! CHR_LOGAR!!'       01';
+  END;
+
+  /*
+  PUT SKIP LIST('CTWBOTP2.KEY_ARLOG= ',CHAR(CTWBOTP2.KEY_ARLOG));
+  PUT SKIP LIST('T04CNV97.COD_EFARM= ',T04CNV97.COD_EFARM      );
+  PUT SKIP LIST('NUM_AR_LOGAR      = ',T04CNV97.NUM_AR_LOGAR   );
+  */
+      ERROR_FLG = 0;
+      EXEC SQL
+          SELECT COD_KATMA ,COD_PELATH
+          INTO   :T04CNV97.COD_KATMA ,
+                 :T04CNV97.COD_PELATH
+          FROM   T04CNV97
+          WHERE  COD_EFARM    = :T04CNV97.COD_EFARM   AND
+                 NUM_AR_LOGAR = :T04CNV97.NUM_AR_LOGAR AND
+                 COD_EMPRESA  = '0012'
+          WITH UR;
+
+        IF SQLCODE = 100  THEN DO;
+            ERROR_FLG = 1;
+            CALL WRITE_ERRFILE ;
+        END;
+        ELSE DO;
+              IF SQLCODE ^= 0 THEN DO;
+                  ERLIN1= ' ';
+                  ERLIN2=' ERROR FETCHING ROW SQLCODE= '!!SQLCODE;
+                  WRITE FILE(PRT) FROM(ERLINE);
+                  GOTO TELOS;
+              END;
+        END;
+
+ END FIND_KATMA_PELATH;
+
+ END WBOTPMIS;
+

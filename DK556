@@ -1,0 +1,1594 @@
+ DK556:   PROCEDURE OPTIONS(MAIN);
+ /********************************************************************/
+ /* –—œ√—¡ÃÃ¡ PLI KAI DB2                                            */
+ /********************************************************************/
+ /*Interface  ·Ù·Ë›ÛÂ˘Ì „È· MIS-PPS                                  */
+ /********************************************************************/
+ /********************************************************************/
+ /* Input :                                                          */
+ /*      AÒ˜ÂﬂÔ 1 BK.P.XS.LOGFMHN   LogFile ”ıÛÙﬁÏ·ÙÔÚ ÃÁÌÈ·ﬂÔ.     */
+ /*      ¡Ò˜ÂﬂÔ 2 BK.P.XS.ISTMHNA   IÛÙÔÒÈÍ¸ ¡Ò˜ÂﬂÔ œÈÍÔÌÔÏÈÍ›Ú –Ò·Ó.*/
+ /*      ¡Ò˜ÂﬂÔ 3 AU.P.BU.AUATMTLF  LogFile Tandem ATM               */
+ /*      DB2 table T04CNV97  for ANOI                                */
+ /*                                                                  */
+ /*  Output:                                                         */
+ /*                                  ¡Ò˜ÂﬂÔ „È· MIS-PPS ( ÔÛÙÔÎ¸„ÁÛÁ)*/
+ /*                                                                  */
+ /********************************************************************/
+ /********************************************************************/
+ /*           PROGRAM NAME: DK556      LOAD MODULE: DK556            */
+ /********************************************************************/
+ /* 06-09-2007 NPK                                                   */
+ /********************************************************************/
+ /* 04-11-2007 NPK ·ÎÎ·„ﬁ ÛÙÔÌ ÙÒ¸Ô ˜ÂÈÒÈÛÏÔ˝ ANOI                  */
+ /* 22-01-2008 NPK KTP9 Transaction Added                            */
+ /********************************************************************/
+ /* NPK ¡ÎÎ·„ﬁ ÙÁÌ 28-03-2008 start                                  */
+ /* ¡ÎÎ·„ﬁ Í·Ù¸ÈÌ ··ﬂÙÁÛÁÚ ¡ÌÌ·Ú Ã·ıÒÔ„È˛Ò„Á ¡ÈÏﬂÎÈÔı ÕÙÔ„·ÌÙÊﬁ    */
+ /* ≈‹Ì TranCode ÂﬂÌ·È '  43','  45','  49' TransChanel '02' not '05'*/
+ /********************************************************************/
+ /********************************************************************/
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+ DCL CZX3VDAT CHAR(6); FETCH CZXDATEP;
+ DCL CZXDATEP ENTRY OPTIONS(INTER,ASM) ;
+ DCL   NULL      BUILTIN;
+ DATE: PROC IRREDUCIBLE RETURNS(CHAR(6)) ;
+         CALL CZXDATEP          ( CZX3VDAT) ;
+         RETURN (CZX3VDAT) ;
+         END DATE ;
+ % INCLUDE  MISPPS00;
+ % INCLUDE  RECIST  ;
+ % INCLUDE  TLFREC  ;
+ % INCLUDE  RISBP2AF ;
+ DCL RISBPD2A ENTRY (PTR) ; FETCH RISBPD2A TITLE('RISBPD2A');
+   /*DATA APO RISPB2AF*/
+  DCL 1  FROM_RISBP2AF,
+       2 WS_CIDB      FIXED (9,0),
+       2 WS_CUSTNAME  CHAR(40),
+       2 WS_RESPCENT  CHAR(12),
+       2 WS_CUSTCATEG CHAR(1),
+       2 WS_CUSTSUBC  CHAR(1),
+       2 WS_CUSTSEGM  CHAR(2);
+
+
+ DCL     PRT FILE     SEQUENTIAL OUTPUT ENV(FB RECSIZE(133) CTLASA);
+ DCL     LINE                CHAR (133);
+ DCL 1   LNX                 BASED(ADDR(LINE)),
+      2  CTLCHR              CHAR(1)      INIT('1'),
+      2  GRAMH               CHAR(132)    INIT(' ');
+
+ DCL 1   ERLINE              ,
+      2  ERLIN1       CHAR(1)      INIT('1'),
+      2  ERLIN2       CHAR(132)    INIT(' ');
+
+ DCL     WS_MSG              CHAR (132);
+ /********************************************************************/
+ /*œÕœÃ¡  ¡… –≈—…√—¡÷π INPUT           ¡—◊≈∫ŸÕ*/
+ /********************************************************************/
+ /* LOG FILE  TP     BK.P.XS.LOGFMHN                               */
+ DCL   INFILE1 FILE  SEQUENTIAL INPUT  ENV(FB RECSIZE( 84));
+ /* ISTORIKO ARXEIO  BK.P.XS.ISTMHNA    */
+ DCL   INFILE2 FILE  SEQUENTIAL INPUT  ENV(FB RECSIZE( 78));
+ /* LOG FILE TANDEM  AU.P.BU.AUATMTLF                     */
+ DCL   INFILE3 FILE  SEQUENTIAL INPUT  ENV(FB RECSIZE(1700));
+ /********************************************************************/
+ /*œÕœÃ¡  ¡… –≈—…√—¡÷π OUTPUT          ¡—◊≈IOY*/
+ /********************************************************************/
+ /*                                     */
+ DCL   OUTFILE FILE  SEQUENTIAL OUTPUT ENV(FB RECSIZE(180));
+ /********************************************************************/
+ /***************************/
+ /*DB2 DECLARATIONS         */
+ /***************************/
+
+ EXEC SQL INCLUDE CTBKACCN;
+ EXEC SQL INCLUDE T04CNV97;                                             01460000
+ EXEC SQL INCLUDE SQLCA;                                                01510500
+ /********************************************************************/
+ /* –ÂÒÈ„Ò·ˆﬁ records ÙÔı LogFile (3 formats) BK.P.XS.LOGFMHN       */
+ /********************************************************************/
+ DCL      IN_REC1   CHAR(84);
+ /* READ NORMAL TRANSACTIONS NOT KE92,KY90,ANOI HAVING DIFF.FORMAT  */
+ DCL  1   IN_REC1F  BASED(ADDR(IN_REC1)) ,
+          2 F_DATE FIXED(7),
+          2 F_TIME FIXED(7),
+          2 F_KATM ,
+            3 F_KATMA CHAR(3),
+            3 F_TERM  CHAR(1),
+         2 F_TRANS    CHAR(4),
+         2 F_MESSAGE  CHAR(66);
+
+ DCL  1 NOT_KE92_KY90_ANOI  BASED(ADDR(F_MESSAGE)) ,
+         2 F1        CHAR(1),
+         2 F_LOGAR   CHAR(8),
+         2 FILLER     CHAR(57);
+
+ /* READ KE92  KY90  (INTERNET FORMAT)   */
+ DCL  1   KE92_KY90       BASED(ADDR(F_MESSAGE)) ,
+            2 F2         CHAR(8),
+            2 S_LOGAR    CHAR(8),
+            2 FILLER     CHAR(52);
+ /********************************************************************/
+ /*           Record  ÙÔı …ÛÙÔÒÈÍÔ˝ ¡Ò˜ÂﬂÔı BK.P.XS.ISTMHNA          */
+ /********************************************************************/
+ /*DCL  IN_REC2  like RECISKAT;*/
+ DCL  IN_REC2  CHAR(78) BASED(ADDR(RECISKAT));
+ /********************************************************************/
+ /*     Record    LogFile Tandem ATM        AU.P.BU.AUATMTLF         */
+ /********************************************************************/
+   DCL  IN_REC3        CHAR(1700);
+   DCL  1 TLF_REC2     BASED(ADDR(IN_REC3)),
+        3 TLFR1        CHAR(456),
+        3 TLFR2        CHAR(1244) ;
+   DCL  WS_REC         CHAR(456)   BASED(ADDR(TLF_REC));
+
+ /*DCL  IN_REC3  CHAR(1700)  BASED(ADDR(TLF_REC));*/
+ DCL  OUT_REC  CHAR(180)   BASED(ADDR(MISPPS00));
+ /********************************************************************/
+ DCL FILE1_EOF  FIXED (1) INIT(0);
+ DCL FILE2_EOF  FIXED (1) INIT(0);
+ DCL FILE3_EOF  FIXED (1) INIT(0);
+ DCL MY_FILE    CHAR  (5) INIT('');
+
+ DCL  F1_RECS  FIXED(15) INIT(0);
+ DCL  F2_RECS  FIXED(15) INIT(0);
+ DCL  F3_RECS  FIXED(15) INIT(0);
+ DCL  ANOI_RECS  FIXED(15) INIT(0);
+ DCL  OUT_RECS  FIXED(15) INIT(0);
+ DCL  REJ_RECS  FIXED(15) INIT(0);
+ DCL  DB2_RECS FIXED(15) INIT(0);
+ DCL  F1_REJECTED_RECS FIXED(15) INIT(0);
+ DCL  F2_REJECTED_RECS FIXED(15) INIT(0);
+ DCL  F3_REJECTED_RECS FIXED(15) INIT(0);
+ DCL 1   REC_COUNTERS,
+      2  REC_APO             FIXED (15)  INIT(0),
+      2  REC_CNT             FIXED (15)  INIT(0),
+      2  REC_ROOT            FIXED (15)  INIT(0),
+      2  REC_TOT             FIXED (15)  INIT(0),
+      2  REC_ERROR           FIXED (15)  INIT(0),
+      2  REC_CONTROL         FIXED (15)  INIT(0),
+      2  TOT_NORMAL_REC      FIXED (15)  INIT(0);
+
+
+ DCL   MY_DATETIME       PIC '9999.99.99B9999';
+         MY_DATETIME =     SUBSTR(DATETIME(),1,12) ;
+ DCL     WS_LAST_DATE      CHAR(10) INIT('');
+ DCL  1  WS_LAST_D    BASED(ADDR(WS_LAST_DATE)) ,
+           2   WS_DD_LST CHAR(2),
+           2   F1                  CHAR(1) ,
+           2   WS_MM_LST CHAR(2)  ,
+           2   F2                  CHAR(1) ,
+           2   WS_YY_LST CHAR (4);
+ DCL     MY_DATE           PIC '(7)9' INIT(0);
+ DCL 1   MY_DATEX          BASED(ADDR(MY_DATE)),
+      2  MY_CENTURY         CHAR(01),
+      2  MY_YEAR            CHAR(02),
+      2  MY_MONTH           PIC '99',
+      2  MY_DAY             CHAR(02);
+
+   DCL    WS_KEY_ACCN1      DEC FIXED(9,0);
+   DCL    WS_KEY_YEAR       DEC FIXED(5,0);
+   DCL    WS_KEY_MONTH      DEC FIXED(3,0);
+   DCL    WS_KEY_YEAR_PREV  DEC FIXED(5,0);
+   DCL    WS_KEY_MONTH_PREV DEC FIXED(3,0);
+  /**                                                   *****/
+   DCL 1 WW_DATE_WRK,
+        2   WS_DD_WRK PIC '(2)9',
+        2   F1                  CHAR(1)              INIT('.'),
+        2   WS_MM_WRK PIC '(2)9',
+        2   F2                  CHAR(1)              INIT('.'),
+        2   WS_YY_WRK PIC '(4)9';
+  /** LAST WORKING DATE OF A GIVEN MONTH ********************/
+   DCL WS_DATE_WRK CHAR(10) BASED(ADDR(WW_DATE_WRK));
+
+  /** LAST WORKING DATE OF A GIVEN MONTH IN 7 CHARS FORMAT **/
+ /* A YYMMDD A=1-->2000 A=0-->1900  */
+  DCL MYDATE      PIC'(7)9' BASED(ADDR(PIC_MYDATE));
+  DCL 1 PIC_MYDATE  ,
+             2 PFF  PIC'9' ,
+             2 PYY  PIC'99',
+             2 PMM  PIC'99',
+             2 PDD  PIC'99';
+ /*ÃﬁÌ·Ú ≈ÙÔÚ ¡Ì·ˆÔÒ‹Ú -”ıÌﬁË˘Ú Ô ÒÔÁ„Ô˝ÏÂÌÔÚ ÏﬁÌ·Ú ÙÔı ÏﬁÌ· ÒÔﬁÚ*/
+ DCL   WS_MNTH       FIXED DEC(2,0)   INIT(0);
+ DCL   WS_YEAR       FIXED DEC(5,0)   INIT(0);
+ DCL TODAYX      CHAR(8);
+ DCL  1 SYSDATE  BASED(ADDR(TODAYX)),
+             2 SYSYY  CHAR(4),
+             2 SYSMM  CHAR(2),
+             2 SYSDD  CHAR(2);
+ DCL  1 PICDATE  BASED(ADDR(SYSDATE)),
+             2 PICYY  PIC'(4)9',
+             2 PICMM  PIC'(2)9',
+             2 PICDD  PIC'(2)9';
+ /****************************************/
+ /*Variables For Contolling Test-Printing*/
+ /****************************************/
+  DCL TEST       CHAR(03) INIT('NO');
+  DCL TEST_COUNT FIXED(3) INIT(0);
+  DCL TEST_LIMIT FIXED(3) INIT(100);
+  DCL 1 P_TR(200)         ,/*                           */
+       2 P_TRANS_CODE CHAR(4) ,
+       2 P_TRANS_TOT  FIXED(15);/*”YNOÀ.–O”O E–I”TPE÷OM.*/
+ DCL   TOT_1  FIXED(15) INIT(0);
+
+
+ DCL     SUBSTR    BUILTIN;
+ DCL     TRANSLATE BUILTIN;
+ DCL     ADDR      BUILTIN;
+ DCL     VERIFY    BUILTIN;
+ DCL     DIVIDE    BUILTIN;
+ DCL     ROUND     BUILTIN;
+ DCL     DATETIME  BUILTIN;
+                                                                        01510400
+      ON ENDFILE(INFILE1)
+           BEGIN ;
+            FILE1_EOF  = 1;
+           END;
+      ON ENDFILE(INFILE2)
+           BEGIN ;
+            FILE2_EOF  = 1;
+           END;
+      ON ENDFILE(INFILE3)
+           BEGIN ;
+            FILE3_EOF  = 1;
+           END;
+    /*----------------------------------------------------------*/
+    /*                    MAIN  PROGRAM                         */
+    /*----------------------------------------------------------*/
+    OPEN FILE(INFILE1);
+    OPEN FILE(INFILE2);
+    OPEN FILE(INFILE3);
+    OPEN FILE(OUTFILE);
+    OPEN FILE(PRT) ;
+
+  P_TR = '';
+    CALL FIND_PERIOD_REFER ;
+    CALL FIND_LAST_DAY(WS_KEY_YEAR, WS_KEY_MONTH);
+    CALL PROC_INFILE1 ;
+    CALL PROC_INFILE2 ;
+    CALL PROC_INFILE3 ;
+    CALL PROC_ANOI    ;
+ /**************************************************************
+ *   PROC_INFILE1                   START                      *
+ **************************************************************/
+  PROC_INFILE1             :PROC ;
+     FILE1_EOF  = 0   ;
+
+     MY_FILE = 'FILE1';
+     OUT_REC='';
+     READ FILE(INFILE1)  INTO(IN_REC1);
+     DO WHILE (FILE1_EOF  = 0 ) ;
+          F1_RECS = F1_RECS  + 1;
+          CALL FILL_OUTPUT;
+          IF TEST = 'YES' THEN
+                      CALL TEST_OUTPUT;
+
+          IF (MIS_CUSTOMER > 0) & MIS_PROD ^= '0000'  THEN DO;
+             WRITE FILE(OUTFILE) FROM(OUT_REC);
+             OUT_RECS = OUT_RECS + 1;
+          END;
+          ELSE
+             REJ_RECS = REJ_RECS + 1;
+          OUT_REC='';
+        /*PUT SKIP LIST('READING INFILE1 ... ',CHAR(F1_RECS));
+          PUT SKIP LIST('FILE1_EOF =     ... ',CHAR(FILE1_EOF));
+         */
+          READ FILE(INFILE1) INTO (IN_REC1);
+
+     END; /*DO WHILE END*/
+  END  PROC_INFILE1;
+  /**************************************************************
+  *   PROC_INFILE1                   END                        *
+  **************************************************************/
+ /**************************************************************
+ *   PROC_ANOI                      START                      *
+ **************************************************************/
+  PROC_ANOI                :PROC ;
+  DCL  END_CURSOR    FIXED(1) INIT(0);
+  DCL  WS_HM_APO         CHAR(10)    INIT('');
+  DCL  1 WS_HM_APOR      BASED(ADDR(WS_HM_APO)),
+          2 WS_DD_APO     PIC '99',
+          2 FIL1_APO      CHAR(01),
+          2 WS_MM_APO     PIC '99',
+          2 FIL2_APO      CHAR(01),
+          2 WS_YY_APO     PIC '9999';
+   /*-------------------------------*/
+   /* DECLARE CURSOR FOR ANOI       */
+   /*-------------------------------*/
+  EXEC SQL
+      DECLARE CURS_CNV97 CURSOR FOR
+           SELECT NUM_AR_LOGAR,
+                  COD_PELATH,
+                  COD_KATMA
+           FROM T04CNV97
+           WHERE COD_EFARM = '70'   AND
+                (FEC_HMNIA_OPEN BETWEEN :WS_HM_APO
+                AND :WS_LAST_DATE) AND
+                 SUBSTR(NUM_AR_LOGAR,17,2) = '01'
+           WITH UR;
+
+  MY_FILE = 'DB2';
+
+  WS_DD_APO  = '01';
+  FIL1_APO   = '.';
+  WS_MM_APO  = WS_KEY_MONTH;
+  FIL2_APO   = '.';
+  WS_YY_APO  =  WS_KEY_YEAR ;
+
+  EXEC SQL OPEN CURS_CNV97;
+  IF SQLCODE ^= 0 THEN DO;
+       CALL ERROR('ERROR OPENING  CURS_CNV97 SQLCODE = '!!SQLCODE);
+  END;
+
+  END_CURSOR  = 0;
+  DO WHILE (END_CURSOR = 0);
+      EXEC SQL FETCH CURS_CNV97
+               INTO  :T04CNV97.NUM_AR_LOGAR,
+                     :T04CNV97.COD_PELATH,
+                     :T04CNV97.COD_KATMA;
+       IF SQLCODE ^= 0 THEN DO;
+          IF SQLCODE = 100  THEN DO;
+              END_CURSOR = 1;
+              GOTO SKIP;
+          END;
+          CALL ERROR('ERROR FETCHING CURS_CNV97 SQLCODE = '!!SQLCODE);
+       END;
+       ELSE DO; /*SQLCODE = 0 */
+          ANOI_RECS = ANOI_RECS  +1 ;
+          CALL FILL_OUTPUT;
+          IF TEST = 'YES' THEN  CALL TEST_OUTPUT;
+          IF (MIS_CUSTOMER > 0) & MIS_PROD ^= '0000'  THEN DO;
+             WRITE FILE(OUTFILE) FROM(OUT_REC);
+             OUT_RECS = OUT_RECS + 1;
+          END;
+          ELSE
+             REJ_RECS = REJ_RECS + 1;
+          OUT_REC='';
+       END; /*SQLCODE = 0 END*/
+  END; /*DO WHILE END*/
+  SKIP:;
+  EXEC SQL CLOSE CURS_CNV97;
+
+  IF SQLCODE ^= 0 THEN DO;
+     CALL ERROR('ERROR CLOSING CURS_CNV97 SQLCODE = '!!SQLCODE);
+  END;
+
+  END  PROC_ANOI   ;
+  /**************************************************************
+  *   PROC_ANOI                      END                        *
+  **************************************************************/
+ /**************************************************************
+ *   PROC_INFILE2                   START                      *
+ **************************************************************/
+  PROC_INFILE2             :PROC ;
+     FILE2_EOF  = 0   ;
+     MY_FILE = 'FILE2';
+     OUT_REC='';
+     READ FILE(INFILE2)  INTO(IN_REC2);
+     DO WHILE (FILE2_EOF  = 0 ) ;
+          F2_RECS = F2_RECS  + 1;
+          CALL FILL_OUTPUT;
+          IF TEST = 'YES' THEN
+                      CALL TEST_OUTPUT;
+          IF (MIS_CUSTOMER > 0) & MIS_PROD ^= '0000'  THEN DO;
+             WRITE FILE(OUTFILE) FROM(OUT_REC);
+             OUT_RECS = OUT_RECS + 1;
+          END;
+          ELSE
+             REJ_RECS = REJ_RECS + 1;
+          OUT_REC='';
+          READ FILE(INFILE2) INTO (IN_REC2);
+
+     END; /*DO WHILE END*/
+  END  PROC_INFILE2;
+  /**************************************************************
+  *   PROC_INFILE2                   END                        *
+  **************************************************************/
+ /**************************************************************
+ *   PROC_INFILE3                   START                      *
+ **************************************************************/
+  PROC_INFILE3             :PROC ;
+     FILE3_EOF  = 0   ;
+     MY_FILE = 'FILE3';
+     OUT_REC='';
+     READ FILE(INFILE3)  INTO(IN_REC3);
+     WS_REC = TLFR1;
+     DO WHILE (FILE3_EOF  = 0 ) ;
+          F3_RECS = F3_RECS  + 1;
+          CALL FILL_OUTPUT;
+          IF (MIS_CUSTOMER > 0) & MIS_PROD ^= '0000'  THEN DO;
+             WRITE FILE(OUTFILE) FROM(OUT_REC);
+             OUT_RECS = OUT_RECS + 1;
+          END;
+          ELSE
+             REJ_RECS = REJ_RECS + 1;
+          OUT_REC='';
+          READ FILE(INFILE3) INTO (IN_REC3);
+          WS_REC = TLFR1;
+     END; /*DO WHILE END*/
+  END  PROC_INFILE3;
+  /**************************************************************
+  *   PROC_INFILE1                   END                        *
+  **************************************************************/
+ /**************************************************************
+ *   TP_TO_MIS_FOR_FILE2            START                      *
+ **************************************************************/
+  TP_TO_MIS_FOR_FILE2 :PROC   RETURNS (CHAR(04));
+    DCL MISCOD CHAR(2) INIT('  ');
+    SELECT(KSMTRKWD);
+      WHEN ('KK11')
+      DO;
+          IF KSMAKYR = '6' THEN DO; /* ≈Í'ÃÂÙ·ˆÔÒ‹Ú */
+             MISCOD = '03';
+          END;
+          ELSE DO;
+             MISCOD = '02';
+          END;
+      END;
+      WHEN ('KK21'       )  MISCOD  = '04';
+      WHEN ('KK31'       )  MISCOD  = '05';
+      WHEN ('KA11','KX11')
+      DO;
+          IF KSMAKYR = '6' THEN DO; /* ≈Í'ÃÂÙ·ˆÔÒ‹Ú */
+             MISCOD = '07';
+          END;
+          ELSE DO;
+             MISCOD = '06';
+          END;
+      END;
+      WHEN ('KA21','KA20','KX21','KX20','KA61')
+      DO;
+          IF KSMAKYR = '6' THEN DO; /* ≈Í'ÃÂÙ·ˆÔÒ‹Ú */
+             MISCOD = '09';
+          END;
+          ELSE DO;
+             MISCOD = '08';
+          END;
+      END;
+      WHEN ('KH01','KH02','KHX2')  MISCOD = '10';
+      WHEN ('KEE1','KTX1','KTE1','KTE2','KTk0','KTp1',
+            'KTk1','KTkE','KTE6') MISCOD = '20';
+      WHEN ('KK51')  MISCOD= '40';
+      WHEN ('KK81')  MISCOD= '41';
+      WHEN ('KTP9')  MISCOD= '54'; /*NPK ADDED 22-01-2008*/
+      WHEN ('KA51')
+      DO ;
+          IF KSMKATLE =  931  THEN DO; /* Trasn Meso Dias */
+             MISCOD = '48';
+
+          END;
+          ELSE DO;
+             MISCOD= '42';
+
+          END;
+      END;
+      WHEN ('KA54')  MISCOD= '47';
+      WHEN ('KTP5')  MISCOD= '46';
+      WHEN ('KA91')  MISCOD= '50';
+      WHEN ('KA92')  MISCOD= '51';
+    OTHERWISE DO;
+          PUT SKIP LIST('KSMTRKWD  = ',KSMTRKWD);
+          MISCOD= 'XX';
+    END;
+    END;
+    RETURN ('  '!!MISCOD);
+   END  TP_TO_MIS_FOR_FILE2;
+  /**************************************************************
+  *   TP_TO_MIS_FOR_FILE2            END                        *
+  **************************************************************/
+ /**************************************************************
+ *   TP_TO_MIS_FOR_FILE1  logfile   START                      *
+ **************************************************************/
+  TP_TO_MIS_FOR_FILE1 :PROC RETURNS (CHAR(04));
+    DCL MISCOD CHAR(2) INIT('  ');
+    SELECT(F_TRANS);
+    /*WHEN ('ANOI','KAN3')  MISCOD  = '01'; FORGET ANOI,NOW FROM DB2*/
+    WHEN ('KKk1','KKkE')  MISCOD  = '11';
+    WHEN ('KY00')  MISCOD  = '12';
+    WHEN ('KEAk')  MISCOD  = '13';
+    WHEN ('KEKA')  MISCOD  = '14';
+    WHEN ('KEP1')  MISCOD  = '15';
+    WHEN ('KprE')  MISCOD  = '16';
+    WHEN ('KArE')  MISCOD =  '17';
+    WHEN ('KTAE','Kp19')  MISCOD  = '18';
+    WHEN ('KB00','Kn00')  MISCOD  = '19';
+    WHEN ('KE92','KE90')  MISCOD  = '52';
+    WHEN ('KY90')  MISCOD= '53';
+    OTHERWISE DO;
+       PUT SKIP LIST('THIS IS F_TRANS FROM FILE 1 :',F_TRANS);
+       MISCOD = '??';
+    END;
+    END;
+    RETURN ('  '!!MISCOD);
+   END  TP_TO_MIS_FOR_FILE1;
+  /**************************************************************
+  *   TP_TO_MIS_FOR_FILE1            END                        *
+  **************************************************************/
+ /**************************************************************
+ *   TP_TO_MIS_FOR_FILE3            START                      *
+ **************************************************************/
+  TP_TO_MIS_FOR_FILE3 :PROC RETURNS (CHAR(04));
+    DCL MISCOD CHAR(4) INIT('    ');
+    IF (T_FROM = '01') & (T_TO = '00') THEN DO;
+       SELECT(T_CDE  );
+       WHEN ('30')
+       DO ; /*TRANS KY50*/
+         IF TERM_FIID = 'CBOG' THEN   MISCOD= '  43';
+         IF TERM_FIID = 'DIAS' THEN   MISCOD= '  49';
+       /*IF TERM_FIID = 'CBOG' THEN   PUT SKIP LIST('CBOG');
+         IF TERM_FIID = 'DIAS' THEN   PUT SKIP LIST('DIAS'); */
+       END;
+       WHEN ('61') MISCOD= '  45';/*TRANS CBRX*/
+       WHEN ('70') MISCOD= '  44';/*TRANS KEA6*/
+       END;
+    END;
+
+    RETURN (MISCOD);
+    /*OTHER      WS_LIT_MNTH = ' À¡»œ” Ã«Õ¡” ';*/
+   END  TP_TO_MIS_FOR_FILE3;
+  /**************************************************************
+  *   TP_TO_MIS_FOR_FILE3            END                        *
+  **************************************************************/
+ /**************************************************************
+ *  GET_TRANS_CHANEL                START                      *
+ **************************************************************/
+    GET_TRANS_CHANEL  :PROC RETURNS (CHAR(02));
+        DCL RET_TRANS_CHANEL CHAR(2) INIT('');
+
+    SELECT(MY_FILE);
+    WHEN ('FILE1')
+    DO;  /*FILE1 START */
+         IF F_KATMA = '555' THEN RET_TRANS_CHANEL = '05';/*INTERNET*/
+         ELSE                    RET_TRANS_CHANEL = '01';/*BRANCH*/
+    END; /*FILE1 END   */
+    WHEN ('FILE2')
+    DO;  /*FILE2 START */
+        DCL   T1_KATMA PIC'9999';
+        DCL 1 T2_CUASTTAY BASED(ADDR(T1_KATMA)),
+              2 T2_CUAKTRAP PIC'9',
+              2 T2_CUASKAT  PIC'999';
+        T1_KATMA = KSMKATLE;
+        IF T2_CUASKAT = 555 THEN RET_TRANS_CHANEL = '05';/*INTERNET*/
+        ELSE                     RET_TRANS_CHANEL = '01';/*BRANCH*/
+        SELECT(KSMTRKWD);
+        WHEN ('KA51','KA54','KK51','KK81','KTP5','KY50')
+             RET_TRANS_CHANEL = '02';/*ATM*/
+        OTHERWISE ;
+        END;
+    END; /*FILE2 END   */
+    WHEN ('FILE3')
+    DO;  /*FILE3 START */
+       IF SUBSTR(TERM_ID,5,3) = '555' THEN
+                  RET_TRANS_CHANEL = '05';
+       ELSE
+                  RET_TRANS_CHANEL = '02';/*ATM*/
+    END; /*FILE3 END   */
+    WHEN ('DB2') RET_TRANS_CHANEL = '01';/*BRANCH*/
+    END;
+    RETURN (RET_TRANS_CHANEL);
+   END GET_TRANS_CHANEL    ;
+  /**************************************************************
+  * GET_TRANS_CHANEL                 END                        *
+  **************************************************************/
+ /**************************************************************
+ *  GET_TRANS_BRANCH  ·Ù‹ÛÙÁÏ· ”ıÌ·ÎÎ·„ﬁÚ              START   *
+ **************************************************************/
+    GET_TRANS_BRANCH     :PROC RETURNS (CHAR(04));
+        DCL RET_BRANCH CHAR(4) INIT(' ');
+    SELECT(MY_FILE);
+    WHEN ('FILE1')
+    DO;  /*FILE1 START */
+         RET_BRANCH = '0'!!  F_KATMA  ;
+    END; /*FILE1 END   */
+    WHEN ('FILE2')
+    DO;  /*FILE2 START */
+        DCL   T1_KATMA PIC'9999';
+        DCL 1 T2_CUASTTAY BASED(ADDR(T1_KATMA)),
+              2 T2_CUAKTRAP PIC'9',
+              2 T2_CUASKAT  CHAR(3);
+        T1_KATMA = KSMKATLE;
+        RET_BRANCH = T1_KATMA;
+    END; /*FILE2 END   */
+    WHEN ('FILE3')
+    DO;  /*FILE3 START */
+         IF TERM_FIID = 'CBOG' THEN
+                   RET_BRANCH = '0'!!  SUBSTR(TERM_ID,5,3);
+         IF TERM_FIID = 'DIAS' THEN
+                   RET_BRANCH = '0931';
+    END; /*FILE3 END   */
+    WHEN ('DB2') RET_BRANCH = FIND_KATMA(SUBSTR(GET_ACCOUNT(),1,8));
+    END;
+    RETURN (RET_BRANCH  );
+   END GET_TRANS_BRANCH          ;
+  /**************************************************************
+  * GET_TRANS_BRANCH                END                        *
+  **************************************************************/
+ /**************************************************************
+ *  GET_BRANCH  K·Ù‹ÛÙÁÏ· ÙﬁÒÁÛÁÚ ÀÔ„·Ò. START                  *
+ **************************************************************/
+    GET_BRANCH  :PROC RETURNS (CHAR(04));
+        DCL RET_BRANCH CHAR(04) INIT('');
+    SELECT(MY_FILE);
+    WHEN ('FILE1')
+    DO;  /*FILE1 START */
+       RET_BRANCH = FIND_KATMA(SUBSTR(GET_ACCOUNT(),1,8));
+    END; /*FILE1 END   */
+    WHEN ('FILE2')
+    DO;  /*FILE2 START */
+        DCL   T1_KATMA PIC'9999';
+        DCL 1 T2_CUASTTAY BASED(ADDR(T1_KATMA)),
+              2 T2_CUAKTRAP PIC'9',
+              2 T2_CUASKAT  PIC'999';
+        T2_CUASKAT = KSMKATMA   ;  T2_CUAKTRAP = '0';
+        RET_BRANCH =   T1_KATMA ;
+    END; /*FILE2 END   */
+    WHEN ('FILE3')
+    DO;  /*FILE3 START */
+       RET_BRANCH =  FIND_KATMA(SUBSTR(GET_ACCOUNT(),1,8));
+    END; /*FILE3 END   */
+    WHEN ('DB2') RET_BRANCH = FIND_KATMA(SUBSTR(GET_ACCOUNT(),1,8));
+    END;
+    RETURN (RET_BRANCH    );
+   END GET_BRANCH    ;
+  /**************************************************************
+  * GET_BRANCH                 END                        *
+  **************************************************************/
+ /**************************************************************
+ *  GET_TRANS_ATM_TERM              START                      *
+ **************************************************************/
+    GET_TRANS_ATM_TERM:PROC RETURNS (CHAR(01));
+       DCL   RET_ATM_TERM   CHAR(01) INIT('');
+    SELECT(MY_FILE);
+    WHEN ('FILE1')
+    DO;  /*FILE1 START */
+         RET_ATM_TERM = F_TERM;
+    END; /*FILE1 END   */
+    WHEN ('FILE2')
+    DO;  /*FILE2 START */
+         RET_ATM_TERM = KSMSTERM;
+    END; /*FILE2 END   */
+    WHEN ('FILE3')
+    DO;  /*FILE3 START */
+         IF TERM_FIID = 'CBOG' THEN
+              RET_ATM_TERM = SUBSTR(TERM_ID,8,1);
+         IF TERM_FIID = 'DIAS' THEN
+              RET_ATM_TERM = '' ;
+    END; /*FILE3 END   */
+    WHEN ('DB2') RET_ATM_TERM = '' ;
+    END;
+    RETURN (RET_ATM_TERM);
+   END GET_TRANS_ATM_TERM  ;
+  /**************************************************************
+  * GET_TRANS_ATM_TERM               END                        *
+  **************************************************************/
+ /**************************************************************
+ *  GET_ACCOUNT                     START                      *
+ **************************************************************/
+    GET_ACCOUNT       :PROC RETURNS (CHAR(25));
+              DCL RET_ACCOUNT CHAR(25) INIT('');
+    SELECT(MY_FILE);
+    WHEN ('FILE1')
+    DO;  /*FILE1 START */
+    DCL TRANS CHAR(4) INIT('');
+        TRANS = GET_TRANS_CODE();
+        SELECT(TRANS) ;
+            WHEN ('KE92','KY90') DO;
+                              RET_ACCOUNT = S_LOGAR ;
+                              END;
+            /*WHEN ('ANOI') ;*/
+            OTHERWISE             RET_ACCOUNT = F_LOGAR ;
+        END;
+      IF VERIFY(SUBSTR(RET_ACCOUNT ,1,8),'0123456789') = 0 THEN ;
+      ELSE
+             RET_ACCOUNT ='00000000';
+
+    END; /*FILE1 END   */
+    WHEN ('FILE2')
+    DO;  /*FILE2 START */
+    DCL PIC_ARLOG PIC '(8)9';
+          PIC_ARLOG=KSMARLOG ;
+          RET_ACCOUNT = PIC_ARLOG;
+      IF VERIFY(SUBSTR(RET_ACCOUNT,1,8),'0123456789') = 0 THEN ;
+      ELSE
+             RET_ACCOUNT ='00000000';
+    END; /*FILE2 END   */
+    WHEN ('FILE3')
+    DO;  /*FILE3 START */
+      IF VERIFY(SUBSTR(FROM_ACCT,1,8),'0123456789') = 0 THEN
+             RET_ACCOUNT = SUBSTR(FROM_ACCT ,1,8);
+      ELSE
+             RET_ACCOUNT ='00000000';
+    END; /*FILE3 END   */
+    WHEN ('DB2') RET_ACCOUNT= SUBSTR(T04CNV97.NUM_AR_LOGAR,1,8);
+    END;
+    RETURN (RET_ACCOUNT );
+   END GET_ACCOUNT         ;
+  /**************************************************************
+  * GET_ACCOUNT                      END                        *
+  **************************************************************/
+ /**************************************************************
+ *  GET_PROD                        START                      *
+ **************************************************************/
+    GET_PROD          :PROC RETURNS (CHAR(04));
+    DCL RET_PROD   CHAR(04) INIT('');
+    DCL PIC_ARLOG PIC '(8)9';
+
+    SELECT(MY_FILE);
+    WHEN ('FILE1')
+    DO;  /*FILE1 START */
+      PIC_ARLOG = SUBSTR(MIS_ACCOUNT,1,8);
+      RET_PROD  = FIND_PROD(PIC_ARLOG);
+    END; /*FILE1 END   */
+    WHEN ('FILE2')
+    DO;  /*FILE2 START */
+          DCL PIC_KSMKATHO   PIC '(4)9' INIT(0);
+              PIC_KSMKATHO  = KSMKATHO ;
+              RET_PROD      = PIC_KSMKATHO ;
+    END; /*FILE2 END   */
+    WHEN ('FILE3')
+    DO;  /*FILE3 START */
+      PIC_ARLOG = SUBSTR(MIS_ACCOUNT,1,8);
+      RET_PROD  = FIND_PROD(PIC_ARLOG);
+    END; /*FILE3 END   */
+    WHEN ('DB2')
+       DO; /*DB2 END*/
+         PIC_ARLOG = SUBSTR(T04CNV97.NUM_AR_LOGAR,1,8) ;
+         RET_PROD  = FIND_PROD(PIC_ARLOG);
+       END;
+    END;
+    RETURN (RET_PROD);
+   END GET_PROD            ;
+  /**************************************************************
+  * GET_PROD                         END                        *
+  **************************************************************/
+ /**************************************************************
+ *  GET_IT_CODE                     START                      *
+ **************************************************************/
+    GET_IT_CODE       :PROC RETURNS (CHAR(04));
+    DCL RET_IT_CODE CHAR(04) INIT('');
+    SELECT(MY_FILE);
+    WHEN ('FILE1')
+    DO;  /*FILE1 START */
+        RET_IT_CODE  = TP_TO_MIS_FOR_FILE1()  ;
+    END; /*FILE1 END   */
+    WHEN ('FILE2')
+    DO;  /*FILE2 START */
+        RET_IT_CODE  = TP_TO_MIS_FOR_FILE2()  ;
+    END; /*FILE2 END   */
+    WHEN ('FILE3')
+    DO;  /*FILE3 START */
+        RET_IT_CODE  = TP_TO_MIS_FOR_FILE3()  ;
+    END; /*FILE3 END   */
+    WHEN ('DB2') RET_IT_CODE= '  01';
+    END;
+    RETURN (RET_IT_CODE );
+   END GET_IT_CODE         ;
+  /**************************************************************
+  * GET_IT_CODE                      END                        *
+  **************************************************************/
+ /**************************************************************
+ *  GET_TRANS_CODE                  START                      *
+ **************************************************************/
+    GET_TRANS_CODE    :PROC RETURNS (CHAR(04));
+    DCL RET_TRANS_CODE    CHAR(04) INIT('');
+    DCL GR  CHAR(8) INIT('ncdkhpru');
+    DCL ENG CHAR(8) INIT('Œ√ƒÀŒ–”÷');
+    SELECT(MY_FILE);
+    WHEN ('FILE1')
+    DO;  /*FILE1 START */
+      RET_TRANS_CODE = TRANSLATE(F_TRANS,ENG,GR) ;
+    END; /*FILE1 END   */
+    WHEN ('FILE2')
+    DO;  /*FILE2 START */
+       RET_TRANS_CODE = TRANSLATE(KSMTRKWD,ENG,GR) ;
+    END; /*FILE2 END   */
+    WHEN ('FILE3')
+    DO;  /*FILE3 START */
+       IF (T_FROM = '01') & (T_TO = '00') THEN DO;
+          SELECT(T_CDE  );
+          WHEN ('30') RET_TRANS_CODE   = ' ’50';
+          WHEN ('61') RET_TRANS_CODE   = 'CBRX';
+          WHEN ('70') RET_TRANS_CODE   = ' ≈¡6';
+          END;
+       END;
+    END; /*FILE3 END   */
+    WHEN ('DB2') RET_TRANS_CODE   = 'ANOI';
+    END;
+
+    RETURN (RET_TRANS_CODE);
+   END GET_TRANS_CODE      ;
+  /**************************************************************
+  * GET_TRANS_CODE                   END                        *
+  **************************************************************/
+ /**************************************************************
+ *   FILL_OUTPUT                    START                      *
+ **************************************************************/
+  FILL_OUTPUT         :PROC ;
+   MIS_APPLIC_CODE  = '70';
+   MIS_TRANS_VOL    =  1;
+   MIS_EXTRACT_DATE = WS_DD_LST!! WS_MM_LST!! WS_YY_LST;
+   MIS_CURRENCY      = 'EUR';
+
+   MIS_BRANCH           = GET_BRANCH();
+   MIS_TRANS_BRANCH     = GET_TRANS_BRANCH();
+   MIS_TRANS_ATM_TERM   = GET_TRANS_ATM_TERM();
+   MIS_ACCOUNT          = GET_ACCOUNT();
+   MIS_PROD             = GET_PROD();
+   MIS_IT_CODE          = GET_TRANS_CODE();
+   CALL LOAD_TRANS(MIS_IT_CODE);
+   MIS_TRANS_CODE       = GET_IT_CODE();
+   MIS_TRANS_CHANEL     = GET_TRANS_CHANEL();
+   /*NPK ¡ÎÎ·„ﬁ ÙÁÌ 28-03-2008 start                           */
+   /*¡ÎÎ·„ﬁ Í·Ù¸ÈÌ ··ﬂÙÁÛÁÚ ¡ÌÌ·Ú Ã·ıÒÔ„È˛Ò„Á,¡ÈÏﬂÎÈÔı ÕÙÔ„·ÌÙÊﬁ*/
+   IF (MIS_TRANS_CODE= '  43' !
+       MIS_TRANS_CODE= '  45' !
+       MIS_TRANS_CODE= '  49' ) THEN DO;
+      IF MIS_TRANS_CHANEL ='05' THEN  MIS_TRANS_CHANEL ='02' ;
+  END;
+   /*NPK ¡ÎÎ·„ﬁ ÙÁÌ 28-03-2008 End                             */
+
+   CALL CALL_RISBPD2A ;
+   MIS_CUSTOMER      = FROM_RISBP2AF.WS_CIDB;
+   MIS_CUST_NAME     = FROM_RISBP2AF.WS_CUSTNAME;
+   MIS_CUST_CATEGORY = FROM_RISBP2AF.WS_CUSTCATEG;
+   MIS_CUST_SUBCATEG = FROM_RISBP2AF.WS_CUSTSUBC;
+   MIS_RESP_CENTRE   = FROM_RISBP2AF.WS_RESPCENT ;
+   MIS_CUST_SUBSEG   = FROM_RISBP2AF.WS_CUSTSEGM;
+
+  END  FILL_OUTPUT;
+  /**************************************************************
+  *   FILL_OUTPUT                    END                        *
+  **************************************************************/
+ /**************************************************************
+ *   TEST_OUTPUT                    START                      *
+ **************************************************************/
+  TEST_OUTPUT         :PROC ;
+    IF TEST_COUNT <= TEST_LIMIT THEN DO;
+
+    DCL MY_TEST_FILE CHAR(35) INIT('');
+    SELECT(MY_FILE);
+    WHEN ('FILE1') MY_TEST_FILE = 'LOGFMHN Log-file TP';
+    WHEN ('FILE2') MY_TEST_FILE = '…ÛÙÔÒÈÍ¸ ¡Ò˜ÂﬂÔ ‘– ';
+    WHEN ('FILE3') MY_TEST_FILE = '¡Ò˜ÂﬂÔ Tandem ';
+    WHEN ('DB2')   MY_TEST_FILE = 'DB2 Table CNV97 ';
+    END;
+           TEST_COUNT = TEST_COUNT + 1    ;
+
+    IF TEST_COUNT  = 1          THEN DO;
+           ERLIN2='*** ≈À≈√◊œ” ¡—◊≈…œ’ : '!! MY_TEST_FILE;
+           WRITE FILE(PRT) FROM(ERLINE);
+           ERLIN2='EXTRACT_DATE    = '!!   MIS_EXTRACT_DATE ;
+           WRITE FILE(PRT) FROM(ERLINE);
+    END;
+
+           ERLIN2='TRANS_CHANEL    = '!!   MIS_TRANS_CHANEL ;
+           WRITE FILE(PRT) FROM(ERLINE);
+           ERLIN2='BRANCH          = '!!   MIS_BRANCH ;
+           WRITE FILE(PRT) FROM(ERLINE);
+           ERLIN2='TRANS_BRANCH    = '!!   MIS_TRANS_BRANCH ;
+           WRITE FILE(PRT) FROM(ERLINE);
+           ERLIN2='TRANS_ATM_TERM  = '!!   MIS_TRANS_ATM_TERM;
+           WRITE FILE(PRT) FROM(ERLINE);
+           ERLIN2='ACCOUNT         = '!!   MIS_ACCOUNT ;
+           WRITE FILE(PRT) FROM(ERLINE);
+           ERLIN2='PROD            = '!!   MIS_PROD ;
+           WRITE FILE(PRT) FROM(ERLINE);
+           ERLIN2='IT_CODE         = '!!   MIS_IT_CODE ;
+           WRITE FILE(PRT) FROM(ERLINE);
+           ERLIN2='TRANS_CODE      = '!!   MIS_TRANS_CODE ;
+           WRITE FILE(PRT) FROM(ERLINE);
+           ERLIN2='CUSTOMER        = '!!   MIS_CUSTOMER ;
+           WRITE FILE(PRT) FROM(ERLINE);
+           ERLIN2='CUST_NAME       = '!!   MIS_CUST_NAME ;
+           WRITE FILE(PRT) FROM(ERLINE);
+           ERLIN2='CUST_CATEGORY   = '!!   MIS_CUST_CATEGORY ;
+           WRITE FILE(PRT) FROM(ERLINE);
+           ERLIN2='CUST_SUBCATEG   = '!!   MIS_CUST_SUBCATEG ;
+           WRITE FILE(PRT) FROM(ERLINE);
+           ERLIN2='RESP_CENTRE     = '!!   MIS_RESP_CENTRE ;
+           WRITE FILE(PRT) FROM(ERLINE);
+           ERLIN2='CUST_SUBSEG     = '!!   MIS_CUST_SUBSEG ;
+           WRITE FILE(PRT) FROM(ERLINE);
+       END  ;
+  END  TEST_OUTPUT;
+  /**************************************************************
+  *   TEST_OUTPUT                    END                        *
+  **************************************************************/
+ /**************************************************************
+ *  ERROR                           START                      *
+ **************************************************************/
+ ERROR        :PROC (MSG     ) ;
+    DCL MSG      CHAR  (132)  ;
+
+    DCL WS_BOOM   FIXED(1) INIT(1);
+    DCL WS_ZERO   FIXED(1) INIT(0);
+
+       ERLIN1='1';
+       ERLIN2='***************************************************';
+       WRITE FILE(PRT) FROM(ERLINE);
+       ERLIN1='0';
+
+       ERLIN2=' * DK556  «Ã≈—¡ —œ«”         = '!!DATE ();
+       WRITE FILE(PRT) FROM(ERLINE);
+
+       ERLIN2='–—œ¬À«Ã¡ ”‘œ –—œ√—¡ÃÃ¡ DK556 ‘œ –—œ√—¡ÃÃ¡ »¡ ” ¡”≈…';
+       WRITE FILE(PRT) FROM(ERLINE);
+
+       ERLIN2=MSG;
+       WRITE FILE(PRT) FROM(ERLINE);
+
+       ERLIN2='***************************************************';
+       WRITE FILE(PRT) FROM(ERLINE);
+
+       WS_BOOM = WS_BOOM /  WS_ZERO  ; /*JUST CRASH*/
+
+   END ERROR        ;
+  /**************************************************************
+  *  ERROR                           END                        *
+  **************************************************************/
+ /**************************************************************
+ *  LOAD_TRANS                      START                      *
+ **************************************************************/
+ LOAD_TRANS   :PROC (TRANS ) ;
+
+  DCL TRANS      CHAR  (4)  ;
+  DCL I FIXED(5) ;
+  DO I=1 TO 200;
+      IF P_TR(I).P_TRANS_CODE =  TRANS THEN DO;
+         P_TR(I).P_TRANS_TOT = P_TR(I).P_TRANS_TOT + 1;
+           GOTO OUT;
+      END;
+      ELSE DO;
+         IF P_TR(I).P_TRANS_CODE = '    ' THEN DO;
+           P_TR(I).P_TRANS_CODE = TRANS;
+           P_TR(I).P_TRANS_TOT =   1;
+           GOTO OUT;
+         END;
+      END;
+  END;/*DO END*/
+  OUT:;
+
+ END LOAD_TRANS   ;
+  /**************************************************************
+  *  LOAD_TRANS                      END                        *
+  **************************************************************/
+ /**************************************************************
+ *  UNLOAD_TRANS                  START                      *
+ **************************************************************/
+ UNLOAD_TRANS   :PROC  ;
+  DCL I FIXED(5) INIT(0);
+   DCL PIC_TRAN PIC'ZZZ.ZZZ.ZZZ.ZZZ.ZZ9';
+   CTLCHR = '1';
+   GRAMH =' *”˝ÌÔÎ· ”ıÌ·ÎÎ·„˛Ì ÛÙÔ –Ò¸„Ò·ÏÏ· DK556 *';
+   WRITE FILE(PRT) FROM(LINE);
+   CTLCHR = ' ';
+  DO I=1 TO 200;
+      IF P_TR(I).P_TRANS_CODE ^= '    ' THEN DO;
+   PIC_TRAN = P_TR(I).P_TRANS_TOT;
+  TOT_1 = TOT_1 + P_TR(I).P_TRANS_TOT;
+   GRAMH =' *”˝ÌÔÎo '!!
+        P_TR(I).P_TRANS_CODE!!' = '!! PIC_TRAN;
+
+   WRITE FILE(PRT) FROM(LINE);
+      END;
+  END;/*DO END*/
+
+
+ END UNLOAD_TRANS   ;
+  /**************************************************************
+  *  UNLOAD_TRANS                   END                        *
+  **************************************************************/
+  /**************************************************************
+  *  CALL_RISBPD2A           START                              *
+  **************************************************************/
+     CALL_RISBPD2A         : PROC;
+      DCL  INP_CALLING_APPL CHAR(02) INIT('70');
+      DCL  INP_MM           PIC'(2)9'   ;
+      DCL  INP_EEEE         PIC'(4)9'   ;
+      DCL  INP_NUM_AR_LOGAR CHAR(16)   ;
+      DCL  PIC_LOGAR        PIC'(8)9'   ;
+      DCL  CHAR_LOGAR       CHAR(8)   ;
+      DCL  INP_COD_EFARM    CHAR(02) INIT('70');
+      DCL  INP_KATMA1       CHAR(4);
+      DCL  INP_KATMA2       CHAR(4);
+      DCL  INP_SERVICE_TYPE CHAR(01) INIT(' ');
+
+      INP_MM    =  WS_KEY_MONTH;
+      INP_EEEE  =  WS_KEY_YEAR;
+      INP_NUM_AR_LOGAR = SUBSTR(MIS_ACCOUNT,1,8)!! (8)' ';
+      INP_KATMA1 = MIS_BRANCH  ;
+      INP_KATMA2 = MIS_BRANCH  ;
+      FROM_RISBP2AF = '';
+      /*
+      ERLIN2= 'LOGARNPK = '!!INP_NUM_AR_LOGAR!!'.ETOS ='!!INP_EEEE
+            !!' MONTH= '!!INP_MM
+            !!' KATMA= '!!INP_KATMA1;
+      WRITE FILE(PRT) FROM(ERLINE);
+      */
+      RISBP2AF_REC                     = '';
+      RISBP2AF_REC_R.I_CALLING_APPL    = '70' ;
+      RISBP2AF_REC_R.I_NUM_YEAR        = INP_EEEE;
+      RISBP2AF_REC_R.I_NUM_MONTH       = INP_MM;
+      RISBP2AF_REC_R.I_COD_PERSONA     = 0;
+      RISBP2AF_REC_R.I_COD_EFARM       = '70' ;
+      RISBP2AF_REC_R.I_NUM_AR_LOGAR    = INP_NUM_AR_LOGAR;
+      RISBP2AF_REC_R.I_NUM_PARTICIP    = '01';
+      RISBP2AF_REC_R.I_ACCOUNT_BRANCH  = INP_KATMA1 ;
+      RISBP2AF_REC_R.I_TRANS_BRANCH    = INP_KATMA2 ;
+      RISBP2AF_REC_R.I_SERVICE_TYPE    = ' ';
+      ERLIN1= ' ';
+
+      CALL RISBPD2A(ADDR(RISBP2AF_REC));
+
+      IF RISBP2AF_REC_R.O_RETV    ^= 0 !
+         RISBP2AF_REC_R.O_SQLCODE ^= 0 !
+         RISBP2AF_REC_R.O_STATUS ^= '' THEN DO;
+
+         ERLIN1= ' ';
+
+         ERLIN2= ' ACCOUNT= '!!INP_NUM_AR_LOGAR!!' KATMA='!!INP_KATMA1
+                 !!' RETV='!!RISBP2AF_REC_R.O_RETV
+                 !!' SQLCODE='!!RISBP2AF_REC_R.O_SQLCODE
+                 !!' STATUS='!!RISBP2AF_REC_R.O_STATUS;
+    /*NPKXX WRITE FILE(PRT) FROM(ERLINE); */
+     END;
+     ELSE DO;
+       IF RISBP2AF_REC_R.O_COD_PERSONA_NEW ^= 0 THEN
+              FROM_RISBP2AF.WS_CIDB =
+              RISBP2AF_REC_R.O_COD_PERSONA_NEW;
+        ELSE
+              FROM_RISBP2AF.WS_CIDB =
+              RISBP2AF_REC_R.O_COD_PERSONA ;
+
+        FROM_RISBP2AF.WS_CUSTNAME =
+        RISBP2AF_REC_R.O_NOM_DENOM;
+        FROM_RISBP2AF.WS_RESPCENT =
+        RISBP2AF_REC_R.O_RESP_CENTER;
+        FROM_RISBP2AF.WS_CUSTCATEG =
+        RISBP2AF_REC_R.O_IND_TIPO_PERSONA;
+        FROM_RISBP2AF.WS_CUSTSUBC =
+        RISBP2AF_REC_R.O_IND_SEUDONIMOS;
+        FROM_RISBP2AF.WS_CUSTSEGM =
+        RISBP2AF_REC_R.O_COD_SEGMENT_G;
+     END;
+     END  CALL_RISBPD2A;
+  /**************************************************************
+  *  CALL_RISBPD2A               END                            *
+  **************************************************************/
+  /**************************************************************
+  *  FIND_PROD             START                                *
+  **************************************************************/
+ FIND_PROD: PROC(ARLOG) RETURNS(CHAR(4));
+   DCL ARLOG FIXED(9,0);
+   DCL PIC_PROD       PIC '(4)9' INIT(0);
+   DCL CHAR_PROD      CHAR(4) INIT('0000');
+
+   IF ARLOG = 0 THEN   RETURN (CHAR_PROD);
+
+   BKACCN.KEY_ARLOG    = ARLOG;
+   EXEC SQL
+       SELECT COD_KATHOL
+       INTO :BKACCN.COD_KATHOL
+       FROM    CTBKACCN
+       WHERE   CTBKACCN.COD_EFARM = '70'                AND
+               CTBKACCN.KEY_ARLOG = :BKACCN.KEY_ARLOG
+       WITH UR;
+   IF SQLCODE ^= 0   THEN  DO;
+            BKACCN.COD_KATHOL = 0;
+            ERLIN2 = '–—œ¬À«Ã¡ : ≈’—≈”« –≈À¡‘« ”‘œÕ CTBKACCN : '        !!
+                   !!' A—…»Ã.Àœ√¡—. '
+                   !! CHAR(BKACCN.KEY_ARLOG)
+                   !!'  SQLCODE  : '!!SQLCODE;
+                  WRITE FILE(PRT) FROM(ERLINE);
+   END;
+   PIC_PROD  = BKACCN.COD_KATHOL;
+   CHAR_PROD = PIC_PROD;
+   RETURN (CHAR_PROD);
+ END FIND_PROD;
+  /**************************************************************
+  *  FIND_PROD             END                                  *
+  **************************************************************/
+  /**************************************************************
+  *  FIND_LAST_DAY         START                                *
+  **************************************************************/
+   FIND_LAST_DAY :PROC (YEAR,MONTH)  ;
+     DCL  YEAR       DEC FIXED(5,0);
+     DCL  MONTH      DEC FIXED(3,0);
+     DCL R_PIC PIC'(6)9';
+     /* */
+      DCL 1 WW_DATE_APO,
+           2   WS_DD_APO PIC '(2)9',
+           2   F1                  CHAR(1)              INIT('.'),
+           2   WS_MM_APO PIC '(2)9',
+           2   F2                  CHAR(1)              INIT('.'),
+           2   WS_YY_APO PIC '(4)9';
+      DCL WS_DATE_APO CHAR(10) BASED(ADDR(WW_DATE_APO));
+
+      WS_DD_APO  = 1;
+      WS_MM_APO  = MONTH;
+      WS_YY_APO  = YEAR;
+
+           EXEC SQL
+                SELECT LAST_DAY(:WS_DATE_APO)
+                       INTO :WS_LAST_DATE
+                FROM SYSIBM.SYSDUMMY1 ;
+        /*      IF SQLCODE = 0 THEN DO;
+                   PUT SKIP LIST('LAST DAY IS ',WS_LAST_DATE);
+                END;
+                ELSE DO;
+                   PUT SKIP LIST ('ERROR IN FIND_LAST_DAY');
+                   PUT SKIP LIST('ERROR SQLCODE ',SQLCODE);
+                END;
+         */
+   END  FIND_LAST_DAY       ;
+  /**************************************************************
+  *  FIND_LAST_DAY               END                            *
+  **************************************************************/
+  /**************************************************************
+  *  FIND_PERIOD_REFER       START                         *
+  **************************************************************/
+     FIND_PERIOD_REFER: PROC;
+
+     WS_KEY_YEAR  = 0 ;
+     WS_KEY_MONTH = 0 ;
+     /*«ÏÂÒÔÏÁÌﬂ· —ÔﬁÚ ¡¸ ÙÁÌ DATE JCL          */
+     TODAYX            = '20'!!
+                          SUBSTR(DATE,1,2) !! /*ETOS */
+                          SUBSTR(DATE,3,2) !! /*MHNAS*/
+                          SUBSTR(DATE,5,2) ;/*HMERA*/
+     /* œ –ÒÔÁ„Ô˝ÏÂÌÔÚ ÃﬁÌ·Ú ·Ô ÙÁÌ ÁÏÂÒÔÏÁÌﬂ· ÒÔﬁÚ*/
+     IF ( PICMM = 1 ) THEN DO;
+       WS_KEY_YEAR  = PICYY - 1;
+       WS_KEY_MONTH = 12 ;
+     END;
+     ELSE DO;
+       WS_KEY_YEAR  = PICYY ;
+       WS_KEY_MONTH = PICMM - 1;
+     END;
+     /*
+     PUT SKIP LIST('√È· «ÏÂÒÔÏÁÌﬂ· —ÔﬁÚ : ',TODAYX);
+     PUT SKIP LIST('«ÏÂÒÔÏÁÌﬂ· AÌ·ˆÔÒ‹Ú ≈ÙÔÚ: ',char(ws_key_year),
+                   ' ÃﬁÌ·Ú ',char(ws_key_month)); */
+     END  FIND_PERIOD_REFER;
+  /**************************************************************
+  *  FIND_PERIOD_REFER      END                            *
+  **************************************************************/
+  /**************************************************************
+  *  FIND_KATMA               START                             *
+  *  ≈ıÒÂÛÁ Í·Ù·ÛÙﬁÏ·ÙÔÚ ÀÔ„·ÒÈ·ÏÔ˝                             *
+  **************************************************************/
+     FIND_KATMA : PROC (WS_ARLOG)  RETURNS (CHAR(04));
+     DCL WS_ARLOG   PIC '(8)9'  ;
+       T04CNV97.COD_KATMA  = '';
+
+       IF WS_ARLOG = 0 THEN  RETURN (T04CNV97.COD_KATMA);
+
+       /* CREATE ACCOUNT NUMBER FOR T04CNV97 */
+       T04CNV97.NUM_AR_LOGAR = WS_ARLOG!!(8)' '!!'01';
+       EXEC SQL
+            SELECT  COD_KATMA                                              05270
+            INTO  :T04CNV97.COD_KATMA
+            FROM   T04CNV97                                                05290
+            WHERE  T04CNV97.COD_EFARM      = '70'   AND                    05300
+                   T04CNV97.NUM_AR_LOGAR   = :T04CNV97.NUM_AR_LOGAR        05310
+            WITH UR;                                                       05320
+                                                                           05330
+       IF SQLCODE ^= 0   THEN  DO;
+            T04CNV97.COD_KATMA  = '0001';
+            ERLIN2 = '–—œ¬À«Ã¡ : ≈’—≈”« –≈À¡‘« ”‘œÕ ‘04CNV97 : '        !!
+                   !!' A—…»Ã.Àœ√¡—. '
+                   !! T04CNV97.NUM_AR_LOGAR
+                   !!'  SQLCODE  : '!!SQLCODE;
+                    WRITE FILE(PRT) FROM(ERLINE);
+       END;
+     RETURN (T04CNV97.COD_KATMA);
+     END  FIND_KATMA            ;
+  /**************************************************************
+  *  FIND_KATMA               END                               *
+  **************************************************************/
+ EXIT1:
+   DCL PIC_RECS PIC'ZZZ.ZZZ.ZZZ.ZZZ.ZZ9';
+   CTLCHR = '1';
+   GRAMH =' *”˝ÌÔÎ· –ÒÔ„Ò‹ÏÏ·ÙÔÚ DK556 *';
+   WRITE FILE(PRT) FROM(LINE);
+   CTLCHR = ' ';
+
+   GRAMH =' «Ï›Ò·  ·È ŸÒ· —ÔﬁÚ  :  '!!MY_DATETIME;
+   WRITE FILE(PRT) FROM(LINE);
+
+   PIC_RECS= F1_RECS ;
+   GRAMH ='≈ÂÓÂÒ„‹ÛËÁÍ·Ì '!!PIC_RECS!!' ¡Ô ‘Ô LogFile  ' ;
+   WRITE FILE(PRT) FROM(LINE);
+   PIC_RECS= F2_RECS ;
+   GRAMH ='≈ÂÓÂÒ„‹ÛËÁÍ·Ì '!!PIC_RECS!!' ¡Ô ÙÔ …ÛÙÔÒÈÍ¸ ¡Ò˜ÂﬂÔ ' ;
+   WRITE FILE(PRT) FROM(LINE);
+   PIC_RECS= F3_RECS ;
+   GRAMH ='≈ÂÓÂÒ„‹ÛËÁÍ·Ì '!!PIC_RECS!!' ¡Ô ÙÔ LogFile Tandem  ' ;
+   WRITE FILE(PRT) FROM(LINE);
+   PIC_RECS= ANOI_RECS ;
+   GRAMH ='≈ÂÓÂÒ„‹ÛËÁÍ·Ì '!!PIC_RECS!!' ¡Õœ… ·Ô ÙÁÌ DB2       ' ;
+   WRITE FILE(PRT) FROM(LINE);
+   PIC_RECS = OUT_RECS ;
+   GRAMH ='√Ò‹ˆÙÁÍ·Ì    : '!!PIC_RECS!!' ”ÙÔ ¡Ò˜ÂÈÔ ÙÔı MIS     ' ;
+   WRITE FILE(PRT) FROM(LINE);
+   PIC_RECS = REJ_RECS ;
+   GRAMH ='¡ÔÒÒÈˆËÁÍ·Ì  : '!!PIC_RECS!!' Â„„Ò·ˆ›Ú ÏÂ cidb-number = 0';
+   WRITE FILE(PRT) FROM(LINE);
+   CALL UNLOAD_TRANS ;
+
+   PIC_RECS = TOT_1    ;
+   GRAMH =' *”˝ÌÔÎo      : '!! PIC_RECS ;
+   WRITE FILE(PRT) FROM(LINE);
+
+
+   CLOSE FILE(INFILE1);
+   CLOSE FILE(INFILE2);
+   CLOSE FILE(INFILE3);
+
+  END  DK556;
+  /****************************************************/
+  /*
+ DCL 1  MISPPS00 ,
+ 2 MIS_APPLIC_CODE    CHAR(02), /  Ÿƒ.   ≈÷¡—Ãœ√π”                    /
+ 2 MIS_TRANS_CHANEL   CHAR(02), /  ¡Õ¢À… ”’Õ¡À.                       /
+ 2 MIS_BRANCH         CHAR(04), /  Ÿƒ.  ¡‘¡”‘.  Àœ√¡—.                /
+ 2 MIS_TRANS_BRANCH   CHAR(04), /  Ÿƒ.  ¡‘¡”‘. ”’Õ¡À.                 /
+ 2 MIS_TRANS_ATM_TERM CHAR(01), /  Ÿƒ. ¡‘Ã / ‘≈—Ã¡‘… œæ               /
+ 2 MIS_CUSTOMER       PIC'9(9)', /  Ÿƒ. CIDB NUMBER                    /
+ 2 MIS_CUST_NAME      CHAR(40), / ≈–ŸÕ’Ã∫¡ –≈À¢‘«                     /
+ 2 MIS_CUST_CATEGORY  CHAR(01), /  ¡‘«√œ—∫¡ –≈À¢‘«                    /
+ 2 MIS_CUST_SUBCATEG  CHAR(01), / ’–œ ¡‘«√œ—∫¡ –≈À¢‘«                 /
+ 2 MIS_RESP_CENTRE    CHAR(12), /  Ÿƒ.  ∏Õ‘—œ’ ≈’»æÕ«”                /
+ 2 MIS_CUST_SUBSEG    CHAR(02), / –≈À¡‘≈…¡ π œÃ¢ƒ¡                    /
+ 2 MIS_ACCOUNT        CHAR(25), / ¡—…»Ãº” Àœ√¡—.                      /
+ 2 MIS_CURRENCY       CHAR(03), /  Ÿƒ. ÕœÃ∫”Ã¡‘œ” ‘π—«”«” Àœ√¡—.      /
+ 2 MIS_PROD           CHAR(04), /  Ÿƒ. –—œ…ºÕ‘œ” ≈÷¡—Ãœ√π”            /
+ 2 MIS_VIRTUALPROD    CHAR(04), /  Ÿƒ. ≈… œÕ… œæ –—œ…ºÕ‘œ”            /
+ 2 MIS_IT_CODE        CHAR(04), /  Ÿƒ. …‘ ”’Õ¡À.                      /
+ 2 MIS_TRANS_SUBTYPE  CHAR(02), /  Ÿƒ. ¡…‘…œÀœ√∫¡” ”’Õ¡À.             /
+ 2 MIS_TRANS_CODE     CHAR(04), /  Ÿƒ. ”’Õ¡À.                         /
+ 2 MIS_TRANS_VOL      PIC'9(9)', / –Àπ»œ” ”’Õ¡ÀÀ¡√øÕ                  /
+ 2 MIS_SEPA_TRANS     CHAR(01), / 1=  SEPA , 0= OXI  SEPA             /
+ 2 MIS_COUNTRY        CHAR(02), /  01=≈ÀÀ¢ƒ¡, 02= Àœ…–¢               /
+ 2 MIS_BRANCH_OMOL    CHAR(04), /  Ÿƒ.  ¡‘/‘œ” œÃœÀœ√.ƒ¡Õ≈∫œ’         /
+ 2 MIS_SAL_CODE       CHAR(10), /  Ÿƒ. ”¡À / ≈…”«√«‘… œ’              /
+ 2 MIS_SRC_STEM_ID    CHAR(01), /  Ÿƒ ≈÷¡—Ãœ√π” (SIGLO, LEGACY,       /
+ 2 MIS_PROD_SUBCODE   CHAR(04), /  Ÿƒ. ’–œ- ¡‘«√œ—∫¡” –—œ…ºÕ‘œ”       /
+ 2 MIS_EXTRACT_DATE   CHAR(08), / «Ã≈—œÃ«Õ∫¡ ‘∏Àœ’” ÃπÕ¡ DDMMYYYY     /
+ 2 FILLER             CHAR(17);
+ DCL 1   RECISKAT,
+      2   KSMDATE  FIXED(7),          /  DATE MERGE HISTORY FILE       /
+      2   KSMLINK  CHAR (3),          /  LINK FIELDS                   /
+      2   KSMTYPE  CHAR(08),          /  EXAMPLE  KMOVESEG             /
+      2   KSMARLOG FIXED (9,0),       /  NUMBER OF ACCOUNT             /
+      2   KSMHMNIA FIXED DEC(7,0),    /  DATE OF OPERATION             /
+      2   KSMKARTR FIXED DEC(5,0),    /  TRANSACTION NUMBER            /
+      2   KSMKSEIR FIXED DEC(1,0),    /  SEQUENCE                      /
+      2   KSMSDF   BIT(8),            /  SYSTEM DELETED FLAG           /
+      2   KSMAKYR  CHAR(1),           /  FLAG DELETED
+      2   KSMKATHO FIXED DEC(5,0),    /  GENERAL ACCOUNT CODE          /
+      2   KSMKATMA FIXED DEC(5,0),    /  BANK,BRANCH CODE OF ACCOUNT   /
+      2   KSMKWDEG CHAR(1),           /  ENTRY CODE
+      2   KSMKAIT  BIT(8),            /  DESCRIPTION CODE
+      2   KSMPOSON FIXED DEC(11,2),   /  AMOUNT                        /
+      2   KSMKATLE FIXED DEC(5,0),    /  BANK,BRANCH OF OPERATION      /
+      2   KSMKATHA FIXED DEC(5,0),    /  CONTRARY G/A CODE             /
+      2   KSMSANAF,                   /  TRANSACTION REFERENCE         /
+       3  KSMTAY,                     /  TERMINAL IDENTIFICATION       /
+        4 KSMSKAT  CHAR(3),           /  BRANCH OF OPERATION           /
+        4 KSMSTERM CHAR(1),           /  TERMINAL NUMBER (LETTER)      /
+       3  KSMARTRT CHAR(3),           /  NUMBER OF OPERATIONS BY TERM. /
+      2   KSMAROPT CHAR(3),           /  TERMINAL OPERATOR ID.         /
+      2   KSMWRSYN CHAR(4),           /  TIME OF OPERATION             /
+      2   KSMAXIA  FIXED(7,0),        /  VALUE DATE                    /
+      2   KSMAREP  FIXED DEC(9,0),    /  CHECK NUMBER                  /
+      2   KSMYPXR  CHAR(1),           /  INDICATION-BALANCE OUERDRAWN
+      2   KSMTRKWD CHAR(4);           /  TRANSACTION CODE             */
+ /*
+ KEAk OK
+ KEKA OK
+ KEP1 OK
+ KprE OK
+ KArE OK
+ KTAE OK
+ Kp19 OK
+ KB00 OK
+ Kn00 OK
+ KKk1 OK
+ KKkE OK
+ KY00 OK
+ KE92 555WKE920000000085510789     PROSOXI
+ KY90     KY900000000085692097     PROSOXI
+ ANOI ÀƒÊ413JANOI,22026551,K,5114  PROSOXI
+
+ KEAk
+ KEKA
+ KEP1
+ KprE
+ KArE
+ KTAE
+ Kp19
+ KB00
+ Kn00
+ KKk1
+ KKkE
+ KY00
+ KE92
+ KY90
+ ANOI
+ */
+ /*
+ KK11
+ KK21
+ KK31
+ KA11
+ KX11
+ KA21
+ KA20
+ KX21
+ KX20
+ KA61
+ KH01
+ KH02
+ KHX2
+ KEE1
+ KTp1
+ KTX1
+ KTE1
+ KTE2
+ KTk0
+ KTk1
+ KTkE
+ KTE6
+ KK51
+ KK81
+ KA51
+ KTP5
+ KA54
+ KA51
+ KA91
+ KA92
+
+ DCL 1  TLF_REC                      ,
+     2  HEAD_IND             CHAR(02),/  TH,FH,DR,FT,TT               /
+     2  HEAD                         ,/  HMEP.& ŸPA KATA√PA÷H” RECORD /
+     3  DAT_TIM              CHAR(08),/  HMEP.& ŸPA KATA√PA÷H” RECORD /
+     3  REC_TYP              CHAR(02),/  KŸƒ… œ” RECORD               /
+             /  00=EXTRACT POSITION RECORD   01=CUSTOMER TRANSACTION  /
+             /  04=ADMINISTRATIVE RECORD     20-22=EXCEPTION RECORD   /
+     3  AUTH_PPD             CHAR(04),/  TO PPD NAME                  /
+     3  TERM                         ,/  KA»OPI”MO” TEPMATIKOY KAI    /
+                                      /  ŸPA” –OY E√INE H TRANSACTION /
+     4  TERM_LN              CHAR(04),/ LOGICAL NETWORK –OY ”YNƒEETAI /
+                                      /  TO TEPMATIKO (–X.TES1)       /
+     4  TERM_FIID            CHAR(04),/ ID IƒIOKTHTH TEPMATIKOY(CBOG) /
+     4  TERM_ID              CHAR(16),/  ID TEPMATIKOY                /
+     3  CRD                          ,/  XAPAKTHPI”TIKA TH” KAPTA”    /
+                                      /  KAI TOY EKƒOTH TH” KAPTA”    /
+     4  CRD_LN               CHAR(04),/ OP√ANI”MO” –OY EXEI ”YMBÀH»EI /
+                                    /  O EKƒOTH” TH” KAPTA” (–X.VISA) /
+     4  CRD_FIID             CHAR(04),/  TO ID TOY EKƒOTH TH” KAPTA”  /
+     4  CRD_PAN              CHAR(19),/  API»MO” KAPTA”               /
+     4  CRD_MBR_NUM          PIC'999',/  MEMBER NUMBER TAYTAPI»MH”    /
+     3  BRCH_ID              CHAR(4) ,/  ‘œ BRANCH ID –œ’ ”◊≈‘…∆≈‘¡…  /
+                     /  Ã≈ ‘œ ‘≈—Ã¡‘… œ –œ’ ≈”‘≈…À≈ THN ‘—¡ÕSACTION   /
+     3  REGN_ID              CHAR(4) ,/  ‘œ REGION ID –œ’ ”◊≈‘…∆≈‘¡…  /
+                     /  Ã≈ ‘œ ‘≈—Ã¡‘… œ –œ’ ≈”‘≈…À≈ THN ‘—¡ÕSACTION   /
+  /  3  USER_FLD1X           CHAR(2) ,   NOT USED                     /
+     /                                                                /
+     /   THE FOLLOWING FIELDS ARE INCLUDED IN FINANCIAL ‘R¡ÕSACTIONS  /
+     /     REC_TYP = 01, 20, 21, 22                                   /
+     /                                                                /
+     2  AUTH                         ,
+     3  AUT_TYP_CDE          CHAR(2) ,/  ”‘…”  ¡‘¡»≈”≈…” ≈¡Õ ◊—«”…-   /
+             /  Ãœ–œ…«»« ≈ ÷¡ ≈Àœ”.     30= ◊—«”…Ãœ–œ…«»« ≈ ÷¡ ≈Àœ”.  /
+             /  31=ƒ≈Õ ◊—«”…Ãœ–œ…«»« ≈ ÷¡ ≈Àœ”. 32=≈–…‘¡√« ◊—«”…Ãœ–.  /
+     3  AUT_TYP             PIC'(4)9',/ TY–O” MHN/TO”: 0210=AUTHORIZ. /
+         / RESPONSE, 0220=AUTHORIZ.ADVICE (STAND IN),  0420=REVERSAL  /
+         / ƒ≈Õ ◊—«”…Ãœ–œ…œ’Ã≈: 5400=TRANSACTION ADJUSTMENT            /
+         / 9980=INFORMATION-MONEY IN DRAWER  9991= LOG REQUEST        /
+
+     3  AUT_RTE_STAT         PIC'99' ,/  STATUS MHN/TO”: 00=NO ERROR  /
+                  / 01=PROCESSING ERROR   02=SECURITY DEVICE FAILURE  /
+                  / 11=DESTINATION NOT AVAILABLE, 12=LINE DOWN        /
+     3  AUT_ORIGINATOR       CHAR(01),/  WHERE TRANSACTION ORIGINATED /
+             / 1=DEVICE CONTROLLED BY BASE24, 2=DEVICE HANDLER        /
+             / 3=AUTHORIZAT.PROCESS, 4=HOST INTERFACE PROCESS, 5=HOST /
+             / 6=INTERCHANGE INTERFACE PROCESS, 7= INTERCHANGE        /
+             / CBOG ◊—«”…Ãœ–œ…EI: 3=STANDIN, 5=ONLINE, 7=INTERCHANGE  /
+     3  AUT_RESPONDER        CHAR(01),/  WHERE MESSAGE ORIGINATED     /
+     3  ENTRY_TIM            CHAR(08),/  Ÿ—¡ –œ’ « TRANS.Ã–« ≈ ¬¡”≈24 /
+     3  EXIT_TIM             CHAR(08),/  Ÿ—¡ –œ’ O HOST 'H TO ¬¡”≈24  /
+               /  ≈”‘≈…À≈ ‘œ Ã«Õ’Ã¡ ”≈ ¡’‘œÕ –œ’ »¡ ƒŸ”≈… ‘«Õ ≈√ —…”« /
+     3  RE_ENTRY_TIM         CHAR(08),/  Ÿ—¡ –œ’ O HOST 'H TO ¬¡”≈24  /
+                                      /  –≈—≈ ¡–¡Õ‘«”«                /
+     3  TRAN_DAT             PIC'(6)9',/ YYMMDD THE DATE ON WHITCH    /
+                                      /  THE TRANSACTION BEGAN        /
+     3  TRAN_TIM             PIC'(8)9',/ HHMMSSHH THE TIME THE TRANS. /
+                                      /  ENTERED THE BASE24           /
+     3  POST_DAT             PIC'(6)9',/ YYMMDD THE DATE ON WHITCH    /
+                                      /  THE TRANS. WILL BE SETTLED   /
+     3  ACQ_ICHG_SETL_DAT    PIC'(6)9',/ YYMMDD                       /
+     3  ISS_ICHG_SETL_DAT    PIC'(6)9',/ YYMMDD                       /
+     3  SEQ_NUM              CHAR(12),/  ¡—…»Ãœ” –—¡Œ«”               /
+     3  TERM_TYP             PIC'99' ,/  ‘’–œ” ‘≈—Ã¡‘… œ’.            /
+                  /  ≈Ã≈… ≈◊œ’Ã≈: 22=NCR 5070/5080,  30=DIEBOLD 1000  /
+     3  TIM_OFST         FIXED BIN(15),/                              /
+     3  ACQ_INST_ID_NUM      CHAR(11),/ THE TRANSIT NUM.OF TERM.OWNER /
+     3  RCV_INST_ID_NUM      CHAR(11),/ THE CARD-ISSUER ROUTING NUM.  /
+     3  TRAN_CDE                     ,/  ‘RANSACTION CODE             /
+                  /  ≈Ã≈… ≈◊œ’Ã≈: 22=NCR 5070/5080,  30=DIEBOLD 1000  /
+     4  T_CDE                PIC'99' ,/  ‘RANSACTION CODE             /
+                  /  10=¡Õ¡À«ÿ«,  20= ¡‘¡»≈”«, 30=≈—Ÿ‘«”« ’–œÀœ…–œ’,  /
+                  /  40=Ã≈‘¡÷œ—¡, 50=–À«—ŸÃ«  ¡—‘¡”, 51=–À«—ŸÃ«  ¡—‘. /
+                  /        Ã≈ Ã≈‘—«‘¡, 61=–¡—¡√√≈À…¡ BLOCK ≈–…‘¡√ŸÕ,  /
+                  /  70=STATEMENT Àœ√/Ãœ’, 81=¡ÀÀ¡√« PIN              /
+     4  T_FROM               PIC'99' ,/  ¡–œ –œ…œÕ Àœ√/”Ãœ            /
+              /  01=CHECKING 11=SAVINGS 31=CREDIT 70=ELECTRONIC PURSE /
+     4  T_TO                 PIC'99' ,/  ”≈ –œ…œÕ Àœ√/”Ãœ             /
+              /  01=CHECKING 11=SAVINGS 31=CREDIT 70=ELECTRONIC PURSE /
+     3  FROM_ACCT            CHAR(19),/  ¡–œ –œ…œÕ Àœ√/”Ãœ            /
+     3  USER_FLD1            CHAR(1) ,/  NOT USED                     /
+     3  TO_ACCT              CHAR(19),/  ”≈ –œ…œÕ Àœ√/”Ãœ             /
+     3  MULT_ACCT            PIC'9'  ,/  0=PRIMARY ACCOUNT            /
+                            /  1=MULTIPLE ACCOUNT 2=FAST CASH TRANS.  /
+     3  CHAR_AMT_1           CHAR(04),/  AMOUNT REQUESTED             /
+     3  AMT_1        FIXED BIN(31,0) ,/  AMOUNT REQUESTED             /
+     3  CHAR_AMT_2           CHAR(04),/  –œ”œ –œ’ –«—≈ œ –≈À¡‘«”      /
+     3  AMT_2        FIXED BIN(31,0) ,/  –œ”œ –œ’ –«—≈ œ –≈À¡‘«”      /
+     3  AMT_3                CHAR(08),/  √…¡ ≈—Ÿ‘«”« ’–œÀœ…–œ’        /
+                                      /  AVAILABLE BALANCE            /
+     3  DEP_BAL_CR   FIXED BIN(31,0) ,/                               /
+     3  DEP_TYP              PIC'9'  ,/  0=NORMAL ENVELOPE DEPOSITORY /
+     3  RESP_CDE                     ,/  000,001=≈–…‘’◊«Ã≈Õ«          /
+     4  RESP_BYTE_1          CHAR(1) ,/  0=CARD WAS RETURNED          /
+                                      /  1=CARD WAS RETAINED          /
+     4  RESP_BYTE_2          CHAR(2) ,/  REASON CODE                  /
+     3  TERM_NAME_LOC        CHAR(25),/                               /
+     3  TERM_OWNER_NAME      CHAR(22),/                               /
+     3  TERM_CITY            CHAR(13),/                               /
+     3  TERM_ST_Y            CHAR(03),/                               /
+     3  TERM_CNTRY_X         CHAR(02),/                               /
+     3  ORIG                         ,/  ‘RANSACTION CODE             /
+     4  OSEQ_NUM             CHAR(12),/  THE SEQUENCE NUMBER OF THE   /
+                                      /  ORIGINAL TRANSACTION         /
+     4  OTRAN_DAT            CHAR(04),/  DATE OF ORIGINAL TRANSACTION /
+     4  OTRAN_TIM            CHAR(08),/  TIME OF ORIGINAL TRANSACTION /
+     4  B24_POST_DAT         CHAR(04),/  BASE24 POSTING DATE          /
+     3  ORIG_CRNCY_CDE       PIC'999',/  TYPE OF CURRENCY INVOLVED    /
+     3  MULT_CRNCY                   ,  /  FIELDS FOR MULTI CURRENCY  /
+     4  AUTH_CRNCY_CDE       PIC'999',  /  TYPE OF CURRENCY USED IN   /
+                                        /  AUTHORIZATION RESPONSE     /
+     4  AUTH_CONV_RATE       PIC'(8)9', /  EXCHANGE RATE OF THE       /
+                                        /  AUTHORIZING INSTITUTION    /
+     4  SETL_CRNCY_CDE       PIC'999',  /  EXCHANGE RATE OF THE       /
+                                        /   SETTLEMENT ENTITY         /
+     4  SETL_CONV_RATE       PIC'(8)9', /  EXCHANGE RATE OF THE       /
+                                        /   SETTLEMENT ENTITY         /
+     4  CONV_DAT_TIM         CHAR(08),  /  DAY AND TIME WHEN EXCANGE  /
+                                        /  RATE WAS APPLIED           /
+     3  RVSL_RSN             PIC'99' ,  /  INDICATOR USED FOR REVERSAL /
+                                        /           REASON             /
+                                       /  01=TIME-OUT                  /
+                                       /  02=COMMAND REJECT            /
+                                       /  03=DESTINATION NOT AVAILABLE /
+                                       /  08=TRANSACTION CANCELED      /
+                                       /  10=HARDWARE ERROR            /
+                                       /  20=SUSPECT TRANSACTION       /
+                                       /  30=FUNDS SIDE OF STORED      /
+                                       /     VALUE TRAN FAILED         /
+                                       /  31=SVC SIDE OF STORED VALUE  /
+                                       /     TRAN FAILED               /
+     3  PIN_OFST             CHAR(16),  /  PIN OFFSET VALUE FOR PIN    /
+     3  SHRG_GRP             CHAR(01), /  INDICATOR USED TO IDENTIFY   /
+                                       /  THE SHARING GROUP USED TO    /
+                                       /  ALLOW THE TRANSACTION, IF    /
+                                       /  IT WAS A NOT-OF-US TRANS.    /
+                                       /  OTHERWISE IT CONTAINS A ZERO /
+     3  DEST_ORDER           CHAR(01), /  INDICATOR USED TO DETERMINE  /
+                                       /  WHICH DESTINATION PERFORMED  /
+                                       /  THE FINAL AUTHORIZATION.     /
+                                       /  A = ALTERNATE DESTINATION    /
+                                       /  P = PRIMARY   DESTINATION    /
+     3  AUTH_ID_RESP         CHAR(06), /  HOST-GENERATED TRANSACTION   /
+                                       /  SEQ. NUMBER USED FOR LOGGING /
+                                       /  AND EXTRACT PURPOSES ONLY    /
+     3  REFR                         , /  FIELDS INDICATE TO REFRESH   /
+     4  IMP_IND              CHAR(01), /  INDICATOR USED TO DETERMINE  /
+                                       /  WHETHER THIS RECORD SHOULD   /
+                                       /  BE CONSIDERED WHEN IMPACTING /
+                                       /  A NEWLY REFRESHED SET OF     /
+                                       /  ACCOUNT RECORDS. VALUES:     /
+                                       /  0 = DO NOT USE THIS RECORD   /
+                                       /      FOR IMPACTING            /
+                                       /  1 = USE THIS RECORD FOR      /
+                                       /      IMPACTING                /
+     4  AVAIL_IMP(2)         CHAR(01), /  INDICATOR USED TO DEFINE HOW /
+                                       /  THE VALUE IN THE AVAIL_BAL   /
+                                       /  FIELD IS IMPACTED. THE FIRST /
+                                       /  OCCURENCE DEFINES IMPACTING  /
+                                       /  ON THE FROM ACCOUNT AND THE  /
+                                       /  SECOND ON THE TO ACCOUNT     /
+                                       /  0 = NO EFFECT ON BALANCE.    /
+                                       /  1 = ADD TO BALANCE           /
+                                       /  2 = SUBTRACT FROM BALANCE    /
+     4  LEDG_IMP(2)          CHAR(01), /  INDICATOR USED TO DEFINE HOW /
+                                       /  THE VALUE IN THE LEDG_BAL    /
+                                       /  FIELD IS IMPACTED. THE FIRST /
+                                       /  OCCURENCE DEFINES IMPACTING  /
+                                       /  ON THE FROM ACCOUNT AND THE  /
+                                       /  SECOND ON THE TO ACCOUNT     /
+                                       /  0 = NO EFFECT ON BALANCE.    /
+                                       /  1 = ADD TO BALANCE           /
+                                       /  2 = SUBTRACT FROM BALANCE    /
+     4  HLD_AMT_IMP(2)       CHAR(01), /  INDICATOR USED TO DEFINE HOW /
+                                       /  THE VALUE IN THE AMT_ON_HLD  /
+                                       /  FIELD IS IMPACTED. THE FIRST /
+                                       /  OCCURENCE DEFINES IMPACTING  /
+                                       /  ON THE FROM ACCOUNT AND THE  /
+                                       /  SECOND ON THE TO ACCOUNT.    /
+                                       /  0 = NO EFFECT ON BALANCE.    /
+                                       /  1 = ADD TO BALANCE.          /
+                                       /  2 = SUBTRACT FROM BALANCE.   /
+     4  CAF_REFR_IND         CHAR(01), /  INDICATOR USED TO DETERMINE  /
+                                       /  WHEN TRANSACTION IMPACTING   /
+                                       /  CAN BE TERMINATED.           /
+     4  USER_FLD3            CHAR(01), /  NOT USED                     /
+     3  DEP_SETL_IMP_FLG     CHAR(01), /  INDICATOR IDENTIFYING HOW    /
+                                       /  DEPOSITS AT AN ATM IMPACT    /
+                                       /  SETTLEMENT. VALUES:          /
+                                       /  0 = DEPOSITS DO NOT IMPACT   /
+                                       /      SETTLEMENT.              /
+                                       /  1 = ENVELOPE DEPOSITS DO     /
+                                       /      IMPACT SETTLEMENT.       /
+                                       /  2 = COMMERCIAL DEPOSITS DO   /
+                                       /      IMPACT SETTLEMENT.       /
+                                       /  3 = BOTH ENVELOPE & COMMERC. /
+                                       /      DEPOSITS DO IMPACT SETTL /
+     3  ADJ_SETL_IMP_FLG     CHAR(01), /  INDICATOR IDENTIFYING HOW    /
+                                       /  ADJUSTMENTS IMPACT SETTLEM.  /
+                                       /  0 = ADJUSTMENTS DO NOT       /
+                                       /      IMPACT SETTLEMENT.       /
+                                       /  1 = ADJUSTMENTS DO IMPACT    /
+                                       /      SETTLEMENT.              /
+     3  REFR_IND                     , /  INDICATOR USED TO DETERMINE  /
+                                       /  WHEN TRANSACTION IMPACTING   /
+                                       /  CAN BE TERMINATED.           /
+     4  PBF1                 CHAR(01), /  FOR CHECKING ACCOUNTS        /
+     4  PBF2                 CHAR(01), /  FOR SAVINGS ACCOUNTS         /
+     4  PBF3                 CHAR(01), /  FOR CREDIT ACCOUNTS          /
+     4  PBF4                 CHAR(01), /  USED IN SITUATIONS WHEN A    /
+                                       /  CPBF IS USED INSTEAD OF PBF  /
+     3  USER_FLD4            CHAR(16), /  NOT USED                     /
+     3  FRWD_INST_ID_NUM     CHAR(04), /  INDENTIFICATION NUMBER TO    /
+                                       /  IDENTIFY THE FORWARDING      /
+                                       /  INSITUTION                   /
+     3  CRD_ACCPT_ID_NUM     CHAR(04), /  INDENTIFICATION NUMBER TO    /
+                                       /  IDENTIFY THE CARD ACCEPTOR   /
+                                       /  FOR A REQUEST MESSAGE ORIGI- /
+                                       /  NATING FROM AN ACQUIRER HOST /
+     3  CRD_ISS_ID_NUM       CHAR(04), /  INDENTIFICATION NUMBER TO    /
+                                       /  IDENTIFY THE CARD ISSUER FOR /
+                                       /  A RESPONSE MESSAGE ORIGINATI /
+                                       /  NG FROM AN AUTHORIZING  HOST /
+     3  USER_FLD6            CHAR(01); /  NOT USED                     /
+ */
+ /* ANOI ANOI ANOI
+    T04CNV97
+    COD_EMPRESA COD_PELATH  COD_EFARM  NUM_AR_LOGAR
+    COD_KATMA   FEC_HMNIA_OPEN  IND_OPEN_CLOSE
+    TIMESTAMP_SIGLO
+
+    COD_USUARIO =  '¡Õœ…'
+
+
+
+  CTBKACCN
+  COD_EFARM KEY_ARLOG  COD_KATHOL  KEY_TIMESTAMP
+
+
+
+
+  */
+

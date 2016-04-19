@@ -1,0 +1,563 @@
+ /* PROCESS A,GOSTMT,NEST,OPT(TIME),AG,MI('+'),MAP,M,OF,NIS;          */
+
+ /*********************** BKXAR6N *************************************/
+ /*  AUTHOR: TSOMLEKTZOGLOY                                           */
+ /*  TO pPOcPAMMA  BKXAR6N dIABAZEI TO APXEIO THr dIKHr MAr MIrhOdOrIA*/
+ /*  KAI uTEIAXNEI APXEIA ApANTHrExN cIA TON dIA                      */
+ /*  pPEpEI NA dIABAZEI KAI TO APXEIO pOY KPATAME cIA NA pAIPNEI TA   */
+ /*  rTOIXEIA ME KxdIKO 4 cIA NA TA dxrOYME rTON dIA                  */
+ /*********************************************************************/
+
+ MANT: PROC OPTIONS(MAIN);
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+ DCL CZX3VDAT CHAR(6); FETCH CZXDATEP;
+ DCL CZXDATEP ENTRY OPTIONS(INTER,ASM) ;
+ DCL TAPE1 FILE RECORD OUTPUT ENV( FB RECSIZE(147) );
+ DCL LIST1 FILE RECORD OUTPUT ENV( FB RECSIZE(133) CTLASA);
+ DCL MIST  FILE RECORD INPUT  SEQUENTIAL  ENV( FB RECSIZE(200) );
+ DCL MIDI  FILE RECORD INPUT  SEQUENTIAL  ENV( FB RECSIZE(147) );
+ DCL MID2 FILE RECORD INPUT  SEQUENTIAL  ENV( FB RECSIZE(147) );
+ DCL ELEG FILE RECORD INPUT  SEQUENTIAL  ENV( FB RECSIZE(65)  );
+ %INCLUDE DAYATNS;
+ %INCLUDE RECDBCR;
+
+ DCL  1  ELEGINP,
+        2 ELEGKWD     PIC'(6)9',           /*  KxdIKOr pEkATH         */
+        2 ELEGDIAS    CHAR(5),             /*  KxdIKOr dIAr           */
+        2 ELEGEPWN    CHAR(27),            /*  EpxNYMIA OPcANIrMOY    */
+        2 ELEGMISTDIA CHAR(3),             /*  EIDOS & MHNAS MISUOD   */
+        2 ELEGINP     FIXED(7,0),          /*  INPUT RECORDS          */
+        2 ELEGAMT     FIXED(15,2),         /*  POSO INPUT             */
+        2 ELEGAPO     FIXED(7,0),          /*  APORRICEIS RECORDS     */
+        2 ELEGAPOAMT  FIXED(15,2);         /*  POSO APORRICEVN        */
+
+
+ /***** pEPIcPAuH  TxN  INPUT  RECORDS *******************************/
+ DCL 1  RECOUT_ALL       CHAR(147)      INIT(' ');
+ DCL 1  RECMIDI          CHAR(147)      INIT(' ');
+ /***** INPUT  RECORD GROUP HEADER RECORD OPcANIrMOY */
+ DCL 1  RECMID2 BASED(ADDR(RECMIDI)),
+      2  RECMID2_EGG      CHAR(1)        INIT(' '),
+      2  RECMID2_ORG      CHAR(5)        INIT(' '),
+      2  RECMID2_NAME     CHAR(30)       INIT(' '),
+      2  RECMID2_MIS      CHAR(2)        INIT(' '),
+      2  RECMID2_MM       CHAR(2)        INIT(' '),
+      2  RECMID2_YY       CHAR(4)        INIT(' '),
+      2  RECMID2_AA       CHAR(3)        INIT(' '),
+      2  RECMID2_PROM     CHAR(3)        INIT(' '),
+      2  RECMID2_MIN_PR   CHAR(3)        INIT(' '),
+      2  RECMID2_MAX_PR   CHAR(4)        INIT(' '),
+      2  RECMID2_EPIBAR   CHAR(2)        INIT(' '),
+      2  RECMID2_HMERES   CHAR(2)        INIT(' '),
+      2  RECMID2_DATE_ER  CHAR(8)        INIT(' '),
+      2  RECMID2_VAL_TRAP CHAR(8)        INIT(' '),
+      2  RECMID2_FILLER   CHAR(70)       INIT(' ');
+
+ DCL 1  RECMID4 BASED(ADDR(RECMIDI)),
+      2  RECMID4_EGG      CHAR(1)        INIT(' '),
+      2  RECMID4_ORG      CHAR(5)        INIT(' '),
+      2  RECMID4_KATMA    CHAR(3)        INIT(' '),
+      2  RECMID4_ARLOG    CHAR(13)       INIT(' '),
+      2  RECMID4_POSO     CHAR(13)       INIT(' '),
+      2  RECMID4_EPVNYMO  CHAR(20)       INIT(' '),
+      2  RECMID4_ONOMA    CHAR(6)        INIT(' '),
+      2  RECMID4_PATR     CHAR(4)        INIT(' '),
+      2  RECMID4_AR_MHTR  CHAR(10)       INIT(' '),
+      2  RECMID4_DIAS     CHAR(17)       INIT(' '),
+      2  RECMID4_FILLER   CHAR(23)       INIT(' '),
+      2  RECMID4_MHTRVO   CHAR(5)        INIT(' '),
+      2  RECMID4_IBAN     CHAR(27)       INIT(' ');
+
+
+ /***** OUTPUT RECORD FILE HEADER RECORD TPApEZAr cIA TON dIA   */
+ DCL 1  RECOUT1 BASED(ADDR(RECOUT_ALL)),
+      2  RECOUT1_EGG      CHAR(1)        INIT(' '),
+      2  RECOUT1_APO      CHAR(3)        INIT(' '),
+      2  RECOUT1_PAR      CHAR(3)        INIT(' '),
+      2  RECOUT1_FILE     CHAR(8)        INIT(' '),
+      2  RECOUT1_DATE     CHAR(8)        INIT(' '),
+      2  RECOUT1_TIME     CHAR(4)        INIT(' '),
+      2  RECOUT1_SYS_DATE CHAR(8)        INIT(' '),
+      2  RECOUT1_SYS_TIME CHAR(4)        INIT(' '),
+      2  RECOUT1_FILLER   CHAR(108)      INIT(' ');
+
+ /***** INPUT  RECORD GROUP HEADER RECORD OPcANIrMOY */
+ DCL 1  RECOUT2 BASED(ADDR(RECOUT_ALL)),
+      2  RECOUT2_EGG      CHAR(1)        INIT(' '),
+      2  RECOUT2_ORG      CHAR(5)        INIT(' '),
+      2  RECOUT2_NAME     CHAR(30)       INIT(' '),
+      2  RECOUT2_MIS      CHAR(2)        INIT(' '),
+      2  RECOUT2_MM       CHAR(2)        INIT(' '),
+      2  RECOUT2_YY       CHAR(4)        INIT(' '),
+      2  RECOUT2_AA       CHAR(3)        INIT(' '),
+      2  RECOUT2_PROM     CHAR(3)        INIT(' '),
+      2  RECOUT2_MIN_PR   CHAR(3)        INIT(' '),
+      2  RECOUT2_MAX_PR   CHAR(4)        INIT(' '),
+      2  RECOUT2_EPIBAR   CHAR(2)        INIT(' '),
+      2  RECOUT2_HMERES   CHAR(2)        INIT(' '),
+      2  RECOUT2_DATE_ER  CHAR(8)        INIT(' '),
+      2  RECOUT2_VAL_TRAP CHAR(8)        INIT(' '),
+      2  RECOUT2_FILLER   CHAR(70)       INIT(' ');
+
+ /***** INPUT  RECORD DETAIL       RECORD OPcANIrMOY */
+ DCL 1  RECOUT4 BASED(ADDR(RECOUT_ALL)),
+      2  RECOUT4_EGG      CHAR(1)        INIT(' '),
+      2  RECOUT4_ORG      CHAR(5)        INIT(' '),
+      2  RECOUT4_KATMA    CHAR(3)        INIT(' '),
+      2  RECOUT4_ARLOG    CHAR(13)       INIT(' '),
+      2  RECOUT4_POSO     CHAR(13)       INIT(' '),
+      2  RECOUT4_EPVNYMO  CHAR(20)       INIT(' '),
+      2  RECOUT4_ONOMA    CHAR(6)        INIT(' '),
+      2  RECOUT4_PATR     CHAR(4)        INIT(' '),
+      2  RECOUT4_AR_MHTR  CHAR(10)       INIT(' '),
+      2  RECOUT4_DIAS     CHAR(17)       INIT(' '),
+      2  RECOUT4_APOR     CHAR(3)        INIT(' '),
+      2  RECOUT4_FILLER   CHAR(25)       INIT(' '),
+      2  RECOUT4_IBAN     CHAR(27)       INIT(' ');
+
+ /***** INPUT  RECORD GROUP SUMMARY RECORD OPcANIrMOY */
+ DCL 1  RECOUT6 BASED(ADDR(RECOUT_ALL)),
+      2  RECOUT6_EGG      CHAR(1)        INIT(' '),
+      2  RECOUT6_ORG      CHAR(5)        INIT(' '),
+      2  RECOUT6_MIS      CHAR(2)        INIT(' '),
+      2  RECOUT6_TRAPEZA  CHAR(3)        INIT(' '),
+      2  RECOUT6_610      CHAR(6)        INIT(' '),
+      2  RECOUT6_DATE_TR  CHAR(8)        INIT(' '),
+      2  RECOUT6_DATE_ER  CHAR(8)        INIT(' '),
+      2  RECOUT6_FILL1    CHAR(2)        INIT(' '),
+      2  RECOUT6_ANAL_EGG CHAR(8)        INIT(' '),
+      2  RECOUT6_FILL2    CHAR(2)        INIT(' '),
+      2  RECOUT6_POSO     CHAR(13)       INIT(' '),
+      2  RECOUT6_FILL3    CHAR(2)        INIT(' '),
+      2  RECOUT6_PROM     CHAR(13)       INIT(' '),
+      2  RECOUT6_FILL4    CHAR(2)        INIT(' '),
+      2  RECOUT6_EPIB     CHAR(13)       INIT(' '),
+      2  RECOUT6_FILLER   CHAR(59)       INIT(' ');
+
+ /***** INPUT  RECORD TRAILER       RECORD TPApEZAr   */
+ DCL 1  RECOUT7 BASED(ADDR(RECOUT_ALL)),
+      2  RECOUT7_EGG      CHAR(1)        INIT(' '),
+      2  RECOUT7_FILL1    CHAR(34)       INIT(' '),
+      2  RECOUT7_ANAL_EGG CHAR(8)        INIT(' '),
+      2  RECOUT7_FILL2    CHAR(2)        INIT(' '),
+      2  RECOUT7_POSO     CHAR(13)       INIT(' '),
+      2  RECOUT7_FILL3    CHAR(2)        INIT(' '),
+      2  RECOUT7_PROM     CHAR(13)       INIT(' '),
+      2  RECOUT7_FILL4    CHAR(2)        INIT(' '),
+      2  RECOUT7_EPIB     CHAR(13)       INIT(' '),
+      2  RECOUT7_FILL5    CHAR(59)       INIT(' ');
+
+ /**********====================================*****************/
+
+ DCL    COUNT_INP         FIXED(15)   INIT(0);
+ DCL    AMT_INP           FIXED(15,2) INIT(0);
+ DCL    DCOUNT            PIC 'ZZZ.ZZZ.ZZZ.ZZ9' INIT(0);
+ DCL    DAMT              PIC 'Z.ZZZ.ZZZ.ZZZ.ZZ9V,99' INIT(0);
+ DCL    DAMT1             PIC 'Z.ZZZ.ZZZ.ZZZ.ZZ9' INIT(0);
+ DCL    COUNT_MIDI        FIXED(15)   INIT(0);
+ DCL    COUNT_OUT         FIXED(15)   INIT(0);
+ DCL    COUNT_1           FIXED(15)   INIT(0);
+ DCL    COUNT_2           FIXED(15)   INIT(0);
+ DCL    COUNT_4           FIXED(15)   INIT(0);
+ DCL    COUNT_6           FIXED(15)   INIT(0);
+ DCL    COUNT_7           FIXED(15)   INIT(0);
+ DCL    GR_EGG            PIC '(8)9'  INIT(0);
+ DCL    GR_AMT            PIC '(13)9' INIT(0);
+ DCL    TR_EGG            PIC '(8)9'  INIT(0);
+ DCL    TR_AMT            PIC '(13)9' INIT(0);
+ DCL    WMHTRWO           PIC '(5)9'  INIT(0);
+ DCL    CMHTRWO           CHAR(5)     INIT(' ');
+ DCL    WEIDOS            PIC '(4)9'  INIT(0);
+ DCL    CEIDOS            CHAR(4)     INIT(' ');
+ DCL    CMISMM            CHAR(4)     INIT(' ');
+ DCL    WMISMM            PIC '(4)9'  BASED(ADDR(CMISMM));
+ DCL    REIDOS            FIXED(4)    BASED(ADDR(MISTDIA));
+ DCL    EIDOS_MM          FIXED(4)    INIT(0);
+ DCL    CEIDOS_MM         CHAR(3)     BASED(ADDR(EIDOS_MM));
+ DCL    KEEP_CEIDOS       CHAR(4)     INIT(' ');
+ DCL    R_POSON           PIC '(13)9' BASED(ADDR(POSON));
+ DCL    WPOSON            PIC '(13)9V99'  INIT(0);
+ DCL    WPOSON1           PIC '(13)9'  INIT(0);
+ DCL    WPOSON2           PIC '(13)9'  INIT(0);
+ DCL    WAA               PIC '(5)9'  INIT(0);
+ DCL    DAA               PIC 'ZZZ.ZZ9'  INIT(0);
+ DCL    WORG              CHAR(5)   INIT(' ');
+ DCL    KEEP_KWD          CHAR(9)   INIT(' ');/*OPcANIrMOr+EIdOr MIr*/
+
+ DCL    SYS_DATE          CHAR(6)    INIT(' ');
+ DCL    SYS_TIME          CHAR(9)    INIT(' ');
+ DCL    WSYS_DATE         PIC '999999' BASED(ADDR(SYS_DATE));
+ DCL    W_DATE            PIC '999999';
+ DCL    ELEG_FLAG         PIC '9' INIT(0);
+
+ DCL    BASED  BUILTIN;
+ DCL    SUBSTR BUILTIN;
+ DCL    VERIFY BUILTIN;
+ DCL    PRIORITY BUILTIN;/****  DATE SIMULATION DEFINED FUNCTION  ****/
+ DATE: PROC IRREDUCIBLE RETURNS(CHAR(6)) ;
+       CALL CZXDATEP          ( CZX3VDAT) ;
+       RETURN (CZX3VDAT) ;
+       END DATE ;
+ /****        END OF MVS-MS INSERT        ****/
+ DCL    TIME   BUILTIN;
+ DCL    ADDR   BUILTIN;
+
+ DCL  1 LINE,
+         2 L1            CHAR(1),
+         2 L2            CHAR(132);
+
+     SYS_DATE = DATE;
+     SYS_TIME = TIME;
+     OPEN FILE(LIST1);
+     OPEN FILE(TAPE1);
+     OPEN FILE(MID2);
+     OPEN FILE(MIDI);
+     OPEN FILE(MIST);
+     ON ENDFILE(MIST) BEGIN;
+        CALL WRITE_6;
+        CALL READ_ELEG;
+        GO TO TELOS;
+        END;
+
+     ON ENDFILE(MIDI) BEGIN;
+        CLOSE FILE(MIDI);
+        OPEN  FILE(MIDI);
+        END;
+
+     ON ENDFILE(MID2) GOTO TELOS;
+
+     CALL HEAD;
+     CALL WRITE_1;
+
+     GR_EGG = 0;
+     GR_AMT = 0;
+     TR_EGG = 0;
+     TR_AMT = 0;
+ RR1:
+
+ R1:
+     READ FILE(MIST) INTO(RECDBCR);
+     COUNT_INP = COUNT_INP + 1;
+     AMT_INP   = AMT_INP + POSON;
+     IF COUNT_INP = 1 THEN DO;
+        KEEP_KWD = SUBSTR(ONOMA,1,9);
+        CALL READ_MID2;
+        CALL WRITE_2N;
+     END;
+
+     IF COUNT_INP ^= 1 THEN DO;
+        IF KEEP_KWD  ^= SUBSTR(ONOMA,1,9) THEN DO;
+           CALL WRITE_6;
+           CALL READ_ELEG;
+           KEEP_KWD = SUBSTR(ONOMA,1,9);
+           CALL READ_MID2;
+           CALL WRITE_2N;
+           GR_EGG = 0;
+           GR_AMT = 0;
+        END;
+     END;
+
+     IF REIDOS = WMISMM THEN DO;
+        CALL WRITE_4;
+     END;
+
+   GOTO R1;
+
+ WRITE_1: PROC;
+        COUNT_1 = COUNT_1 + 1;
+        RECOUT1 = '';
+        RECOUT1_EGG      = '1';
+        RECOUT1_APO      = '012';
+        RECOUT1_PAR      = '000';
+        RECOUT1_FILE     = 'PA012F00';
+        RECOUT1_DATE     = '00000000';
+        RECOUT1_TIME     = '0000';
+        SUBSTR(RECOUT1_SYS_DATE,1,2) = '20';
+        SUBSTR(RECOUT1_SYS_DATE,3,6) = SYS_DATE;
+        RECOUT1_SYS_TIME = SUBSTR(SYS_TIME,1,4);
+        WRITE FILE(TAPE1) FROM(RECOUT1);
+        COUNT_OUT = COUNT_OUT + 1;
+ END WRITE_1;
+
+ WRITE_2N: PROC;
+        WRITE FILE(TAPE1) FROM(RECMID2);
+        WORG             = RECMID2_ORG;
+        COUNT_OUT = COUNT_OUT + 1;
+        COUNT_2 = COUNT_2 + 1;
+ END WRITE_2N;
+ WRITE_4: PROC;
+        RECOUT4 = '';
+        RECOUT4_EGG      = '4';
+
+        /* PREPEI NA ELEGXEI TON KVDIKO APORRICHS KAI AN EINAI
+           DIAFORO TOY MHDENOS NA DIABAZEI TO ALLO ARXEIO
+           KAI NA PAIRNEI TA STOIXEIA */
+
+        IF STATUS ^= '00' THEN DO;
+           WMHTRWO = SUBSTR(MHTRWO,1,5);  /* MMHTRWO */
+           CMHTRWO = WMHTRWO;
+           CALL READ_MIDI;
+
+           RECOUT4_ORG      = RECMID4_ORG;
+           WORG             = RECMID4_ORG;
+           RECOUT4_ARLOG    = RECMID4_ARLOG;
+           RECOUT4_IBAN     = RECMID4_IBAN;
+           RECOUT4_EPVNYMO  = RECMID4_EPVNYMO;
+           RECOUT4_ONOMA    = RECMID4_ONOMA;
+           RECOUT4_PATR     = RECMID4_PATR;
+           RECOUT4_KATMA    = RECMID4_KATMA;
+           RECOUT4_AR_MHTR  = RECMID4_AR_MHTR;
+           RECOUT4_DIAS     = RECMID4_DIAS;
+
+           IF STATUS = '01' THEN DO;      /* ANYpAPKTOr kOcAPIArMOr */
+              RECOUT4_APOR     = 'P'!!'21';
+           END;
+           IF STATUS = '07'  THEN DO;       /* KkEIrTOr kOcAPIArMOr   */
+              RECOUT4_APOR     = 'P'!!'22';
+           END;
+           IF STATUS = '06' THEN DO;       /* pOrO MHdEN             */
+              RECOUT4_APOR     = 'P'!!'26';
+           END;
+           IF ^(STATUS = '01' ! STATUS = '07' ! STATUS = '06') THEN DO;
+              RECOUT4_APOR     = 'P'!!'99';
+           END;
+
+           COUNT_4 = COUNT_4 + 1;
+           COUNT_OUT = COUNT_OUT + 1;
+
+           WPOSON1 = POSON * 100;
+           RECOUT4_POSO = WPOSON1;
+           GR_AMT = GR_AMT + WPOSON1;
+           GR_EGG = GR_EGG + 1;
+           TR_AMT = TR_AMT + WPOSON1;
+           TR_EGG = TR_EGG + 1;
+           WRITE FILE(TAPE1) FROM(RECOUT4);
+
+        END;
+
+ END WRITE_4;
+ WRITE_6: PROC;
+        COUNT_6 = COUNT_6 + 1;
+        RECOUT6 = '';
+        RECOUT6_EGG      = '6';
+        RECOUT6_ORG      = WORG;
+        RECOUT6_MIS      = SUBSTR(KEEP_CEIDOS,1,2);
+        RECOUT6_TRAPEZA  = '000';
+        RECOUT6_610      = '000000';
+        RECOUT6_DATE_TR  = '00000000';
+        RECOUT6_DATE_ER  = '00000000';
+        RECOUT6_ANAL_EGG = GR_EGG;
+        RECOUT6_POSO     = GR_AMT;
+        RECOUT6_PROM     = '0000000000000';
+        RECOUT6_EPIB     = '0000000000000';
+        WRITE FILE(TAPE1) FROM(RECOUT6);
+        COUNT_OUT = COUNT_OUT + 1;
+        L1 = ' ';
+        WPOSON1 = GR_AMT;
+        WPOSON  = WPOSON1 / 100;
+        DAMT   = WPOSON;
+        DAMT1  = GR_AMT;
+        L2 = 'ApOPPIwEIr OPcANIrMOY rE EccPAuEr & pOrO '!!
+                 WORG!!' '!!GR_EGG!!' '!!DAMT!!' EYPx'!!
+                 ' APXEIOY:'!!DAMT1;
+        WRITE FILE(LIST1) FROM(LINE);
+ END WRITE_6;
+ WRITE_7: PROC;
+        COUNT_7 = COUNT_7 + 1;
+        RECOUT7 = '';
+        RECOUT7_EGG      = '7';
+        RECOUT7_ANAL_EGG = TR_EGG;
+        RECOUT7_POSO     = TR_AMT;
+        RECOUT7_PROM     = '0000000000000';
+        RECOUT7_EPIB     = '0000000000000';
+        WRITE FILE(TAPE1) FROM(RECOUT7);
+        COUNT_OUT = COUNT_OUT + 1;
+ END WRITE_7;
+ READ_MIDI: PROC;
+ READ_JANA:
+     READ FILE(MIDI) INTO(RECMIDI);
+     COUNT_MIDI = COUNT_MIDI + 1;
+     /*
+     IF COUNT_MIDI > 100000000 THEN DO;
+       L2 = COUNT_MIDI!!' CMHTRWO='!!CMHTRWO!!' MID4='!!RECMID4_MHTRVO!!
+            ' '!!WORG;
+       WRITE FILE(LIST1) FROM(LINE);
+     END;
+     */
+
+     /*
+     L2 = COUNT_MIDI!!' CMHTRWO='!!CMHTRWO!!' MID4='!!RECMID4_MHTRVO!!
+          ' '!!WORG;
+     WRITE FILE(LIST1) FROM(LINE);
+     */
+
+     IF SUBSTR(RECMIDI,1,1) ^= '4' THEN DO;
+        GO TO READ_JANA;
+     END;
+     /* AN BPEhEI kOcAPIArMOr ME 9(9) rTO TAM1 cPAuETAI ME 08(9)
+        KAI rTO INPUT APXEIO TOY dIA EINAI ME 9(9)
+        cIA NA ZEYcAPxrEI pPEpEI NA cINEI 9(9)            */
+     IF ARLOG = 099999999 THEN ARLOG = 999999999;
+     /*
+     WPOSON2 = POSON;
+     L1 = '0';
+     L2 = 'WPOSON2 '!!WPOSON2!!' RECMID4_POSO '!!RECMID4_POSO!!
+          ' ARLOG  '!!ARLOG!!' RECMID4_ARLOG '!!RECMID4_ARLOG;
+     WRITE FILE(LIST1) FROM(LINE);
+     */
+     WPOSON2 = POSON * 100;
+     IF SUBSTR(RECMID4_IBAN,1,2) = '  ' THEN DO;
+        IF ^( CMHTRWO = RECMID4_MHTRVO             &
+              ARLOG = SUBSTR(RECMID4_ARLOG,5,9)   &
+              WPOSON2 = RECMID4_POSO ) THEN DO;
+           GO TO READ_JANA;
+        END;
+     END;
+     ELSE DO;
+        IF ^( CMHTRWO = RECMID4_MHTRVO             &
+              ARLOG = '0'!!SUBSTR(RECMID4_IBAN,20,8)   &
+              WPOSON2 = RECMID4_POSO ) THEN DO;
+           GO TO READ_JANA;
+        END;
+     END;
+ END READ_MIDI;
+ READ_MID2: PROC;
+ READ_JAN2:
+     READ FILE(MID2) INTO(RECMIDI);
+     COUNT_MIDI = COUNT_MIDI + 1;
+     /*
+     L1 = '0';
+     L2 = '2,5 :'!!SUBSTR(RECMIDI,2,5)!!' '!!SUBSTR(KEEP_KWD,1,5)!!
+          ' 37,4 '!!SUBSTR(RECMIDI,37,4)!!' '!!SUBSTR(KEEP_KWD,6,4);
+     WRITE FILE(LIST1) FROM(LINE);
+     */
+     IF ^ ( SUBSTR(RECMIDI,2,5)  = SUBSTR(KEEP_KWD,1,5) &
+            SUBSTR(RECMIDI,37,4) = SUBSTR(KEEP_KWD,6,4) ) THEN DO;
+        GO TO READ_JAN2;
+     END;
+     SUBSTR(CMISMM,1,2) = RECMID2_MIS;
+     SUBSTR(CMISMM,3,2) = RECMID2_MM;
+     EIDOS_MM = WMISMM;
+     KEEP_CEIDOS = CMISMM;
+ END READ_MID2;
+
+ READ_ELEG: PROC;
+     ELEG_FLAG = 0;
+     OPEN FILE(ELEG);
+     ON ENDFILE(ELEG) BEGIN;
+        GO TO READ_ELEG_END;
+        END;
+ READ_ELEG1:
+     READ FILE(ELEG) INTO(ELEGINP);
+     IF RECOUT6_ORG = ELEGDIAS & CEIDOS_MM = ELEGMISTDIA THEN DO;
+        IF ^( GR_EGG = ELEGAPO & GR_AMT = ELEGAPOAMT * 100 ) THEN DO;
+           L1 = '0';
+           L2 = '***ArYMuxNIA BKBIX3,BKXAR6N cIA TON OPcANIrMO:'!!
+                 RECOUT6_ORG!!' '!!GR_EGG!!' '!!ELEGAPO!!' '!!
+                 GR_AMT!!' '!!ELEGAPOAMT;
+           WRITE FILE(LIST1) FROM(LINE);
+           GO TO READ_ELEG_END;
+        END;
+        ELSE DO;
+           ELEG_FLAG = 1;
+           GO TO READ_ELEG_END;
+        END;
+     END;
+     GO TO READ_ELEG1;
+ READ_ELEG_END:
+     /*
+     IF ELEG_FLAG = 0 THEN DO;
+        L1 = '0';
+        L2 = '***pPOrOXH:dEN BPEhHKE O OPcANIrMOr rTO BKBIX3:'!!
+             RECOUT6_ORG;
+        WRITE FILE(LIST1) FROM(LINE);
+     END;
+     */
+     CLOSE FILE(ELEG);
+ END READ_ELEG;
+
+ READ_ELEG_SYNOLA: PROC;
+     OPEN FILE(ELEG);
+     ON ENDFILE(ELEG) BEGIN;
+        GO TO READ_ELEG_SYNOLA_END;
+        END;
+ READ_ELEG1_SYNOLA:
+     READ FILE(ELEG) INTO(ELEGINP);
+     IF ELEGDIAS = 'D9999' THEN DO;
+        IF ^( TR_EGG = ELEGAPO & TR_AMT = ELEGAPOAMT ) THEN DO;
+           L1 = '0';
+           L2 = '***ArYMuxNIA BKBIX3 ME BKXAR6N cIA TA rYNOkA '!!
+                ' MIrhOdOrIxN TOY dIA>>>TrEKAPE TA LIST1     ';
+           WRITE FILE(LIST1) FROM(LINE);
+           WRITE FILE(LIST1) FROM(LINE);
+           WRITE FILE(LIST1) FROM(LINE);
+           WRITE FILE(LIST1) FROM(LINE);
+           WRITE FILE(LIST1) FROM(LINE);
+           GO TO READ_ELEG_SYNOLA_END;
+        END;
+     END;
+     GO TO READ_ELEG1_SYNOLA;
+ READ_ELEG_SYNOLA_END:
+     CLOSE FILE(ELEG);
+ END READ_ELEG_SYNOLA;
+ /*********************************************************************/
+ HEAD: PROC;
+     L1 = '1';
+     L2 = (10)' '!!'APXEIO ApOPPIwExN cIA TON dIA (EYPx) '
+                 !!'HM/NIA: '!!SUBSTR(DAYA6S8(WSYS_DATE),1,2)
+                 !!'/'!!SUBSTR(DAYA6S8(WSYS_DATE),3,2)
+                 !!'/'!!SUBSTR(DAYA6S8(WSYS_DATE),5,4)
+                 !!' xPA: ' !! SUBSTR(SYS_TIME,1,2)
+                 !!':' !! SUBSTR(SYS_TIME,3,2)
+                 !!':' !! SUBSTR(SYS_TIME,5,4)
+                 !!' **BKXAR6N**';
+     WRITE FILE(LIST1) FROM(LINE);
+     L1 = '0';
+     L2 = (10)' '!!'==============================================';
+     WRITE FILE(LIST1) FROM(LINE);
+ END HEAD;
+
+ TELOS:;
+  /* CALL WRITE_6; */
+     CALL WRITE_7;
+     /*
+     CALL READ_ELEG_SYNOLA;
+     */
+     L1 = '0';
+     DCOUNT = COUNT_INP;
+     L2 = 'INPUT RECORDS  '!!DCOUNT;
+     WRITE FILE(LIST1) FROM(LINE);
+     DAMT   = AMT_INP;
+     L2 = 'INPUT pOrO     '!!DAMT!!' EYPx';
+     WRITE FILE(LIST1) FROM(LINE);
+
+     L1 = '0';
+     L2 = 'OUTPUT 1 rYNOkO  '!!COUNT_1;
+     WRITE FILE(LIST1) FROM(LINE);
+     L2 = 'pkHhOr MIrhOdOrIxN'!!COUNT_2!!' cIA IdIO H dIAuOPETIKO OPc.';
+     WRITE FILE(LIST1) FROM(LINE);
+     L2 = 'pkHhOr ApOPPIwExN '!!COUNT_4;
+     WRITE FILE(LIST1) FROM(LINE);
+     L2 = 'OUTPUT 6 rYNOkO  '!!COUNT_6;
+     WRITE FILE(LIST1) FROM(LINE);
+     L2 = 'OUTPUT 7 rYNOkO  '!!COUNT_7;
+     WRITE FILE(LIST1) FROM(LINE);
+
+     DCOUNT = COUNT_OUT;
+     L2 = '** EccPAuEr cIA dIA '!!DCOUNT;
+     WRITE FILE(LIST1) FROM(LINE);
+     DCOUNT = TR_EGG;
+     L2 = '** EccPAuEr ApOPPIwExN '!!DCOUNT;
+     WRITE FILE(LIST1) FROM(LINE);
+     DAMT1 = TR_AMT;
+     DAMT  = TR_AMT / 100;
+     L2 = '** pOrO ApOPPIwExN cIA dIA:'!!DAMT1!!' '!!' rE EYPx:'!!DAMT;
+     WRITE FILE(LIST1) FROM(LINE);
+
+  CLOSE FILE(TAPE1) ;
+  CLOSE FILE(MID2) ;
+  CLOSE FILE(LIST1) ;
+  CLOSE FILE(MIST) ;
+  CLOSE FILE(MIDI) ;
+ END MANT;
+

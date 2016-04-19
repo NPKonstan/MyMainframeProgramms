@@ -1,0 +1,875 @@
+ /* PROCESS A,GOSTMT,NEST,OPT(TIME),AG,MR('+'),S,X,MAP;               */
+     /* pPOcPAMMA *TPKAT24 * dHMIOYPcIA DISK.TERM. - EKTYp. EpITAcxN */
+
+   /*                           TEkEYTAIA  AkkAcH : 09-01-96      */
+     /*-------------------------------------------------------------*/
+     /* аккацг 12/6/98 : вягсг тгс DAYATNS циа ма бакоуле стис      */
+     /*                 гл/миес ейтупысгс 4ьгжио етос,йаи то 1 тгс  */
+     /*  -Y2000-        викиетгяидас стгм AVALER.                   */
+     /*-------------------------------------------------------------*/
+     /*npk changes for enterprice pli 21-05-2007 -------------------*/
+     /*-------------------------------------------------------------*/
+
+     /*  TRANSLATE  GREEK CHARACTERS  ц */
+         TRKAT24 : PROC (PCBIO,PCBPTRK)OPTIONS(MAIN);
+      /*****       VSE/MVS TRANSLATION PROCESSED BY MVS-MS       *****/
+      /*****          SATURDAY  96/05/11  AT  22.10.19           *****/
+      /*** PL/1 OPTIMIZER EXECUTION TIME OPTIONS ***/
+      DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+                   /* KAhOPIrMOr APXEIxN */
+         DCL DISKA FILE RECORD INPUT ENV(                    FB RECSIZE
+             (42)                         );
+                   /* APXEION EpITAcxN KINHrExr  */
+         DCL DTFSMBI FILE RECORD OUTPUT ENV(                    FB
+             RECSIZE(200)           );
+                   /* APXEION MHNYMATx - DISK.TERMINAL */
+         DCL DTFSMCI FILE RECORD OUTPUT ENV(                    FB
+              RECSIZE(200)           ) ;
+         DCL DTFSM   FILE VARIABLE ;
+         DCL DISKC FILE RECORD OUTPUT ENV(                    FB
+              RECSIZE(104)           ) ;
+                   /* APXEION AKAkYpTxN EpITAcxN  */
+         DCL DISKE FILE RECORD OUTPUT ENV(                    FB
+              RECSIZE(104)           ) ;
+                   /* APXEION EpIrTPEuOMENxN EpITAcxN  */
+         DCL PRINTER FILE RECORD OUTPUT ENV(                    FB
+             RECSIZE(133)             CTLASA);
+         DCL   CREADF  FILE  RECORD  INPUT  ENV(
+             FB    RECSIZE(080)             );
+                   /*                                           */
+                   /* AREA VANDL/1  - PCB , FUNCTION            */
+         DCL PCBPTRK POINTER ;
+         DCL THREE STATIC FIXED BIN(31) INIT(3) ;
+         DCL FUNGU CHAR(4) INIT('GU  ') ;
+         DCL FUNGNP CHAR(4) INIT('GNP ');
+         DCL FOUR STATIC FIXED BINARY(31) INIT(4);
+         DCL 1 PCBK BASED(PCBPTRK)   ,
+               2 PCBDBDNM CHAR(8)    ,
+               2 FA       CHAR(2)    ,
+               2 PCBSC    CHAR(2)    ,
+               2 PCBPROPT CHAR(4)    ,
+               2 FB FIXED BIN(31)    ,
+               2 PCBSEGNM CHAR(8)    ,
+               2 PCBLFBK  FIXED BIN(31),
+               2 FC       FIXED BIN(31),
+               2 PCBFBK   CHAR(32) ;
+         /*  S  S  A    */
+         DCL 1 QUALSSA ,
+               2 F1  CHAR(19) ,
+               2  KEY FIXED(9,0) ,
+               2 F2  CHAR(1) INIT(')')  ;
+         /*  I/O AREA   */
+         DCL PERSOS CHAR(450) ;
+         DCL IOROOT CHAR(450) ;
+         DCL 1 IOROOT1 BASED(ADDR(PERSOS)) ,
+               2 KSRARLOG FIXED(9,0) ,       /* APIh. kOc/rMOY  */
+               2 F1    CHAR(7)    ,
+               2 KSRAKYR CHAR(1) ,
+               2 KSRKATMA FIXED(5) ,
+               2 KSRKATHO FIXED(5)  ,       /* KATHOLIKON  */
+               2 KSRFN    CHAR(1)    ,       /* uYrIKON - NOMIKON */
+               2 F2       CHAR(2)    ,
+               2 KSROROI  CHAR(1)    ,       /* EIdIKOI OPOI      */
+               2 KSRONOMA CHAR(31) ,
+               2 KSRDIEYT CHAR(35) ,
+               2 F21      CHAR(9)    ,
+               2 KSRAPAN  CHAR(1)    ,       /* ENdEInIr pAPABIArExr */
+               2 F3       CHAR(3)    ,
+               2 KSRDYPOL FIXED(13,2),       /* dIAhErIMON YpOkOIrON */
+               2 KSREKKRE FIXED(13,2),       /* YpOkOIpON En EpITAcxN */
+               2 KSRPOSPR FIXED(11,2),       /* YpOkOIpON pPOBkEwExN  */
+               2 KSRPOBLK FIXED(11,2),       /* pOrON EN dErMEYrEI    */
+               2 F4       CHAR(17)   ,
+               2 KSRHMLHN FIXED(7,0) ,       /* HMEPOM. kHn. NOM/rExr */
+               2 KSRPARLO FIXED(7),
+               2 F5       CHAR(100),
+               2 KSRDEH   BIT(8),
+               2 KSRKEN01 CHAR(1),
+               2 FF6U     CHAR(10),
+               2 KSROVERD FIXED(13,2);       /* pOrON OVERDRAFT       */
+         DCL 1 IOCHECK BASED(ADDR(IODSEG)),  /* I/O AREA CHECK-BOOK   */
+               2 KSCHMXST FIXED(7,0) ,       /* HMER. XOP. rTEkEXOYr  */
+               2 F1       CHAR(4)    ,
+               2 KSCAREST FIXED(9)   ,       /* APIh. ENAPn. rTEkEXOYr*/
+               2 F2       CHAR(2)    ,
+               2 KSCKATEP(20) BIT(4) ,       /* KATArTArIr EpITAcHr   */
+               2 F3       CHAR(4)    ;
+            /*                          */
+         DCL 1 IOSUSP BASED(ADDR(IODSEG)),   /* I/O AREA PROVISION SEG*/
+               2 KSSKHMER FIXED(7)   ,       /* HMEPOM. KINHrExr */
+               2 F1       CHAR(6)    ,
+               2 KSSPOSON FIXED(11,2),       /* pOrON   */
+               2 KSSAXIA  FIXED(7)   ,       /* VALEUR  */
+               2 KSSEP    CHAR(1)    ,       /* ENdEInIr  E - P     */
+               2 KSSAREP  FIXED(9)   ;       /* APIh. EpITAcHr      */
+         DCL IODSEG CHAR(29) ;
+            /*  ANAkYrIr RECORD INPUT      */
+         DCL 1 WDISKA ,
+               2 AKWDA CHAR(1),          /* KxdIn               */
+               2 ATRKAT ,
+                 3 ATRAP BIT(8),         /* TPAp.  kOc/rMOY     */
+                 3 AKATMA FIXED(3),      /* KAT/MA   ->>-       */
+               2 AHMGS   FIXED(7),        /* HMEROM. cPAu.rYMw. */
+               2 ARTRAN CHAR(3),
+               2 KWDLO FIXED(1) ,
+               2 LOIP   CHAR(3),
+               2 ARLOG FIXED(9)   ,      /* APIh.    ->>-       */
+               2 APOSON FIXED(11,2),     /* pOrON               */
+               2 AVALER FIXED(7),        /* VALEUR              */
+               2 AAREP  FIXED(9,0),      /* APIh. EpITAcHr      */
+               2 ATRKATL,
+                 3 TRAPKTL BIT(8),       /* TPAp. rYN/cHr       */
+                 3 KATLE   FIXED(3),     /* KAT/MA  ->>-        */
+               2 TAYT   FIXED(7) ;
+          DCL 1 WDAKAL ,     /* RECORD AKAkYpTxN EpIT. */
+                2 HEAD     CHAR(38) ,
+                2 ONOMA    CHAR(31) ,
+                2 DIEYT    CHAR(35) ;
+          DCL 1 WDEPIS ,     /* RECORD EpIrTPEuOMENxN EpIT. */
+                2 EPHEAD   CHAR(38) ,
+                2 EPONOMA  CHAR(31) ,
+                2 EPDIEYT  CHAR(35) ;
+          DCL BOHTHEAD CHAR(38) BASED(ADDR(WDISKA)) ;
+            /* ANAkYrIr RECORD DISK-TERMINAL */
+         DCL 1 WDISKB,
+               2 BKWDPR0 CHAR(4) INIT('KH09'),
+               2 BKTRMID CHAR(4)             ,
+               2 BKWDPR  CHAR(4) INIT('KH09'),
+               2 BKOMA1  CHAR(1) INIT(',')   ,
+               2 BARLOG  PIC'(8)9'           ,
+               2 BKOMA2  CHAR(1) INIT(',')   ,
+               2 BAREP   PIC'(8)9'           ,
+               2 BKOMA3  CHAR(1) INIT(',')   ,
+               2 BPOSON  PIC'(9)9V.99'       ,
+               2 BKOMA4  CHAR(1) INIT(',')   ,
+               2 BVALER  PIC'(6)9'           ,
+               2 BKOMA5  CHAR(1) INIT(',')   ,
+               2 BKATPL  PIC'(3)9'           ,
+               2 BKOMA6  CHAR(1) INIT(',')   ,
+               2 BAPANT  PIC'(4)9' INIT(4400),
+               2 BEO     BIT(8) INIT('11100000'B),
+               2 BEFILER CHAR(140) INIT(' ') ;
+         /* RECORD MHNYMATOr EIr pEPIpTxrIN pAkAIOY kOc/MOY   */
+         DCL 1 WDISPAL,
+               2 PLBKDPR1 CHAR(4) INIT('KH09'),
+               2 PLBKTRID CHAR(4)             ,
+               2 PLBKWDPR CHAR(4) INIT('KH09'),
+               2 PLBKOMA1 CHAR(1) INIT(',')   ,
+               2 PLBARLOG,
+                 3 PLKATMA PIC'999'           ,
+                 3 PLKATH  PIC'999'           ,
+                 3 PLARLG  PIC'(6)9'          ,
+               2 PLBKOMA2  CHAR(1) INIT(',')  ,
+               2 PLBAREP   PIC'(6)9'          ,
+               2 PLBKOMA3  CHAR(1) INIT(',')  ,
+               2 PLBPOSON  PIC'(9)9V.99'      ,
+               2 PLBKOMA4  CHAR(1) INIT(',')  ,
+               2 PLBVALER  PIC'(6)9'          ,
+               2 PLBKOMA5  CHAR(1) INIT(',')  ,
+               2 PLBKATPL  PIC'(3)9'          ,
+               2 PLBKOMA6  CHAR(1) INIT(',')  ,
+               2 PLBARANK  PIC'(4)9' INIT(4400),
+               2 PLBEO     BIT(8) INIT('11100000'B) ,
+               2 PLFILLER  CHAR(138) INIT(' ') ;
+             /*  RECORD pAkAIOY - NEOY kOc/rMOY         */
+
+         /*-------------------------------------- */
+         /* DISK TERMINAL pIrTxrHr O.p.A.p.       */
+         /*-------------------------------------- */
+         DCL   RECDISMS  CHAR(200)  INIT (' ') ;
+         DCL 1 RECDISKT  BASED(ADDR(RECDISMS)),
+               2 DTTRCOD  CHAR(4),       /* TRANSACTION CODE         */
+               2 DTTRMID  CHAR(4),       /* TERMINAL IDENTIFICATION  */
+               2 DTTRCOD1 CHAR(4),       /* TRANSACTION CODE         */
+               2 DTKOM1   CHAR(1),
+               2 DTARLOG  PIC'(8)9',     /* APIhMOr kOcAPIArMOY      */
+               2 DTKOM2   CHAR(1),
+               2 DTPOSON  PIC'(9)9V.99', /* pOrO EKKAhAPIrHr-MIrh/rIA*/
+               2 DTKOM3   CHAR(1),
+               2 DTVALR   PIC'(6)9',     /* VALEUR                   */
+               2 DTKOM4   CHAR(1),
+               2 DTKTMPL  PIC'(3)9',     /* KATArTHMA pkHPxMHr       */
+               2 DTKOM6   CHAR(1),
+               2 DTARKAT  PIC'(4)9',     /* APIhMOr cENIKOY KAhOk.   */
+               2 DTENDTR  BIT(8);        /* END OF TRASMITION        */
+
+   DCL    CREADR      CHAR(080)
+                 INIT('C 018 1252 '); /* RECORD APXEIOY CREADF  */
+   DCL 1  CREADRR1    BASED(ADDR(CREADR)),
+        2 CRCODE      CHAR(02)           ,
+        2 CRKATMA     PIC'(03)9'         ,
+        2 CRFIL1      CHAR(01)           ,
+        2 CRTERMID    CHAR(04)           ;
+
+         DCL (ATHREP,AREPISEP,AREPAK) FIXED(5) INIT(0) ;  /* ATHR.KAT.*/
+         DCL (POSEP,POSEPIEP,POSEPAK) FIXED(13,2) INIT(0);  /*  ->>-  */
+         DCL 1 RIST BASED(ADDR(NELOG)),
+               2 ARISF BIT(32)        ,
+               2 BITE BIT(8)          ;
+         DCL MASK BIT(8) INIT('00001111'B);
+         DCL RLOG BIT(8) BASED(ADDR(ARLOG));
+         DCL NELOG FIXED(9) ;
+         DCL SPAL PIC'9' INIT(0) ;
+         DCL STER PIC'9' INIT(0) ;
+         DCL (SAN,SW1,D1,STITL) PIC'9' INIT(0) ;
+         DCL SAKAL PIC'9' INIT(0) ;  /* dIAKOpTHr AKAk. EpITAcxN */
+         DCL KLKATR FIXED(5) BASED(ADDR(ATRKAT));
+         DCL 1 FUNCWD,
+               2 F1  BIT(4) ,
+               2 FKWD BIT(4);
+
+
+         /* npk changes for enterprice pli I ommited this stupidity
+         DCL 1 KWNPER  ,
+               2 KW1 BIT(4)  ,
+                             INIT('0000'B); */
+         DCL 1 APOKAT,              /* ApOhHKH KAT/MATOr kOc/rMOY   */
+               2 APOTRA BIT(8),
+               2 APOKATM FIXED(3) INIT(0) ;
+         DCL APOTHLOG FIXED(9) INIT(0) ;     /* ApOhHKH APIh. k/c/rMOY*/
+         DCL (ATHRSEL,ATHRFYL) FIXED(3,0) INIT(1) ;
+         /* AhPOIrTAI TPApEZHr  */
+         DCL (ARTREP,ARTREPIS,ARTREPAK) FIXED(5) INIT(0);
+         DCL (POSTREP,POSTREPIS,POSTREPAK) FIXED(13,2) INIT(0);
+         DCL SPOSTREP                      FIXED(15,2) INIT(0);
+              /* ApOhHKH DEPENDENT SEGMENTS    */
+         DCL 1 TABCH(3000) ,        /* FOR CHECK BOOK SEGMENT */
+               2 HMPAR FIXED(7) ,
+               2 F1    CHAR(4)  ,
+               2 ARCH  FIXED(9) ,       /* APIh. ENAPn. rTEkEXOYr  */
+               2 F2    CHAR(2)  ,
+               2 PLCHKA(20) BIT(4) ,    /* hErIr EpITAcHr          */
+               2 F3    CHAR(4)  ;
+         /*                        */
+         DCL 1 TABPR(3000) ,        /* FOR PROVISION SEGMENT  */
+               2 BHMPROV FIXED(7),
+               2 F1      CHAR(6) ,
+               2 BROS    FIXED(11,2),   /* pOrON              */
+               2 BVAL    FIXED(7),
+               2 BSEP    CHAR(1) ,
+               2 BARCH   FIXED(9);      /* APIh. EpITAcHr     */
+         DCL (ATRX, ATRZ) FIXED(9) INIT(0) ;  /* dEIKTAI pINAKxN   */
+         DCL 1 PERVIT,
+               2 PERVITA PIC'(8)9',  /* pEPIOXH dIA THN ANAZHTHrIN    */
+               2 PERVITC PIC'9' ;    /* EIr CHECK-BOOK TOY AP.EpITApHr*/
+         DCL 1 PERGAM,
+               2 PERGAMA PIC'(8)9',  /*          - >> -               */
+               2 PERGAMC PIC'9' ;    /*          - >> -               */
+         DCL PERGA  PIC'(9)9' BASED(ADDR(PERGAM));   /*  ->>-         */
+         DCL PERVI  PIC'(9)9' BASED(ADDR(PERVIT));   /*  ->>-         */
+         DCL BOHTVAL PIC'99';                /* pEPIOXAI dI ANTIrTRO- */
+         DCL BOHTVAL1 FIXED(7) ;             /*  uHN VALEUR           */
+         DCL 1 ANTVAL ,            /* uHN VALEUR    */
+               2 HMVAL PIC'99' ,             /*         ->>-          */
+               2 MHVAL PIC'99' ,             /*         ->>-          */
+               2 ETVAL PIC'99' ;
+         DCL AVALR1 PIC'(6)9' BASED(ADDR(ANTVAL));   /*  ->>-         */
+         DCL K03VALER  PIC'(6)9' INIT (0) ;
+         DCL ATHSYGR FIXED(13,2) ;
+         DCL WDISMESG CHAR(200) ;
+                 /* c P A M M A I   E K T Y p x r E x r     */
+         DCL 1 LINE,
+               2 CC01 CHAR(1),
+               2 GRAM CHAR(132) ;
+         DCL 1 LINE1,
+               2 L1TREX  CHAR(2)   ,
+               2 L1ARLOG PIC'99999999',
+               2 L1F1 CHAR(1),
+               2 L1PARL PIC'ZZZZZZ' ,
+               2 L1FILP CHAR(1) ,
+               2 L1AREP  PIC'99999999',
+               2 L1END CHAR(1) ,
+               2 L1POSON PIC'ZZZZ.ZZZ.ZZ9V,99',
+               2 L1F3 CHAR(1),
+               2 L1KATLE PIC'999',
+               2 L1F4 CHAR(1),
+               2 L1PARAT CHAR(17);
+         DCL NORMLIN CHAR(64) BASED(ADDR(LINE1));
+         DCL 1  NORMLIX          BASED(ADDR(LINE1)),
+              2 NORMLI1  CHAR(16)                  ,
+              2 NORMLI2  CHAR(24)                  ,
+              2 NORMLI3  CHAR(24)                  ;
+         DCL CODAIT FIXED BIN(15) BASED(ADDR(CDAIT1));
+ DCL  1  A  BASED(ADDR(WDAKAL)),
+        2  F5   CHAR(35),
+        2  F25  BIT(4),
+        2  F35  BIT(4);
+ DCL  1  AEP  BASED(ADDR(WDEPIS)),
+        2  FEP5   CHAR(35),
+        2  FEP25  BIT(4),
+        2  FEP35  BIT(4);
+         DCL 1 CDAIT1,
+               2 CDS BIT(12) INIT('000000000000'B),
+               2 CDBIT BIT(4);
+         DCL PIN(4) CHAR(37) INIT('ELQORIJG URAQEFA UGS EKKADOS A.E  ',
+                               'IOMIJG JAI KAIJG URAQEFA EKKADOS A.E.',
+                               'URAQEFA QEIRAIZS A.E.' ,
+                               'URAQEFA AUUIJGS A.E.' ) ;
+         DCL KATROUT CHAR(3);
+         DCL KMA CHAR(14);
+        DCL EKXOR ENTRY(CHAR(3),CHAR(14))                   OPTIONS(INTE
+ R,ASM)                                                    ;
+                                                            FETCH EKXOR
+   ;     DCL KATRT PIC'999' BASED(ADDR(KATROUT));
+         DCL ARFYLOY PIC'ZZZ' ;
+         DCL SATHREP FIXED(5) INIT(0) ;
+         DCL SPOSEP FIXED(13,2) INIT(0) ;
+         DCL 1 LINE2 BASED(ADDR(LINE1)),
+               2 L2F1    CHAR(5)     ,
+               2 L2LIT   CHAR(21)    ,
+               2 L2EPIT  PIC'ZZZZ'   ,
+               2 L2F2    CHAR(1)     ,
+               2 L2LIT1   CHAR(6)     ,
+               2 L2POS   PIC'ZZZZ.ZZZ.ZZ9V.99',
+               2 L2LIT2  CHAR(6)     ;
+         DCL DATEGS PIC'99.99.9999' ;                  /* Y2000 */
+         DCL LABEL   LABEL ;
+         DCL ADDR    BUILTIN ;
+         DCL SUBSTR  BUILTIN ;
+         DCL PLITDLI EXTERNAL ENTRY ;
+         DCL PINPAR(15) CHAR(17) INIT('AQZKESHEISA      ',
+                                      'JKAQEISA         ',
+                                      'AJVRZHEISA       ',
+                                      'EMUOKG LG QKGRZL.',
+                                      'AMAJKEIHEISA     ',
+                                      'LG EQARJES VQOK. ',
+                                      'AMVQ. ARIH.KPSLOV',
+                                      '                 ',
+                                      'WEREUAI QKGRPSA  ',
+                                      'AMVQ. ARIH.EQIU. ',
+                                      'KPSLOS VQO OROVS ',
+                                      'KPSLOS EM DESLEVS',
+                                      'LG QARAU.MOLPSEZS',
+                                      'MOLPSIS EKGNEM   ',
+                                      'DIAW.QOSOV QROBK.' ) ;
+
+   /*-----------------------------------------------------------*/
+   /* богхгтийес гл/миес циа 4ьгжио етос стис ейтупысеис  Y2000 */
+   /*-----------------------------------------------------------*/
+
+ DCL     W_HM           PIC '(8)9'     INIT(0);
+ DCL     W_AVALER       FIXED (7)      INIT(0);
+
+ %INCLUDE DAYATNS;
+
+             /*  A P X H   p P O c P A M M A T O r       */
+         OPEN FILE(CREADF) ;
+         READ FILE(CREADF)  INTO(CREADR) ;
+         IF  CRKATMA = 018   THEN
+             DTFSM  =  DTFSMBI ;
+         IF  CRKATMA = 400   THEN
+             DTFSM  =  DTFSMCI ;
+
+         OPEN FILE(DISKA),FILE(DTFSM),FILE(DISKC),FILE(DISKE) ;
+ AN: ;
+         READ FILE(DISKA) INTO(WDISKA) ;
+              ON ENDFILE(DISKA) GOTO TELOS ;
+         IF  KATLE = 431  THEN  KATLE = 999;
+         IF  KATLE = 353  THEN  KATLE = 999;
+         KATLE  =  CRKATMA ;
+         W_AVALER = DAYA6F7 (AVALER);               /* Y2000 */
+         IF KWDLO = 4 THEN DO;
+                           SAN = 1 ;
+                           GOTO B1 ;
+                           END ;
+         SAN = 0 ;
+ B1: ;
+                                     NELOG = ARLOG ;
+         IF ATRAP = APOTRA & AKATMA = APOKATM THEN DO ;
+         SATHREP = SATHREP + 1 ;
+         SPOSEP = SPOSEP + APOSON ;
+                                  IF NELOG ^= APOTHLOG THEN GOTO B4 ;
+                                                       ELSE GOTO C1 ;
+                                  END;
+         IF SW1 = 0 THEN DO;
+                         SW1 = 1 ;
+                         GOTO B3;
+                         END;
+         IF ATRAP = APOTRA THEN DO;
+                         CALL TELKAT;
+                         GOTO B3;
+                         END;
+ B2: ;
+         CALL TELKAT ;
+         CALL TELTRAP ;
+         ARTREP,ARTREPIS, ARTREPAK, POSTREP, POSTREPIS, POSTREPAK = 0 ;
+ B3: ;
+         APOKAT = ATRKAT ;
+         SATHREP , SPOSEP = 0 ;
+         ATHREP, AREPISEP, AREPAK, POSEP, POSEPIEP, POSEPAK = 0 ;
+         CALL TITLE ;
+         SATHREP = SATHREP + 1 ;
+         SPOSEP = SPOSEP + APOSON ;
+ B4: ;
+         APOTHLOG = NELOG ;
+         ATRX = 0 ;
+         ATRZ = 0 ;
+         IF STER = 1 THEN STER = 0 ;
+                     ELSE STER = 1 ;
+ B5: ;
+         BITE = BITE ! MASK ;
+         KEY = NELOG ;
+         QUALSSA.F1 = 'KROOTSEG(KSRARLOG =' ;
+         CALL PLITDLI(FOUR,FUNGU,PCBK,IOROOT,QUALSSA);
+         PERSOS = IOROOT ;
+         IF PCBK.PCBSC = '  ' THEN GOTO B6A ;
+                         FKWD = '0111'B;
+                         GOTO E ;
+         DCL KSRKATH FIXED(5) INIT(0) ;
+ B6A : ;
+         IF  KSRKATMA > 2000  &  KSRKATMA < 3000   THEN  /*05.07.96*/
+             KSRAKYR = '1' ;                             /*05.07.96*/
+         KSRKATH = KSRKATHO ;
+         IF KSRAKYR = '1' THEN GOTO E ;
+ /*      IF KSRDEH='00011100'B THEN KSRDYPOL=KSRDYPOL+300000;  ELSE; */
+         KSRDYPOL = KSRDYPOL + KSROVERD ;
+ B6: ;
+         CALL PLITDLI(THREE,FUNGNP,PCBK,IODSEG);
+         IF PCBK.PCBSC = '  ' THEN GOTO B7 ;
+                         IF PCBSC ='GK' THEN GOTO B8 ;
+                         IF PCBSC ='GA' THEN GOTO B8;
+                         IF PCBSC='GE' THEN GOTO C1 ;
+                         ELSE FKWD='1010'B ;
+                         GOTO E ;
+ B7: ;
+         IF PCBSEGNM = 'KCHKBSEG' THEN DO ;
+                         ATRX = ATRX + 1 ;
+         IF ATRX > 3000 THEN GOTO ST ;
+                         TABCH(ATRX) = IOCHECK ;
+                         GOTO B6 ;
+                         END ;
+ B8: ;
+         IF PCBSEGNM = 'KSUSPSEG' THEN DO ;
+                         IF KSSEP = 'P' THEN DO;
+                         ATRZ = ATRZ + 1 ;
+         IF ATRZ > 3000 THEN GOTO ST ;
+                         TABPR(ATRZ) = IOSUSP ;
+                         END;
+                         ELSE;
+                         GOTO B6 ;
+                         END ;
+ C1: ;
+         IF ATRZ = 0 THEN GOTO C2 ;
+                         DO L= 1 TO ATRZ ;
+                         IF BARCH(L) = AAREP THEN DO ;
+                         IF BROS(L) ^= APOSON THEN DO ;
+                                                   FKWD = '1111'B ;
+                                                   GOTO E ;
+                                                   END ;
+                         KSRPOSPR = KSRPOSPR - APOSON ;
+         KSRDYPOL = KSRDYPOL - APOSON ;
+                         GOTO G1 ;
+                         END;
+                         END;
+ C2: ;
+         IF SAN = 0 & ATRX = 0 THEN DO ;
+                                    FKWD = '1010'B ;
+                                    GOTO E ;
+                                    END ;
+         IF KSROROI = '1' THEN DO;
+                         FKWD = '1011'B ;
+                         GOTO E ;
+                         END ;
+         IF KSRKATH  = 5078 THEN DO ;
+                   IF KSRHMLHN ^< W_AVALER  THEN GOTO C3 ;  /* Y2000 */
+                                 END ;
+         IF KSRPOBLK = 999999999.99  THEN DO ;
+                         FKWD = '1100'B ;
+                         GOTO E ;
+                         END ;
+         IF KSRFN = 'u' THEN GOTO C3 ;
+         IF KSRAPAN = '1' THEN DO;
+                         FKWD = '1101'B ;
+                         GOTO E ;
+                         END ;
+         IF KSRHMLHN < W_AVALER THEN DO;                    /* Y2000 */
+                         FKWD ='1110'B ;
+                         GOTO E;
+                         END;
+ C3: ;
+         IF SAN = 1 THEN GOTO GA ;
+         IF ATRX = 0 THEN GOTO GA ;
+                         PERGA = AAREP ;
+                         DO M = 1 TO ATRX;
+                         PERVI = TABCH(M).ARCH ;
+                         BOHTVAL1 = PERGAMA - PERVITA ;
+         IF KSRKATH  = 5078 THEN DO ;
+               IF BOHTVAL1 >= 0 & BOHTVAL1 < 10 THEN GOTO C4 ;
+                                 GOTO C3A ;
+                                 END ;
+                         IF BOHTVAL1 >= 0 & BOHTVAL1 < 20 THEN
+                         GOTO C4 ;
+ C3A : ;
+                         END;
+                         FKWD = '1010'B ;
+                         GOTO E ;
+ C4 : ;
+         K = BOHTVAL1 + 1 ;
+ IF TABCH(M).PLCHKA(K)='1010'B THEN TABCH(M).PLCHKA(K)='0000'B; ELSE;
+         IF TABCH(M).PLCHKA(K) = '0000'B THEN GOTO G ;
+                         FKWD =TABCH(M).PLCHKA(K);
+                         FSHM = FKWD ;
+ E: ;
+                         EPHEAD  = BOHTHEAD ;
+                         EPONOMA = KSRONOMA ;
+                         EPDIEYT = KSRDIEYT ;
+                         FEP25   ='0000'B   ;
+                         WRITE FILE(DISKE) FROM(WDEPIS) ;
+                         AREPISEP = AREPISEP + 1 ;
+                         POSEPIEP = POSEPIEP + APOSON ;
+                         GOTO EKTY ;
+ G: ;
+         TABCH(M).PLCHKA(K) = '1001'B ;
+ GA : ;
+         ATHSYGR = KSRDYPOL - KSRPOSPR - KSRPOBLK ;
+         IF ATHSYGR ^< APOSON THEN DO;
+ GB : ;
+                         KSRDYPOL = KSRDYPOL - APOSON ;
+                         GOTO G1 ;
+                         END ;
+         IF KSRKATH  = 5078 THEN DO ;
+               IF KSRHMLHN ^< W_AVALER  THEN DO ;          /* Y2000 */
+                                 IF APOSON ^> 15000  THEN GOTO GB ;
+                                           END ;
+                                 END ;
+         AKWDA = 'U' ;
+         HEAD = BOHTHEAD ;
+         ONOMA = KSRONOMA ;
+         DIEYT = KSRDIEYT ;
+         ATHSYGR = KSRDYPOL + KSREKKRE ;
+         IF ATHSYGR >= APOSON THEN SUBSTR(HEAD,12,1) = '*' ;
+     F25='0000'B;
+         WRITE FILE(DISKC) FROM(WDAKAL) ;
+     FKWD ='0110'B ;
+         AREPAK = AREPAK + 1 ;
+         POSEPAK = POSEPAK + APOSON ;
+         SAKAL = 1 ;
+ G1: ;
+         IF D1 = 0 THEN DO ;
+                 WDISMESG= 'CESN PS=DSKTERM,USERID=DSKTERM\ ';
+                 WRITE FILE(DTFSM) FROM(WDISMESG) ;
+                 WDISMESG='PRIT\';
+                 WRITE FILE(DTFSM) FROM(WDISMESG);
+                 D1 = 1 ;
+                 END ;
+ D: ;
+         AVALR1 = AVALER ;   BOHTVAL = HMVAL ;
+         HMVAL = ETVAL ;     ETVAL = BOHTVAL ;
+         IF SAN = 1 THEN DO ;
+         PLBKWDPR ='KH09' ;
+ PLBKOMA1 =',' ;
+ PLBKOMA2 =',' ;
+ PLBKOMA3 =',' ;
+ PLBKOMA4 =',' ;
+ PLBKOMA5 =',' ;
+ PLBKOMA6 =',' ;
+  PLBARANK = 4400 ;
+ PLBEO = '11100000'B ;
+                         PLKATMA = AKATMA ;
+                         PLKATH = 506 ;
+         IF KSRKATH  = 5078 THEN PLKATH = 507 ;
+                         PLARLG = KSRPARLO ;
+                         PLBAREP = AAREP ;
+                         PLBPOSON = APOSON ;
+                         PLBVALER = AVALR1 ;
+                         PLBKATPL= KATLE ;
+         IF STER = 1 THEN GOTO D1A;
+         PLBKTRID = CRTERMID ;
+         WRITE FILE(DTFSM) FROM(WDISPAL) ;
+         GOTO DIS ;
+ D1A: ;
+                         PLBKTRID = CRTERMID ;
+                         WRITE FILE(DTFSM) FROM(WDISPAL);
+                         GOTO DIS ;
+                         END;
+ BKWDPR = 'KH09' ;
+ BKOMA1 = ',';
+ BKOMA2 = ',';
+ BKOMA3 = ',';
+ BKOMA4 = ',';
+ BKOMA5 = ',';
+ BKOMA6 = ',';
+ BAPANT = 4400 ;
+ BEO = '11100000'B ;
+         BARLOG = ARLOG ;
+         BAREP  = AAREP ;
+         BPOSON = APOSON;
+         BVALER = AVALR1;
+         K03VALER = AVALR1;
+         BKATPL = KATLE ;
+         IF STER = 1 THEN GOTO D2 ;
+         BKTRMID  = CRTERMID ;
+         WRITE FILE(DTFSM) FROM(WDISKB) ;
+         GOTO DIS ;
+ D2: ;
+         BKTRMID = CRTERMID ;
+         WRITE FILE(DTFSM) FROM(WDISKB) ;
+ DIS: ;
+         IF SAKAL = 1 THEN DO ;
+                           SAKAL = 0 ;
+                           GOTO EKTY ;
+                           END ;
+         ATHREP = ATHREP + 1 ;
+         POSEP = POSEP + APOSON ;
+         FKWD = '1000'B ;
+ EKTY: ;
+         IF KSRKATH  = 5078 THEN DO ;
+                                 L1TREX = 'U.' ;
+               IF KSRHMLHN ^< W_AVALER  THEN DO ;        /* Y2000 */
+                             IF ATHSYGR < APOSON THEN DO ;
+                                                      L1END = 'E' ;
+                                                      END ;
+                                           END ;
+                                 END ;
+         L1ARLOG = ARLOG ;
+          IF SAN = 1 THEN L1PARL = KSRPARLO ;
+         L1AREP  = AAREP ;
+         L1POSON = APOSON;
+         L1KATLE = KATLE ;
+         CDS = '000000000000'B ;
+         CDBIT   = FKWD  ;
+         I = CODAIT ;
+         L1PARAT = PINPAR(I); CC01 = ' ' ;
+         IF FSHM = '1000'B THEN L1PARAT = 'SVMEM.LE VQ.QROBK' ;
+         FSHM = '0000'B ;
+         IF KSRAKYR = '1' THEN L1PARAT = 'KPSLOS JKEISHEIS ' ;
+         CALL PRINT ;
+         ATHRSEL = ATHRSEL + 1 ;
+         IF ATHRSEL = 57 THEN DO ;
+                         ATHRSEL = 0 ;
+                         ATHRFYL = ATHRFYL + 1 ;
+                         STITL = 1 ;
+                         CC01 = '1' ;
+                         CALL TITLKAT ;
+                         END ;
+         GOTO AN ;
+ PRINT: PROC ;
+         SUBSTR(GRAM,1,64) = NORMLIN ;
+         SUBSTR(GRAM,69,64)= NORMLIN ;
+         WRITE FILE(PRINTER) FROM(LINE);
+         GRAM =(132)' ' ; NORMLIN = (64)' ' ;
+         END PRINT ;
+ TITLE: PROC ;
+         CC01 = '1' ;
+         CDBIT = SUBSTR(ATRAP,5,4) ; J = CODAIT + 1 ;
+         SUBSTR(NORMLIN,1,37) = PIN(J) ;
+         CALL PRINT;
+         ATHRSEL = ATHRSEL + 1 ;
+         LABEL = EPIKEF ;
+         CC01 = ' ' ;
+ TITLKAT: ENTRY ;
+         KATRT = APOKATM ;
+        CALL EKXOR(KATROUT,KMA) ;
+         SUBSTR(NORMLIN,1,25) = 'JAUPLA '!!KATRT!!' '!!KMA ;
+         ARFYLOY = ATHRFYL ;
+         SUBSTR(NORMLIN,52,7) = 'WVK.'!!ARFYLOY ;
+         CALL PRINT ;
+         ATHRSEL = ATHRSEL + 1 ;
+         IF STITL = 1 THEN DO ;
+                           STITL = 0 ;
+                           GOTO EP1 ;
+                           END ;
+         GOTO LABEL ;
+ EPIKEF: ;
+         CC01 = '-' ;
+         SUBSTR(NORMLIN,9,37) = 'JAUASUASIS EQIUACZM LESZ UOV CRAWEIOV';
+         CALL PRINT ;
+         ATHRSEL = ATHRSEL + 1 ;
+         CC01 = ' ' ;
+         SUBSTR(NORMLIN,14,16) = 'SVLYGWISLOV UGS ' ;    /* Y2000 */
+         AVALR1 = AHMGS ; BOHTVAL = HMVAL ; HMVAL = ETVAL ;
+         ETVAL = BOHTVAL ; BOHTVAL1 = AVALR1 ;
+     /*    DATEGS = BOHTVAL1 ;   */                 /* Y2000 */
+         W_HM = DAYS6S8 (AVALR1);                   /* Y2000 */
+         DATEGS = W_HM;                             /* Y2000 */
+         SUBSTR(NORMLIN,30,10) = DATEGS ;           /* Y2000 */
+         IF  CRKATMA = 018   THEN
+             NORMLI3 = ' 018 OQAQ AHGMZM       ' ;
+         IF  CRKATMA = 400   THEN
+             NORMLI3 = ' 400 OQAQ HESSAKOMIJGS ' ;
+         CALL PRINT ;
+         ATHRSEL = ATHRSEL + 1 ;
+         SUBSTR(NORMLIN,9,37) = (37)'-' ;
+         CALL PRINT ;
+         ATHRSEL = ATHRSEL + 1 ;
+ EP1: ;
+         CC01 = '0' ;
+         SUBSTR(NORMLIN,3,24) = 'ARIHLOS KPSLOV   ARIHLOS' ;
+         SUBSTR(NORMLIN,42,6) = 'JAUPLA' ;
+         CALL PRINT ;
+         ATHRSEL = ATHRSEL + 1 ;
+         SUBSTR(NORMLIN,3,36) = 'MEOS    QAKAIOS  EQIUACGS      QOSOM';
+         SUBSTR(NORMLIN,42,20) ='SVMAK.  QARAUGRGSEIS';
+         CC01 = ' ' ;
+         CALL PRINT ;
+         ATHRSEL = ATHRSEL + 1 ;
+         SUBSTR(NORMLIN,3,17) = (7)'-'!!(1)' '!!(7)'-'!!(2)' ' ;
+         SUBSTR(NORMLIN,20,42)=(8)'-'!!(6)' '!!(5)'-'!!(3)' '!!(6)'-'!!
+                               (2)' '!!(12)'-' ;
+         CALL PRINT;
+         ATHRSEL = ATHRSEL + 1;
+         END TITLE ;
+ TELKAT: PROC ;
+         ATHRSEL = 0 ;
+         CC01 = ' ' ;
+         SUBSTR(NORMLIN,29,13) = (13)'-';
+         CALL PRINT ;
+         ARFYLOY =SATHREP ;
+         SUBSTR(NORMLIN,1,21)='SVMOKOM    '!!ARFYLOY!!'   DRX.';
+         L1POSON =SPOSEP ;
+         CALL PRINT ;
+         SUBSTR(NORMLIN,17,25) =(25)'*' ;
+         CC01 = '0' ;
+         CALL PRINT ;
+                         /*  A N A K E u A k A I x r I r    */
+         CC01 = '-' ;
+         L2LIT = 'EQIUACAI JAKVWHEISAI' ;
+         L2EPIT= ATHREP ;
+         L2LIT1 = 'DRX.' ;
+         L2POS  = POSEP ;
+         CALL PRINT ;
+         CC01 = '0' ;
+         L2LIT = '  ->>-   EQISUREWOL.' ;
+         L2EPIT=AREPISEP ;
+         L2LIT1= 'DRX.' ;
+         L2POS = POSEPIEP ;
+         L2LIT2='  ' !! (4)'*' ;
+         CALL PRINT ;
+         L2LIT2 = (6)' ';
+         CC01 = ' ' ;
+         SUBSTR(NORMLIN,28,26) = (26)'-' ;
+         CALL PRINT ;
+         L2LIT = 'SVMGLLEMAI EQIUACAI';
+         L2EPIT = ATHREP + AREPISEP ;
+         L2LIT1 = 'DRX.' ;
+         L2POS  = POSEP + POSEPIEP ;
+         CALL PRINT ;
+         CC01 = '0' ;
+         L2LIT = 'EQIUACAI EQISURPSAI ' ;
+         CALL PRINT ;
+         CC01 = ' ' ;
+         L2LIT = 'EIS JAUPUA SVMPCGS ZS' ;
+         CALL PRINT ;
+         L2LIT =  'LG JAKVWHEISAI' ;
+         L2EPIT = AREPAK ;
+         L2LIT1 ='DRX.' ;
+         L2POS  = POSEPAK ;
+         CALL PRINT ;
+         CC01 = ' ' ;
+         SUBSTR(NORMLIN,28,26) = (26)'-' ;
+         CALL PRINT ;
+         CC01 = '0' ;
+         L2LIT ='   S V M O K A ' ;
+         L2EPIT = ATHREP + AREPISEP + AREPAK ;
+         L2LIT1 ='DRX.' ;
+         L2POS = POSEP + POSEPIEP + POSEPAK ;
+         CALL PRINT ;
+         CC01 = '0' ;
+         SUBSTR(NORMLIN,28,26) = (26)'*' ;
+         CALL PRINT ;
+         ARTREP = ARTREP + ATHREP ;
+         ARTREPIS = ARTREPIS + AREPISEP ;
+         ARTREPAK = ARTREPAK + AREPAK ;
+         POSTREP = POSTREP + POSEP ;
+         POSTREPIS = POSTREPIS + POSEPIEP ;
+         POSTREPAK = POSTREPAK+ POSEPAK ;
+         ATHRFYL = 1 ;
+         END TELKAT ;
+ TELTRAP: PROC ;
+         CC01 = '1' ;
+         SUBSTR(NORMLIN,1,36) = (6)'*' !! 'A M A J E W A K A I Z S I S';
+         SUBSTR(NORMLIN,37,22) = '*' !! DATEGS !! (10)'*' ; /* Y2000 */
+         CALL PRINT ;
+         CC01 = '0' ;
+         SUBSTR(NORMLIN,1,37) = PIN(J) ;
+         CALL PRINT ;
+         CC01 = '-' ;
+         L2LIT ='EQIUACAI JAKVWHEISAI' ;
+         L2EPIT = ARTREP ;
+         L2LIT1 ='DRX.' ;
+         L2POS  = POSTREP ;
+         CALL PRINT ;
+         CC01 = '0' ;
+         L2LIT ='  ->>-   EQISUREWOL.' ;
+         L2EPIT = ARTREPIS ;
+         L2LIT1 = 'DRX.' ;
+         L2POS = POSTREPIS ;
+         CALL PRINT ;
+         L2LIT =  'AJAKVQUOI EQIUACAI';
+         L2EPIT = ARTREPAK ;
+         L2LIT1 = 'DRX.' ;
+         L2POS  = POSTREPAK ;
+         CALL PRINT ;
+         CC01 = ' ' ;
+         SUBSTR(NORMLIN,28,26) = (26)'-' ;
+         CALL PRINT ;
+         L2LIT = 'S V M O K A' ;
+         L2EPIT = ARTREP + ARTREPIS + ARTREPAK ;
+         L2LIT1 ='DRX.' ;
+         L2POS = POSTREP + POSTREPIS + POSTREPAK ;
+         CALL PRINT ;
+         SUBSTR(NORMLIN,28,26) = (26)'*' ;
+         CALL PRINT ;
+         CC01 = '0' ;
+         NORMLIN = (61)'*' ;
+         IF  CRKATMA = 018   THEN
+             NORMLI2 = ' 018 OQAQ AHGMZM       ' ;
+         IF  CRKATMA = 400   THEN
+             NORMLI2 = ' 400 OQAQ HESSAKOMIJGS ' ;
+         CALL PRINT ;
+         CC01 = '0' ;
+         NORMLIN = (61)'*' ;
+         IF  CRKATMA = 018   THEN
+             NORMLI2 = ' 018 OQAQ AHGMZM       ' ;
+         IF  CRKATMA = 400   THEN
+             NORMLI2 = ' 400 OQAQ HESSAKOMIJGS ' ;
+         CALL PRINT ;
+         CC01 = '0' ;
+         NORMLIN = (61)'*' ;
+         IF  CRKATMA = 018   THEN
+             NORMLI2 = ' 018 OQAQ AHGMZM       ' ;
+         IF  CRKATMA = 400   THEN
+             NORMLI2 = ' 400 OQAQ HESSAKOMIJGS ' ;
+         CALL PRINT ;
+         SPOSTREP = SPOSTREP + POSTREP ;
+         ARTREP,ARTREPIS,ARTREPAK,POSTREP,POSTREPIS,POSTREPAK = 0 ;
+         END TELTRAP ;
+ ST : ;
+         DISPLAY ('YPERPLHRWSIS PINAKOS D.SEGMENTS - DEN OLOKLHRWTHH DI
+ SK TERM.') ;
+         STOP ;
+ TELOS: ;
+         CALL TELKAT ;
+         CALL TELTRAP;
+
+    /*   ====> AYTOMATH pIrTxrH OpAp ME TO pOrO TxN EpITAcxN - APXH
+         DTTRCOD = 'KH03';
+         DTTRCOD1= 'KH03';
+         DTARLOG = 80469381 ;
+         DTPOSON = SPOSTREP ;
+         DTVALR  = K03VALER ;
+         DTKTMPL = 018 ;
+         DTARKAT = 0 ;      * 4400 *
+         DTKOM1  = ',';
+         DTKOM2  = ',';
+         DTKOM3  = ',';
+         DTKOM4  = ',';
+         DTKOM6  = ',';
+         DTENDTR = '11100000'B;
+
+         IF  STER = 1 THEN DO ;
+             DTTRMID = CRTERMID ;
+             WRITE FILE(DTFSM) FROM(RECDISMS) ;
+         END ;
+         ELSE  DO ;
+             DTTRMID  = CRTERMID ;
+             WRITE FILE(DTFSM) FROM(RECDISMS) ;
+         END ;
+         ====> AYTOMATH pIrTxrH OpAp ME TO pOrO TxN EpITAcxN - TEkOr */
+
+         SUBSTR(WDISMESG,1,15) ='CESF GOODNIGHT\';
+         WRITE FILE(DTFSM) FROM(WDISMESG) ;
+         CLOSE FILE(DISKA),FILE(DTFSM),FILE(DISKC),FILE(DISKE) ;
+         CLOSE FILE(CREADF) ;
+         END ;
+

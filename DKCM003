@@ -1,0 +1,319 @@
+ /* DKCM003: диабафеи OUTPUT 200аяи апо то тал1 ле пациес       */       */
+ /*           пистысеис йежакаиоу йаи емглеяылемо STATUS,  */
+ /*           йаи емглеяымеи ле тис апояяиьеис том CTDKCM02 */
+ /* AUTHOR   : EVANGELOS KOULIS   */
+ /* CREATION : ауцоустос 2008       */
+ /*           B A T C H  P L I - D B 2   */
+ /*******************************************************************/
+ /* NPK 06-04-2012                                                  */
+ /* йкгсг тгс яоутимас DKRCM01 циа еисацыцг стоивеиым сто CRM       */
+ /*******************************************************************/
+ DKCM003: PROC OPTIONS(MAIN);
+ /*-----------------------------------------------------------*/
+ /*               BUILTIN  FUNCTIONS                          */
+ /*-----------------------------------------------------------*/
+ DCL  NULL BUILTIN;
+ DCL  ADDR BUILTIN;
+ DCL  SUBSTR BUILTIN;
+ DCL  DATETIME BUILTIN;
+
+ DCL DKRCM01 ENTRY (CHAR(200),    /* RECDBCR        */
+                    CHAR(2)  ,    /* SOURCESYSTEMID */
+                    CHAR(30)      /* TRANSTYPECD    */
+                     )
+     RETURNS( FIXED BIN(31));       /*SQLCODE*/
+  FETCH DKRCM01 ;
+ /*******  DCLGEN  *******/
+ EXEC SQL INCLUDE CTDKCM02;
+ EXEC SQL INCLUDE SQLCA;
+ /************************/
+
+ % INCLUDE DAYRTNS;
+ DCL MY_RECDBCR CHAR(200) BASED(ADDR(RECDBCR));
+ /************************************/
+ /* пяосдиояислос, пеяицяажг аявеиым */
+ /************************************/
+ DCL  PRINT    FILE RECORD SEQUENTIAL OUTPUT
+      ENV(FB RECSIZE(133) CTLASA);
+
+ DCL    LINE            CHAR (133)   INIT(' ');
+
+ DCL  1  LINE1 BASED(ADDR(LINE)),
+        2  CTLCHR1  CHAR(1)  INIT('1'),
+        2  GRAMMH  CHAR(132)  INIT(' ');
+
+ DCL  1  LNX  BASED(ADDR(LINE)),
+        2  CTLCHR         CHAR(1)      INIT('1'),
+        2  LEKTIKO        CHAR(60)     INIT(' '),
+        2  ARITHMOS       CHAR(16)     INIT(' '),
+        2  FILLME         CHAR(56)     INIT(' ');
+
+ DCL  ANSWR FILE RECORD SEQUENTIAL INPUT ENV(FB RECSIZE(200));
+
+ % INCLUDE RECDBCR;
+
+ DCL   SUM_CREDIT      PIC 'ZZ.ZZZ.ZZZ.ZZ9V,99' INIT(0);
+ /***************************************************************/
+ DCL   WS1_ARLOG     FIXED(9)     INIT(0);
+ DCL   WS1_POSON     FIXED(13,2)  INIT(0);
+ DCL   WS1_POSOXRPI  FIXED(13,2)  INIT(0);
+ DCL   WS1_HMEKD     FIXED(7)     INIT(0);
+ DCL   WS1_HMVAL     FIXED(7)     INIT(0);
+ DCL   WS1_MHTRWO    CHAR(12)     INIT('');
+ DCL   WS2_MHTRWO    PIC '(12)9'  INIT(0);
+ DCL   WS1_KATMAXOR  FIXED(5)     INIT(0);
+ DCL   WS2_KATMAXOR  PIC '(4)9'   INIT(0);
+ /***************************************************************/
+
+ /***************************************************************/
+ DCL    ANSWR_CNT       PIC '(9)Z9'       INIT(0);
+ DCL    ANSWR_U_CNT     PIC '(9)Z9'       INIT(0);
+ DCL    ANSWR_S_CNT     PIC '(9)Z9'       INIT(0);
+ DCL    INSCM02_CNT     PIC '(9)Z9'       INIT(0);
+ DCL    PIC_MHTRWO      PIC '(5)9'        INIT(0);
+ DCL    PIC_POSO        PIC '(11)9V.99'   INIT(0);
+ DCL    PIC_ARLOG       PIC '(9)9'        INIT(0);
+ /***************************************************************/
+
+ % PAGE;
+
+ OPEN FILE(ANSWR),FILE(PRINT);
+
+ ON ENDFILE(ANSWR) GOTO TELOS;
+
+ READ_ANSWR:
+        READ FILE(ANSWR) INTO(RECDBCR);
+        ANSWR_CNT = ANSWR_CNT + 1;
+        CALL INSERT_CRM;
+
+        IF RECDBCR.STATUS ^= '00' THEN  CALL WRITE_REJ;
+        ELSE DO;
+                ANSWR_S_CNT =  ANSWR_S_CNT + 1;
+                SUM_CREDIT = SUM_CREDIT + RECDBCR.POSON;
+             END;
+
+        GOTO READ_ANSWR;
+
+ /*******************************************************************/
+ WRITE_REJ: PROC;
+ /*******************************************************************/
+      ANSWR_U_CNT = ANSWR_U_CNT + 1;
+
+      CTDKCM02.COD_CHANNEL   = 1;
+      WS2_MHTRWO = RECDBCR.MHTRWO;
+      CTDKCM02.KEY_AR_PAGIA  = WS2_MHTRWO;
+        CTLCHR1 = ' ';
+        GRAMMH = 'MHTRWO='!!RECDBCR.MHTRWO!!', WS2_MHTRWO='!!
+                 WS2_MHTRWO!!', KEY_AR_PAGIA='!!CTDKCM02.KEY_AR_PAGIA;
+        WRITE FILE(PRINT) FROM(LINE1);
+      CTDKCM02.COD_TYP_PAGIA = 1;
+      WS2_KATMAXOR = RECDBCR.KATMAXOR;
+      CTDKCM02.COD_KATMA     = WS2_KATMAXOR;
+        CTLCHR1 = ' ';
+        GRAMMH = 'KATMAXOR='!!RECDBCR.KATMAXOR!!', WS2_KATMAXOR='!!
+                 WS2_KATMAXOR!!', COD_KATMA='!!CTDKCM02.COD_KATMA;
+        WRITE FILE(PRINT) FROM(LINE1);
+      CTDKCM02.KEY_D_ARLOG1  = RECDBCR.ARLOG;
+        CTLCHR1 = ' ';
+        GRAMMH = 'KEY_D_ARLOG1='!!CTDKCM02.KEY_D_ARLOG1;
+        WRITE FILE(PRINT) FROM(LINE1);
+
+      IF RECDBCR.ARLOG > 80000000 THEN
+          CTDKCM02.COD_D_EFARM1  = '70';
+      ELSE
+          CTDKCM02.COD_D_EFARM1  = '90';
+        CTLCHR1 = ' ';
+        GRAMMH = 'COD_D_EFARM1='!!CTDKCM02.COD_D_EFARM1;
+        WRITE FILE(PRINT) FROM(LINE1);
+
+      CTDKCM02.KEY_D_ARLOG2  = 0;
+        CTLCHR1 = ' ';
+        GRAMMH = 'KEY_D_ARLOG2='!!CTDKCM02.KEY_D_ARLOG2;
+        WRITE FILE(PRINT) FROM(LINE1);
+          CTDKCM02.COD_D_EFARM2  = '';
+        CTLCHR1 = ' ';
+        GRAMMH = 'COD_D_EFARM2='!!CTDKCM02.COD_D_EFARM2;
+        WRITE FILE(PRINT) FROM(LINE1);
+
+      CTDKCM02.AMT_D_POSO    = RECDBCR.POSON;
+        CTLCHR1 = ' ';
+        GRAMMH = 'AMT_D_POSO='!!CTDKCM02.AMT_D_POSO;
+        WRITE FILE(PRINT) FROM(LINE1);
+      CTDKCM02.COD_DEBCRE    = RECDBCR.KWDXRPIS;
+        CTLCHR1 = ' ';
+        GRAMMH = 'COD_DEBCRE='!!CTDKCM02.COD_DEBCRE;
+        WRITE FILE(PRINT) FROM(LINE1);
+      CTDKCM02.CHR_USER_ID   = 'DKCM003 ';
+
+      SELECT (RECDBCR.STATUS);
+           WHEN ('01')
+                      CTDKCM02.CHR_REJ_DESCR = 'амупаяйтос коц/слос';
+           WHEN ('02')
+                      CTDKCM02.CHR_REJ_DESCR = 'кахос аяих. коц/слоу';
+           WHEN ('03')
+                      CTDKCM02.CHR_REJ_DESCR = 'ови тяевоул. коцслос';
+           WHEN ('04')
+                      CTDKCM02.CHR_REJ_DESCR = 'вяеыстийо посо';
+           WHEN ('05')
+                      CTDKCM02.CHR_REJ_DESCR = 'к/слос етеяоу йат/тос';
+           WHEN ('06')
+                      CTDKCM02.CHR_REJ_DESCR = 'посо лгдем';
+           WHEN ('07')
+                      CTDKCM02.CHR_REJ_DESCR = 'коцаяиаслос йкеистос';
+           WHEN ('08','10')
+                      CTDKCM02.CHR_REJ_DESCR = 'лг аподейто йахокийо';
+           WHEN ('09')
+                      CTDKCM02.CHR_REJ_DESCR = 'амупаяйтос йыд. пекатг';
+           WHEN ('11')
+                       CTDKCM02.CHR_REJ_DESCR = 'посо ле дейадийа';
+           WHEN ('12')
+                   CTDKCM02.CHR_REJ_DESCR = 'посо памы апо то ояио';
+           WHEN ('13')
+                   CTDKCM02.CHR_REJ_DESCR = 'VALEUR ейтос ояиым';
+           WHEN ('14')
+                   CTDKCM02.CHR_REJ_DESCR = 'аккгс тяапефас коцая.';
+           WHEN ('15')
+                   CTDKCM02.CHR_REJ_DESCR = 'лг аподейто йахокийо';
+           WHEN ('16')
+                   CTDKCM02.CHR_REJ_DESCR = 'кахос лояжг посоу';
+           WHEN ('17')
+                   CTDKCM02.CHR_REJ_DESCR = 'апыкеиа бибкиаяиоу';
+           WHEN ('18')
+                   CTDKCM02.CHR_REJ_DESCR = 'евеи ояоус';
+           WHEN ('19')
+                   CTDKCM02.CHR_REJ_DESCR = 'евеи деслеухеи посо';
+           WHEN ('20')
+                   CTDKCM02.CHR_REJ_DESCR = 'лг епаяйес упокоипо';
+           WHEN ('21')
+                  CTDKCM02.CHR_REJ_DESCR = 'VALEUR > гл.кгн. молил.';
+           WHEN ('22')
+                  CTDKCM02.CHR_REJ_DESCR = 'лг епаяйес упокоипо (л)';
+           WHEN ('23')
+                  CTDKCM02.CHR_REJ_DESCR = 'кахос мол. (еуяы)';
+           WHEN ('24')
+                  CTDKCM02.CHR_REJ_DESCR = 'лецако пкгхос еццяаж.';
+           OTHERWISE
+                  CTDKCM02.CHR_REJ_DESCR = '*********************';
+        END;
+
+        EXEC SQL
+            INSERT INTO CTDKCM02
+                (
+                 COD_CHANNEL,
+                 KEY_AR_PAGIA,
+                 COD_TYP_PAGIA,
+                 COD_KATMA,
+                 KEY_D_ARLOG1,
+                 COD_D_EFARM1,
+                 KEY_D_ARLOG2,
+                 COD_D_EFARM2,
+                 AMT_D_POSO,
+                 DAT_REJECT,
+                 COD_DEBCRE,
+                 CHR_REJ_DESCR,
+                 CHR_USER_ID,
+                 KEY_TIMESTAMP
+                )
+            VALUES
+                (
+                 :CTDKCM02.COD_CHANNEL,
+                 :CTDKCM02.KEY_AR_PAGIA,
+                 :CTDKCM02.COD_TYP_PAGIA,
+                 :CTDKCM02.COD_KATMA,
+                 :CTDKCM02.KEY_D_ARLOG1,
+                 :CTDKCM02.COD_D_EFARM1,
+                 :CTDKCM02.KEY_D_ARLOG2,
+                 :CTDKCM02.COD_D_EFARM2,
+                 :CTDKCM02.AMT_D_POSO,
+                 CURRENT DATE,
+                 :CTDKCM02.COD_DEBCRE,
+                 :CTDKCM02.CHR_REJ_DESCR,
+                 :CTDKCM02.CHR_USER_ID,
+                 CURRENT TIMESTAMP
+                );
+
+            IF SQLCODE ^= 0 THEN DO;
+               CTLCHR1 = ' ';
+               GRAMMH = 'ERROR INSERTING INTO CTDKCM02, SQLCODE='!!
+                        SQLCODE;
+               WRITE FILE(PRINT) FROM(LINE1);
+               CALL ERROR_ABEND;
+            END;
+            ELSE  INSCM02_CNT = INSCM02_CNT + 1;
+
+ END WRITE_REJ;
+
+ /*******************************************************************/
+ INSERT_CRM: PROC;
+ DCL RC  FIXED BIN(31);
+     RC =  DKRCM01(MY_RECDBCR,'57','1')              ;
+        IF RC                           ^= 0  THEN DO;
+           CTLCHR1 = ' ';
+           GRAMMH = 'ERROR CALLING ROUTINE DKRCM01 FOR CRM '!!
+                    'SQLCODE = '!!RC     ;
+           WRITE FILE(PRINT) FROM(LINE1);
+        END;
+ END INSERT_CRM ;
+ /*******************************************************************/
+ /*=================================================*/
+ ERROR_ABEND: PROC;
+ /*=================================================*/
+ DCL BOOM     DEC FIXED(1,0) INIT(0)  ;
+ DCL ZERO     DEC FIXED(1,0) INIT(0)  ;
+
+       CTLCHR1 = ' ';
+       GRAMMH = 'TO пяOцяалла ха KAмеи CANCEL CANCEL CANCEL';
+       WRITE FILE(PRINT) FROM(LINE1);
+       BOOM = BOOM / ZERO;
+
+ END ERROR_ABEND;
+
+
+ TELOS:
+        CTLCHR1 = ' ';
+        GRAMMH = '===============================================';
+        WRITE FILE(PRINT) FROM(LINE1);
+        CTLCHR1 = ' ';
+        GRAMMH = ' ейтупысг сулжымиас тоу пяоцяаллатос *DKCM003* ';
+        WRITE FILE(PRINT) FROM(LINE1);
+        CTLCHR1 = ' ';
+        GRAMMH = '===============================================';
+        WRITE FILE(PRINT) FROM(LINE1);
+
+        CTLCHR1 = ' ';
+        GRAMMH = ' глеяолгмиа KAI ыяа яогс :  ' !!
+                 SUBSTR(DATETIME,7,2)!!'.'!!SUBSTR(DATETIME,5,2)!!'.'!!
+                 SUBSTR(DATETIME,1,4)!!'-'!!SUBSTR(DATETIME,9,2)!!':'!!
+                 SUBSTR(DATETIME,11,2)!!':'!!SUBSTR(DATETIME,13,2);
+        WRITE FILE(PRINT) FROM(LINE1);
+
+        CTLCHR1 = ' ';
+        GRAMMH = '-------------------------------------------------';
+        WRITE FILE(PRINT) FROM(LINE1);
+
+        CTLCHR1 = ' ';
+        GRAMMH = 'диабастгйам апо то OUPUT TOY TAM1 (пистысеис) = ' !!
+        ANSWR_CNT;
+        WRITE FILE(PRINT) FROM(LINE1);
+        CTLCHR1 = ' ';
+        GRAMMH = 'епитувеис пистысеис                           = '!!
+        ANSWR_S_CNT;
+        WRITE FILE(PRINT) FROM(LINE1);
+        CTLCHR1 = ' ';
+        GRAMMH = 'сумокийо посо поу пистыхгйе                   = '!!
+        SUM_CREDIT;
+        WRITE FILE(PRINT) FROM(LINE1);
+        CTLCHR1 = ' ';
+        GRAMMH = 'апояяижхеисес пистысеис                       = '!!
+        ANSWR_U_CNT;
+        WRITE FILE(PRINT) FROM(LINE1);
+        CTLCHR1 = ' ';
+        GRAMMH = 'еццяажес стом пIмайа апояяиьеым (CTWBOTP2)    = '!!
+        INSCM02_CNT;
+        WRITE FILE(PRINT) FROM(LINE1);
+
+        CLOSE FILE(ANSWR),FILE(PRINT);
+
+ END DKCM003;
+
+

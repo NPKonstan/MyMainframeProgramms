@@ -1,0 +1,464 @@
+ /* PROCESS A,GOSTMT,NEST,OPT(TIME),AG,MI('+'),MAP,M,OF,NIS;          */
+
+ /*********************** DKMISTA3*************************************//
+ /*  AUTHOR :BARBETAKI                                                */
+ /*      диабафеи то аявеио тым лисходосиым йаи еисацеи тис еццяажес  */
+ /*      стом DB2 пимайа CTDKMIST. та епипкеом педиа тоу пимайа емг-  */
+ /*      леяымомтаи апо то аявеио тым тойаяихлым.                     */
+ /*********************************************************************/
+ /* npk changes for enterprise pli 21-05-2007 DIVIDE                  */
+ /*********************************************************************/
+
+ MANT: PROC OPTIONS(MAIN);
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+ DCL CZX3VDAT CHAR(6); FETCH CZXDATEP;
+ DCL CZXDATEP ENTRY OPTIONS(INTER,ASM) ;
+ DCL TABLES FILE RECORD DIRECT INPUT KEYED ENV ( VSAM );
+ DCL LIST1  FILE RECORD OUTPUT ENV( FB RECSIZE(132) CTLASA);
+ DCL MIST   FILE RECORD INPUT  SEQUENTIAL  ENV( FB RECSIZE(200) );
+ DCL TOKAR  FILE RECORD INPUT  SEQUENTIAL  ENV( FB RECSIZE(240) );
+ DCL MISTOUT   FILE RECORD OUTPUT  SEQUENTIAL  ENV( FB RECSIZE(150) );
+ DCL READER FILE RECORD INPUT  ENV( FB RECSIZE(80) );
+ /*DCL OUTCARD FILE RECORD OUTPUT  ENV( FB RECSIZE(80) ); */
+
+ %INCLUDE RECTABL1;
+ %INCLUDE TOKARIR;
+ %INCLUDE RECDBCR;
+ %INCLUDE RECMIS2;
+ %INCLUDE DAWATNS;
+ %INCLUDE DAYATNS;
+
+ EXEC SQL INCLUDE CTDKMIST;
+ EXEC SQL INCLUDE SQLCA;
+
+ DCL 1 RECOUTCARD,
+       2 OLABEL1           CHAR(9) INIT ('LAST RUN: '),
+       2 ODATEFR           PIC '(10)9',
+       2 OLABEL2           CHAR(1) INIT ('-'),
+       2 ODATETO           PIC '(10)9',
+       2 OLABEL3           CHAR(2) INIT ('  '),
+       2 OLABEL4           CHAR(12) INIT ('RUN ANYWAY: '),
+       2 ORUNFLG           CHAR(1)  INIT ('N');
+
+ DCL 1 RECDATA,
+       2 LABEL1            CHAR(12) INIT ('гл/миа апо: '),
+       2 DATEFR            ,
+         3 DD1             PIC '99',
+         3 P11             CHAR(1)    INIT('.'),
+         3 MM1             PIC '99',
+         3 P21             CHAR(1) INIT('.'),
+         3 YYYY1           PIC '9999',
+       2 FILLER1           CHAR(3) INIT('   '),
+       2 LABEL2            CHAR(12) INIT ('гл/миа еыс: '),
+       2 DATETO            ,
+         3 DD2             PIC '99',
+         3 P12             CHAR(1)    INIT('.'),
+         3 MM2             PIC '99' ,
+         3 P22             CHAR(1)    INIT('.'),
+         3 YYYY2           PIC '9999',
+       2 FILLER2           CHAR(3) INIT('   '),
+       2 LABEL3            CHAR(9) INIT('амакусг: '),
+       2 ANALISI           CHAR(1) INIT('м'),
+       2 FILLER3           CHAR(20) INIT (' ');
+
+ DCL (ADDR,TRANSLATE,SUBSTR,LENGTH) BUILTIN;
+ DCL (BASED,VERIFY,PRIORITY) BUILTIN;
+ DCL TIME   BUILTIN;
+
+ DCL    HMEKD1             PIC'(8)9'   INIT(0);
+ DCL    COUNT_INP         FIXED(15)    INIT(0);
+ DCL    COUNT_INS         PIC '(15)9'  INIT(0);
+ DCL    CNT_TOKAR         PIC '(15)9'  INIT(0);
+ DCL    DEL_ROWS          PIC '(15)9'  INIT(0);
+ DCL    COUNT_OUT         FIXED(15)    INIT(0);
+ DCL    DCOUNT            PIC 'ZZZ.ZZZ.ZZZ.ZZ9' INIT(0);
+ DCL    DAMT              PIC 'ZZZ.ZZZ.ZZZ.ZZ9V,99' INIT(0);
+ DCL    AMT_INP           FIXED(15,2)  INIT(0);
+ DCL    AMT_INS           FIXED(15,2)  INIT(0);
+ DCL    AMT_OUT           FIXED(15,2)  INIT(0);
+ DCL    POSON2            FIXED(15,2)  INIT(0);
+ DCL    WAMT              FIXED(15,2)  INIT(0);
+ DCL    KEEP_DEBCRE       PIC '9'    INIT(0);
+ DCL    KEEP_KWDPEL       PIC '999999'  INIT(0);
+ DCL    WORG              CHAR(30)   INIT(' ');
+ DCL    MONOMA1           CHAR(32)   INIT(' ');
+ DCL    MONOMAN           CHAR(36)   INIT(' ');
+ DCL    MONOMAY           CHAR(48)   INIT(' ');
+ DCL    WEXPLDC           PIC'999'   INIT(0);
+ DCL    CAMTK             PIC '(9)ZV.99' INIT(0);
+ DCL    KATHO2       PIC '99999' INIT (0);
+ DCL    MIN_DATE          FIXED(7);
+ DCL    CMAX_DATE         PIC '999999' BASED(ADDR(SYS_DATE));
+ DCL    MAX_DATE          FIXED(7);
+ DCL    FR_DATE           FIXED(7);
+ DCL    TO_DATE           FIXED(7);
+ DCL    PREV_DATE         FIXED(7);
+ DCL    DATEFROM          CHAR(10);
+ DCL    DATE_TO            CHAR(10);
+ DCL    PREV_ARLOGM       PIC '(9)9' INIT(0);
+ DCL    PREV_ARLOGT       PIC '(9)9' INIT(0);
+ DCL    CMIN_DATE         PIC '999999' BASED(ADDR(SYS_DATE));
+
+ DCL    SYS_DATE          CHAR(6)    INIT(' ');
+ DCL    SYS_TIME          CHAR(9)    INIT(' ');
+ DCL    WSYS_DATE         PIC '999999' BASED(ADDR(SYS_DATE));
+ DCL    W_DATE            PIC '999999';
+ DCL    LINES             PIC '999';
+ DCL    SWEOF             PIC '9' INIT (0);
+
+       /*-------------------------------*/
+       /* EXTERNAL PROCEDURE VALDAY     */
+       /*-------------------------------*/
+     DCL WRKDT            CHAR (6);
+     DCL WRKDATE          PIC '999999' BASED(ADDR(WRKDT));
+      DCL VALDAY  EXTERNAL ENTRY(CHAR(44))
+          OPTIONS(INTER,ASM);
+      FETCH VALDAY ;
+
+      DCL CUA                      CHAR(44);
+      DCL 1 CUE BASED(ADDR(CUA)),
+             2 CUATRKWD            CHAR(4),
+             2 CUAFW               CHAR(4),
+             2 CUAFW1              CHAR(4),
+             2 KWDPROC             CHAR(2),   /* KxdIKOr VALDAY    */
+             2 CUAEKAE             CHAR(1),
+             2 CUAEHMER            CHAR(1),
+             2 CUAHMERX            CHAR(2),
+             2 HMARXHS             FIXED(7),  /* HMEPOMHNIA APXHr  */
+             2 CUAAPANT            CHAR(1),
+             2 CUAOFORM            CHAR(1),
+             2 CUAHMERZ            CHAR(2),
+             2 HMTELOYS            FIXED(7),  /* HMEPOMHNIA TEkOYS */
+             2 HMERES              FIXED(5),  /* OUTPUT HMEPEr     */
+             2 CUAKENO3            CHAR(3),
+             2 CUABIN3             BIT(8),
+             2 CUAHMTS             CHAR(6),
+             2 CUAKENON            CHAR(1);
+
+
+    DCL  ENA  CHAR(24)
+         INIT('ABcdEZHhIKkMNnOpPrTYuXwx');
+    DCL  DYO  CHAR(24)
+         INIT('абцдефгхийклмнопястужвьы');
+
+ DATE: PROC IRREDUCIBLE RETURNS(CHAR(6)) ;
+       CALL CZXDATEP          ( CZX3VDAT) ;
+       RETURN (CZX3VDAT) ;
+       END DATE ;
+
+ DCL  1 LINE,
+         2 L1            CHAR(1),
+         2 L2            CHAR(131);
+ DCL  L3                 CHAR(132);
+ DCL  L4                 CHAR(150);
+ DCL  DIVIDE BUILTIN;
+
+ DCL  1 P1            CHAR(7) ;
+ DCL  1 P2            PIC 'ZZZZ9';
+
+     OPEN FILE(MIST);
+     OPEN FILE(MISTOUT);
+     OPEN FILE(LIST1);
+     OPEN FILE(TABLES);
+     OPEN FILE(TOKAR);
+     OPEN FILE(READER);
+     ON ENDFILE(MIST) BEGIN;
+        SWEOF = 1;
+        GO TO TELOS;
+        END;
+     ON ENDFILE(READER) BEGIN;
+        GO TO TELOS;
+        END;
+     ON ENDFILE(TOKAR) BEGIN;
+        IF (SWEOF = 0) THEN DO;
+            L2 = ' то аявеио тым тойаяихлым диабастгйе выяис ма евеи '!!
+                 ' окойкгяыхеи г амацмысг тоу аявеиоу тым лисходосиым';
+            WRITE FILE(LIST1) FROM(LINE);
+        END;
+        GO TO TELOS;
+        END;
+     /* амацмысг тгс йаятас */
+     READ FILE(READER) INTO(RECDATA);
+     P1 ='секида';
+     SYS_DATE = DATE;
+     SYS_TIME = TIME;
+     LINES = 0;
+     FR_DATE = '1'!!SUBSTR(YYYY1,3,2)!!MM1!!DD1;
+     TO_DATE = '1'!!SUBSTR(YYYY2,3,2)!!MM2!!DD2;
+
+     /*екецвос глеяолгмиым йаятас */
+     IF(FR_DATE > TO_DATE ) THEN DO;
+            L2 = ' кахос диастгла глеяолHмиым йаятас. ';
+            WRITE FILE(LIST1) FROM(LINE);
+            P2 = DIVIDE(LINES,0,1,1);/*npk change for enterprise pli*/
+     END;
+
+     RECMIS2.FILLER1 = ';';
+     RECMIS2.FILLER2 = ';';
+     RECMIS2.FILLER3 = ';';
+     RECMIS2.FILLER4 = ';';
+     RECMIS2.FILLER5 = ';';
+     RECMIS2.FILLER6 = ';';
+     RECMIS2.FILLER7 = ';';
+     RECMIS2.FILLER8 = ';';
+     RECMIS2.FILLER9= ';';
+     RECMIS2.FILLER10= ' ';
+     RECMIS2.FILLER11= ' ';
+     CNT_TOKAR = 0;
+
+     EXEC SQL LOCK TABLE CTDKMIST IN EXCLUSIVE MODE;
+
+ R1: /* амацмысг еццяажым аявеиоу */
+     READ FILE(MIST) INTO(RECDBCR);
+     COUNT_INP = COUNT_INP + 1;
+     IF COUNT_INP = 1 THEN DO;  /*аявийопоигсг тилым */
+        KEEP_KWDPEL = RECDBCR.KWDPEL;
+        CALL ORG;
+        MAX_DATE = RECDBCR.HMEKD;
+        MIN_DATE = RECDBCR.HMEKD;
+        PREV_DATE= 0;
+     END;
+
+
+     /* аккацг пекатг */
+     IF COUNT_INP > 1 THEN DO;
+        IF RECDBCR.KWDPEL ^= KEEP_KWDPEL THEN DO;
+           KEEP_KWDPEL = RECDBCR.KWDPEL;
+           CALL ORG;
+        END;
+     END;
+     L1 = ' ';
+
+     /* EYRESH THW MEGISTHS KAI ELAXISTIS HMEROMHNIAS */
+     IF (MAX_DATE < RECDBCR.HMEKD)  THEN DO;
+         MAX_DATE = RECDBCR.HMEKD;
+     END;
+     IF (MIN_DATE > RECDBCR.HMEKD )  THEN DO;
+         MIN_DATE = RECDBCR.HMEKD;
+     END;
+
+     /* екецвос ам амгйеи сто диастгла г еццяажг */
+     IF (RECDBCR.HMEKD >= FR_DATE & RECDBCR.HMEKD <= TO_DATE &
+         RECDBCR.STATUS = '00')      THEN DO;
+
+         POSON2 = RECDBCR.POSON;
+         KATHO2 = RECDBCR.KATHO;
+         AMT_INP   = AMT_INP + POSON2;
+
+         RECMIS2.KATMALOG1 = RECDBCR.KATMA;
+         RECMIS2.ARLOGAR1  = RECDBCR.ARLOG;
+         RECMIS2.KWDPEL1   = RECDBCR.KWDPEL;
+         RECMIS2.KWDXRPIS1 = RECDBCR.KWDXRPIS;
+         RECMIS2.AITIOL1   = RECDBCR.AITIOL;
+         RECMIS2.KATMALOG1 = RECDBCR.KATMA;
+         EGRAFES           = 1;
+         KATHO1            = RECDBCR.KATHO;
+         POSON1            = RECDBCR.POSON;
+         HMEKD1            = DAYA6R8(RECDBCR.HMEKD);
+
+         /* ╦кецвос ам еимаи сыста танимолглемо то аявеио тым лисходос*/
+         IF (PREV_ARLOGM > ARLOGAR1) THEN DO;
+            L2 = ' дем бяехгйе сыста танимолглемо то аявеио тым лисх'!!
+                 'одосиым.';
+            WRITE FILE(LIST1) FROM(LINE);
+            P2 = DIVIDE(LINES,0,1,1);/*npk change for enterprise pli*/
+         END;
+
+         ONOMA1    = CUST_NAME;
+         KATMAPEL1 = BRNC;
+         KWDPEL1   = CUST_CDE;
+         ONOMA1    = TRANSLATE(ONOMA1, DYO, ENA);
+         KEY_PELCODE = KWDPEL1;
+         KEY_ARLOG = ARLOGAR1;
+         CHR_EPONYMIA = ONOMA1;
+         COD_KATMAPEL = KATMAPEL1;
+         COD_KATMAEMP = KATMALOG1;
+         FLG_DBCR = KWDXRPIS1;
+         COD_KATHO= KATHO1;
+         COD_AITIOL = AITIOL;
+         CAMTK = POSON1;
+         AMT_POSON = CAMTK;
+         DAT_HMNIA = DAYR8SA(HMEKD1);
+         KEY_SERIAL = 1;
+
+         IF (PREV_ARLOGM ^= ARLOGAR1) THEN DO;
+          RTOKAR:
+          /*диацяажг тым еццяажым стом пимайа циа то диастгла гл/миым */
+          /*поу тяевеи то пяоцяалла                                   */
+            IF (CNT_TOKAR = 0) THEN DO;
+              DATEFROM =DAYR8SA(DAYA6R8(SUBSTR(YYYY1,3,2)!!MM1!!DD1));
+              DATE_TO = DAYR8SA(DAYA6R8(SUBSTR(YYYY2,3,2)!!MM2!!DD2));
+              EXEC SQL DELETE FROM CTDKMIST
+                 WHERE DAT_HMNIA BETWEEN :DATEFROM  AND :DATE_TO;
+              DEL_ROWS = SQLERRD(3);
+              EXEC SQL COMMIT;
+              /* циметаи паяаккгкг амацмысг тоу аявеиоу тойаяихлым*/
+              READ FILE(TOKAR) INTO(TKRREC);
+              CNT_TOKAR = CNT_TOKAR + 1;
+            END;
+
+            /* ╦кецвос ам еимаи сыста танимолглемо то аявеио тойаяихл */
+            IF(PREV_ARLOGT > TKRARLOG) THEN DO;
+               L2 = ' дем бяехгйе сыста танимолглемо то аявеио тым '!!
+                'тойым.';
+               WRITE FILE(LIST1) FROM(LINE);
+               P2 = DIVIDE(LINES,0,1,1);/*npk change for enterpr pli*/
+            END;
+            PREV_ARLOGT = TKRARLOG;
+
+            /*суцйяисг тоу ая. коцаяиаслоу тоу аявеиоу тойаяихлым ле  */
+            /*том коцаяиасло тоу аявеиоу лисходосиым. ам дем бяехеи   */
+            /*о коцаяиаслос та амтистоива педиа лгдемифомтаи стом     */
+            /*пимайа аккиыс паиямоум тис тилес тоу аявеиоу тойаяихлым */
+            IF(ARLOGAR1 < TKRARLOG) THEN DO;
+              L2 = ' дем бяехгйе о коцаяиаслос '!!ARLOGAR1 !!
+                   ' сто аявеио тым тойаяихлым йаи тгм епымулиа '!!
+                   CHR_EPONYMIA;
+              WRITE FILE(LIST1) FROM(LINE);
+              AMT_MEDPOSON = 0;
+              AMT_PTOKAR = 0;
+              AMT_XTOKAR = 0;
+              AMT_PTOKOS = 0;
+              AMT_XTOKOS = 0;
+              AMT_FOROS = 0;
+              FLG_OVERD = 0;
+              NUM_PERDAYS = 0;
+            END;
+
+
+            IF(ARLOGAR1 ^= TKRARLOG &  ARLOGAR1 > TKRARLOG)
+            THEN DO;
+               READ FILE(TOKAR) INTO(TKRREC);
+               CNT_TOKAR = CNT_TOKAR + 1;
+               PREV_ARLOGM = ARLOGAR1;
+               GOTO RTOKAR;
+            END;
+            ELSE DO;
+               AMT_MEDPOSON = TKRMESYP;
+               AMT_PTOKAR = TKRPTKR1 + TKRPTKR2 + TKRPTKR3;
+               AMT_XTOKAR = TKRXTKR1 + TKRXTKR2;
+               AMT_PTOKOS = TKRPTOK1 + TKRPTOK2 + TKRPTOK3;
+               AMT_XTOKOS = TKRXTOK1 + TKRXTOK2;
+               AMT_FOROS = TKRTAXES;
+               FLG_OVERD = TKROVERD;
+               NUM_PERDAYS = TKRHMPER;
+            END;
+         END;
+
+         INS:
+         EXEC SQL INSERT INTO CTDKMIST (
+            KEY_PELCODE , KEY_ARLOG   , DAT_HMNIA   , KEY_SERIAL,
+            CHR_EPONYMIA, COD_KATMAPEL, COD_KATMAEMP, FLG_DBCR  ,
+            COD_KATHO   , DAT_AXIA    , DAT_BIRTH   , AMT_POSON ,
+            AMT_MEDPOSON, AMT_PTOKAR  , AMT_XTOKAR  , AMT_PTOKOS,
+            AMT_XTOKOS  , AMT_FOROS   , FLG_OVERD   , NUM_PERDAYS,
+            COD_AITIOL
+          )
+         VALUES (
+           :KEY_PELCODE , :KEY_ARLOG  , :DAT_HMNIA ,:KEY_SERIAL,
+           :CHR_EPONYMIA, :COD_KATMAPEL, :COD_KATMAEMP, :FLG_DBCR,
+           :COD_KATHO,    :DAT_HMNIA   , :DAT_HMNIA   , :AMT_POSON,
+           :AMT_MEDPOSON, :AMT_PTOKAR  , :AMT_XTOKAR  ,:AMT_PTOKOS,
+           :AMT_XTOKOS  , :AMT_FOROS   , :FLG_OVERD   , :NUM_PERDAYS,
+           :COD_AITIOL
+         );
+         IF SQLCODE = -803 THEN
+         DO;
+            L2 = 'упаявеи гдг г еццяажг циа '
+            !!'том коцаяиасло '!!KEY_ARLOG!!'( '!!
+            KEY_PELCODE!!' )';
+            WRITE FILE(LIST1) FROM(LINE);
+            KEY_SERIAL = KEY_SERIAL + 1;
+            GOTO INS;
+         END;
+         ELSE IF SQLCODE ^= 0 THEN
+         DO;
+            L2 = '*** собаяо кахос стгм DB2 *** SQLCODE: '!!SQLCODE!!' '
+            !!KEY_ARLOG;
+            WRITE FILE(LIST1) FROM(LINE);
+            P2 = DIVIDE(LINES,0,1,1);/*npk change for enterprise pli*/
+         END;
+         ELSE DO;
+             COUNT_INS = COUNT_INS + 1;
+             AMT_INS = AMT_INS + AMT_POSON;
+             IF ( MOD(COUNT_INS,1000) = 0 ) THEN
+                 EXEC SQL COMMIT;
+         END;
+         COUNT_OUT = COUNT_OUT + 1;
+         AMT_OUT   = AMT_OUT + POSON2;
+     END;
+
+   GOTO R1;
+
+ /* еуяесг тоу пекатг апо том TABLES                               */
+ ORG: PROC;
+      PEL_REC                   = ''    ; /* OTAN AkkAZEI pEkATHr  */
+      TEAM_CDE                  = '0030'; /* dIABAZx TO TABLES     */
+      CUST_CDE                  = KEEP_KWDPEL;
+
+      READ FILE ( TABLES   )
+      INTO      ( PEL_REC  )
+      KEY       ( VSAM_KEY )            ;
+
+      WORG = KEEP_KWDPEL !! ' ' !! CUST_NAME;
+ END ORG;
+
+ /*********************************************************************/
+ HEAD: PROC;
+     L1 = '1';
+     P2 = DIVIDE(LINES,60,4,0) + 1;
+     L2 = (3)' '!!'лисходосиес циа диастгла глеяолгмиым апо '
+                 !! DD1!!'.'!!MM1!!'.'!!YYYY1!!'-'
+                 !! DD2!!'.'!!MM2!!'.'!!YYYY2!!' ('
+                 !! 'HM/NIA: '!!SUBSTR(SYS_DATE,5,2)!!'.'
+                 !!SUBSTR(SYS_DATE,3,2)!!'.'!!'20'
+                 !!SUBSTR(SYS_DATE,1,2)!! ' xPA: '
+                 !!SUBSTR(SYS_TIME,1,2)!! ':'
+                 !!SUBSTR(SYS_TIME,3,2)!! ':'
+                 !!SUBSTR(SYS_TIME,5,2)!!')*DKMISTA3* '!!
+                 (5)' '!!P1!!P2;
+   WRITE FILE(LIST1) FROM(LINE);
+   L1 = ' ';
+   L2 = (132)'=';
+   WRITE FILE(LIST1) FROM(LINE);
+   LINES =LINES + 2;
+ END HEAD;
+
+ /* ейтупымеи та сумока тгс ейтупысгс, INPUT RECORDS, лецакутеяг */
+ /* лийяотеяг глеяолгмиа                                         */
+ TELOS:;
+     LINES = LINES +60;
+     CALL HEAD;
+     L1 = ' ';
+
+     DCOUNT = COUNT_INP;
+     DAMT = AMT_INP;
+     L2 = 'INPUT RECORDS & посо          '!!DCOUNT!!' '!!DAMT;
+     WRITE FILE(LIST1) FROM(LINE);
+
+     DCOUNT = DEL_ROWS;
+     L2 = 'стO TABLE DELETED ROWS        '!!DCOUNT;
+     WRITE FILE(LIST1) FROM(LINE);
+     DCOUNT = COUNT_OUT;
+     DAMT = AMT_OUT;
+     L2 = 'OUTPUT RECORDS & посо         '!!DCOUNT!!' '!!DAMT;
+     WRITE FILE(LIST1) FROM(LINE);
+     DCOUNT = COUNT_INS;
+     DAMT = AMT_INS;
+     L2 = 'стO TABLE RECORDS & посо      '!!DCOUNT!!' '!!DAMT;
+     WRITE FILE(LIST1) FROM(LINE);
+     CMAX_DATE = MAX_DATE;
+     L2 = 'лецакутеяг глеяолгмиа'!!(17)' '!!DAYR8SA(DAYA6R8(CMAX_DATE));
+     WRITE FILE(LIST1) FROM(LINE);
+     CMIN_DATE = MIN_DATE;
+     L2 = 'лийяотеяг глеяолгмиа '!!(17)' '!!DAYR8SA(DAYA6R8(CMIN_DATE));
+     WRITE FILE(LIST1) FROM(LINE);
+
+  CLOSE FILE(MIST) ;
+  CLOSE FILE(LIST1);
+  CLOSE FILE(MISTOUT);
+  CLOSE FILE(TABLES);
+  CLOSE FILE(READER);
+  CLOSE FILE(TOKAR);
+ END MANT;
+

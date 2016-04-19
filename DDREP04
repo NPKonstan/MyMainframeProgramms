@@ -1,0 +1,637 @@
+*PROCESS LIMITS (FIXEDDEC(15,31));
+ DDREP04: PROC OPTIONS (MAIN);
+ /***********************************************************/
+ /*          MEMBER = DDREP04 PLI + DB2                     */
+ /***********************************************************/
+ /*                                                         */
+ /***********************************************************/
+ /*                                                         */
+ /*npk 14-01-2010                                           */
+ /***********************************************************/
+ DCL PLIXOPT CHAR(39) VAR EXT    INIT('ERRCOUNT(0)');
+ DCL READER  FILE RECORD INPUT   ENV (  FB RECSIZE(080) ) ;
+ DCL PRT     FILE RECORD OUTPUT  ENV (  FB RECSIZE(133) CTLASA) ;
+ DCL PRT2    FILE RECORD OUTPUT  ENV (  FB RECSIZE(133) CTLASA) ;
+ DCL OUTFILE FILE RECORD OUTPUT  ENV (  FB RECSIZE(250) ) ;
+
+ %INCLUDE COBRANDS ;
+ DCL   ADDR      BUILTIN;
+ DCL   DATE      BUILTIN;
+ DCL   TIME      BUILTIN;
+ DCL   SUBSTR    BUILTIN;
+ DCL   VALIDDATE BUILTIN;
+ DCL   DATETIME  BUILTIN;
+ DCL   PLIRETC   BUILTIN;
+ DCL   EOC           BIT(1)    INIT('0'B);
+ DCL   TOT_FETCHED   FIXED(9)  INIT(0);
+ DCL   WS_POSO       FIXED(15,2)  INIT(0);
+
+ DCL OUTREC      CHAR(250);
+ DCL 1 OUTREC1   BASED(ADDR(OUTREC )) ,
+        2 OUT_FROM        CHAR(10)  ,
+        2 OUT_DELIM_11    CHAR(01) INIT(';') ,
+        2 OUT_TO          CHAR(10)  ,
+        2 OUT_DELIM_12    CHAR(01) INIT(';') ,
+        2 OUT_CR_NAME     CHAR(70)  ,
+        2 OUT_DELIM_1     CHAR(01) INIT(';') ,
+        2 OUT_VOL1        PIC'ZZ.ZZZ.ZZ9',
+        2 OUT_DELIM_2     CHAR(01) INIT(';') ,
+        2 OUT_AMT1        PIC'ZZZ.ZZZ.ZZZ.ZZ9V,99',
+        2 OUT_DELIM_3     CHAR(01) INIT(';') ,
+        2 OUT_MO1         PIC'ZZZ.ZZZ.ZZZ.ZZ9V,99',
+        2 OUT_DELIM_4     CHAR(01) INIT(';') ,
+        2 OUT_VOL2        PIC'ZZ.ZZZ.ZZ9',
+        2 OUT_DELIM_5     CHAR(01) INIT(';') ,
+        2 OUT_AMT2        PIC'ZZZ.ZZZ.ZZZ.ZZ9V,99',
+        2 OUT_DELIM_6     CHAR(01) INIT(';') ,
+        2 OUT_MO2         PIC'ZZZ.ZZZ.ZZZ.ZZ9V,99',
+        2 OUT_DELIM_7     CHAR(01) INIT(';') ,
+        2 OUT_VOL3        PIC'ZZ.ZZZ.ZZ9',
+        2 OUT_DELIM_8     CHAR(01) INIT(';') ,
+        2 OUT_AMT3        PIC'ZZZ.ZZZ.ZZZ.ZZ9V,99',
+        2 OUT_DELIM_9     CHAR(01) INIT(';') ,
+        2 OUT_MO3         PIC'ZZZ.ZZZ.ZZZ.ZZ9V,99',
+        2 OUT_DELIM_10    CHAR(03) INIT(';') ;
+
+ DCL 1 CC_REC1 ,      /*CONTROL CARD RECORD */
+        2 FILLER0     CHAR(01), /*C                     */
+        2 CC_DATEFROM CHAR(10),  /*YYYY-MM-DD*//*DATE FROM */
+        2 FILLER1     CHAR(01),
+        2 CC_DATETO   CHAR(10),  /*YYYY-MM-DD*//*DATE TO   */
+        2 FILLER2     CHAR(58);
+
+ DCL 1   ERLINE              ,
+      2  ERLIN1       CHAR(1)      INIT('1'),
+      2  ERLIN2       CHAR(132)    INIT(' ');
+
+ DCL    LINES1            PIC '999999';
+ DCL    LINES2            PIC '999999';
+ DCL    PAGES             PIC '9999';
+ DCL    PAGES2            PIC '9999';
+ DCL    L00               FIXED(1) INIT(0) ;
+ DCL    RC                BIT(1) INIT('1'B);
+ DCL    SYS_DATE          CHAR(6)    INIT(' ');
+ DCL    SYS_TIME          CHAR(9)    INIT(' ');
+ DCL    WS_DATE_TO        FIXED(8,0);
+ DCL    WS_DATE_FROM      FIXED(8,0);
+ DCL    WS_MYDATE         CHAR(10);
+ DCL    WS_TOTAL          FIXED(7);
+ DCL    MY_AMT1           FIXED(17);
+ DCL    MY_AMT2           FIXED(17);
+ DCL    MY_AMT3           FIXED(17);
+ DCL    MY_VOLUME1        FIXED(6) INIT(0);
+ DCL    MY_SUMVOLUME1     FIXED(6) INIT(0);
+ DCL    MY_VOLUME2        FIXED(6) INIT(0);
+ DCL    MY_VOLUME3        FIXED(6) INIT(0);
+ DCL    FIRST_TIME        FIXED(1) INIT(0);
+ /*  == ==========================================  */
+ DCL  LIMIT    FIXED (7)   INIT (200);
+
+ /*  == ==========================================  */
+   EXEC SQL INCLUDE CTDDMV01;
+   EXEC SQL INCLUDE CTDDOR86;
+   EXEC SQL INCLUDE SQLCA;
+  ON ENDFILE(READER)
+  BEGIN ;
+       ERLIN1= ' ';
+       ERLIN2= ' дем упаявеи йаята    ' ;
+       WRITE FILE(PRT) FROM(ERLINE);
+       L00 = DIVIDE(10,L00,1,0);
+  END;
+
+  OPEN FILE(PRT),FILE(READER),FILE(OUTFILE);
+
+  SYS_DATE = DATE();
+  SYS_TIME = TIME();
+  LINES1 = 0; PAGES = 0;
+
+  READ  FILE(READER) INTO(CC_REC1);
+  IF(CC_DATEFROM = '0000-00-00') THEN DO;
+     CC_DATEFROM ='20'!!SUBSTR(SYS_DATE,1,2)!!'.'!!
+                   SUBSTR(SYS_DATE,3,2)!!'.'!!SUBSTR(SYS_DATE,5,2) ;
+     CC_DATETO   = CC_DATEFROM;
+  END;
+
+  RC = VALIDDATE(CC_DATEFROM        ,'YYYY-MM-DD');
+  IF RC = '0'B THEN DO ;
+       ERLIN1= ' ';
+       ERLIN2= ' кахос глеяолгмиа стгм йаята      = '!!CC_DATEFROM;
+       WRITE FILE(PRT) FROM(ERLINE);
+       GOTO TELOS;
+  END;
+
+  RC = VALIDDATE(CC_DATETO          ,'YYYY-MM-DD');
+  IF RC = '0'B THEN DO ;
+       ERLIN1= ' ';
+       ERLIN2= ' кахос глеяолгмиа стгм йаята      = '!!CC_DATETO ;
+       WRITE FILE(PRT) FROM(ERLINE);
+       GOTO TELOS;
+
+  END;
+
+  WS_DATE_FROM = FIXED(SUBSTR(CC_DATEFROM,1,4 ),4,0)*10000 +
+                 FIXED(SUBSTR(CC_DATEFROM,6,2 ),4,0)*100   +
+                 FIXED(SUBSTR(CC_DATEFROM,9,2 ),4,0) ;
+
+  WS_DATE_TO   = FIXED(SUBSTR(CC_DATETO  ,1,4 ),4,0)*10000 +
+                 FIXED(SUBSTR(CC_DATETO  ,6,2 ),4,0)*100   +
+                 FIXED(SUBSTR(CC_DATETO  ,9,2 ),4,0) ;
+
+  PUT SKIP LIST('WS_DATE_TO   = ',WS_DATE_TO        );
+  PUT SKIP LIST('WS_DATE_FROM = ',WS_DATE_FROM      );
+
+  CALL DECLARE_CUR2;
+  CALL OPEN_CUR2;
+  CALL HEADER;
+  CALL HEADER2;
+  CALL FETCH_ROWS2;
+  DO WHILE(^EOC);
+     CALL FETCH_ROWS2;
+  END; /*DO WHILE END*/
+ /*  =============================================  */
+ DECLARE_CUR2:    PROC;
+    EXEC SQL
+    DECLARE CUR2 CURSOR WITH HOLD FOR
+    SELECT    A.CHR_CR_NAME,
+              IFNULL(SUM(CASE
+              WHEN B.CHR_ERROR_CBOG = '00' THEN B.AMT_INTERB_SETTL
+              END ),0) ,
+              IFNULL(COUNT(CASE
+              WHEN B.CHR_ERROR_CBOG = '00' THEN +1
+              END ),0) ,
+              IFNULL(SUM(CASE
+              WHEN B.CHR_ERROR_CBOG <> '00' THEN B.AMT_INTERB_SETTL
+              END ),0) ,
+              IFNULL(COUNT(CASE
+              WHEN B.CHR_ERROR_CBOG <> '00' THEN +1
+              END ),0),
+              IFNULL(SUM(CASE
+              WHEN B.CHR_ERROR_CBOG = '07' THEN B.AMT_INTERB_SETTL
+              END ),0) ,
+              IFNULL(COUNT(CASE
+              WHEN B.CHR_ERROR_CBOG = '07' THEN +1
+              END ),0)
+              FROM   CTDDMV01 AS B, CTDDOR86 AS A
+              WHERE      B.DEC_INTRB_SETL_DAT  >= :WS_DATE_FROM
+                   AND   B.DEC_INTRB_SETL_DAT  <= :WS_DATE_TO
+                   AND   B.CHR_CR_S_I_I_328   = A.CHR_C_S_I_I_517
+            /* AND   B.CHR_ERROR_CBOG    IN ('20','00','07' ) */
+                   GROUP BY A.CHR_CR_NAME
+              WITH UR;                                                  00006599
+ END DECLARE_CUR2;
+ /*  =============================================  */
+ OPEN_CUR2:    PROC;
+    EXEC SQL OPEN CUR2;
+    IF SQLCODE ^= 0 THEN DO;
+       ERLIN1= '1';
+       ERLIN2= ' ERROR OPENING CURSOR CUR2 SQLCODE= '!!SQLCODE;
+       WRITE FILE(PRT) FROM(ERLINE);
+       GOTO TELOS;
+    END;
+ END OPEN_CUR2;
+ /*  ---------------------------------------------  */
+ FETCH_ROWS2: PROC;
+       EXEC SQL FETCH CUR2 INTO
+          :CTDDOR86.CHR_CR_NAME    ,
+          :MY_AMT1,
+          :MY_VOLUME1,
+          :MY_AMT2,
+          :MY_VOLUME2,
+          :MY_AMT3,
+          :MY_VOLUME3;
+
+    IF ( SQLCODE ^= 0 ) & ( SQLCODE ^= 100) THEN DO;
+       ERLIN1= ' ';
+       ERLIN2= ' ERROR FETCHING CURSOR CUR2 SQLCODE= '!!SQLCODE;
+       WRITE FILE(PRT) FROM(ERLINE);
+       GOTO TELOS;
+    END;
+    ELSE DO;
+        IF SQLCODE = 100 THEN DO;
+           EOC='1'B;
+           CALL CLOSE_CUR2;
+           RETURN;
+        END;
+        ELSE              DO;
+             CALL WRITE_FILE ;
+             CALL PRINT_REPORT;
+             IF(MY_VOLUME3 > 0) THEN
+                 CALL PRINT_REPORT2;
+             TOT_FETCHED = TOT_FETCHED+1;
+        END;
+   END;
+
+ END FETCH_ROWS2;
+ /*  ---------------------------------------------  */
+ /*  ---------------------------------------------  */
+ CLOSE_CUR2:    PROC;
+    PUT SKIP LIST('SYNOLO EPITYXON = ',CHAR(MY_SUMVOLUME1));
+    EXEC SQL  CLOSE CUR2;
+
+    IF SQLCODE ^= 0 THEN DO;
+       ERLIN1= ' ';
+       ERLIN2= ' ERROR CLOSING CURSOR CUR2 SQLCODE= '!!SQLCODE;
+       WRITE FILE(PRT) FROM(ERLINE);
+       GOTO TELOS;
+    END;
+   /* ELSE
+      CALL PRINT_TOTALS;*/
+ END CLOSE_CUR2;
+ /*  ---------------------------------------------  */
+ WRITE_FILE: PROC;
+      IF FIRST_TIME = 0 THEN DO;
+         FIRST_TIME = 1;
+         OUTREC = '';
+         OUTREC = 'апо'!!';'!!
+                  'еыс'!!';'!!
+                  'епымулиа'!!';'!!
+                  'йимгсеис'!!';'!!
+                  'аниа'!!';'!!
+                  'л.о'!!';'!!
+                  'йимгсеис'!!';'!!
+                  'аниа'!!';'!!
+                  'л.о'!!';'!!
+                  'йимгсеис'!!';'!!
+                  'аниа'!!';'!!
+                  'л.о'!!';';
+         WRITE FILE(OUTFILE) FROM(OUTREC);
+         OUTREC = '';
+         OUTREC = 'глеяолгмиа'!!';'!!
+                  'глеяолгмиа'!!';'!!
+                  'ояцамислоу'!!';'!!
+                  'петувглемым'!!';'!!
+                  'петувглемым'!!';'!!
+                  'петувглемым'!!';'!!
+                  'амепитувым'!!';'!!
+                  'амепитувым'!!';'!!
+                  'амепитувым'!!';'!!
+                  'амепитувым вяеысеым'!!';'!!
+                  'амепитувым вяеысеым'!!';'!!
+                  'амепитувым вяеысеым'!!';';
+         WRITE FILE(OUTFILE) FROM(OUTREC);
+         OUTREC = '';
+         OUTREC = ''!!';'!!
+                  ''!!';'!!
+                  ''!!';'!!
+                  'вяеысеым'!!';'!!
+                  'вяеысеым'!!';'!!
+                  'вяеысеым'!!';'!!
+                  'вяеысеым'!!';'!!
+                  'вяеысеым'!!';'!!
+                  'вяеысеым'!!';'!!
+                  'коцы йкеистым коцаяиаслым'!!';'!!
+                  'коцы йкеистым коцаяиаслым'!!';'!!
+                  'коцы йкеистым коцаяиаслым'!!';';
+         WRITE FILE(OUTFILE) FROM(OUTREC);
+      END;
+      OUTREC = '';
+      OUT_DELIM_1  =';';
+      OUT_DELIM_2  =';';
+      OUT_DELIM_3  =';';
+      OUT_DELIM_4  =';';
+      OUT_DELIM_5  =';';
+      OUT_DELIM_6  =';';
+      OUT_DELIM_7  =';';
+      OUT_DELIM_8  =';';
+      OUT_DELIM_9  =';';
+      OUT_DELIM_10 =';';
+      OUT_DELIM_11 =';';
+      OUT_DELIM_12 =';';
+      OUT_CR_NAME  = CTDDOR86.CHR_CR_NAME;
+      OUT_VOL1     = MY_VOLUME1;
+      OUT_VOL2     = MY_VOLUME2;
+      OUT_VOL3     = MY_VOLUME3;
+      MY_SUMVOLUME1 = MY_SUMVOLUME1+  MY_VOLUME1;
+      OUT_AMT1     = DIVIDE(MY_AMT1,100,15,2);
+      OUT_AMT2     = DIVIDE(MY_AMT2,100,15,2);
+      OUT_AMT3     = DIVIDE(MY_AMT3,100,15,2);
+      IF(MY_VOLUME1 > 0) THEN
+           OUT_MO1  = DIVIDE(MY_AMT1,MY_VOLUME1*100,15,2);
+      ELSE
+           OUT_MO1  = 0;
+      IF(MY_VOLUME2 > 0) THEN
+           OUT_MO2  = DIVIDE(MY_AMT2,MY_VOLUME2*100,15,2);
+      ELSE
+           OUT_MO2  = 0;
+      IF(MY_VOLUME3 > 0) THEN
+           OUT_MO3  = DIVIDE(MY_AMT3,MY_VOLUME3*100,15,2);
+      ELSE
+           OUT_MO3  = 0;
+
+      OUT_FROM =
+        SUBSTR(CC_DATEFROM,9,2)!!'.'!!
+        SUBSTR(CC_DATEFROM,6,2)!!'.'!!SUBSTR(CC_DATEFROM,1,4);
+      OUT_TO   =
+        SUBSTR(CC_DATETO  ,9,2)!!'.'!!
+        SUBSTR(CC_DATETO  ,6,2)!!'.'!!SUBSTR(CC_DATETO  ,1,4);
+
+
+      WRITE FILE(OUTFILE) FROM(OUTREC);
+
+ END WRITE_FILE ;
+ /*  ---------------------------------------------  */
+ HEADER: PROC;
+ DCL   HEAD1   CHAR(132) ;
+ DCL   HEAD2   CHAR(132) ;
+ DCL   HEAD3   CHAR(132) ;
+ DCL 1 HEADER1  BASED(ADDR(HEAD1))     ,
+        2 H11             CHAR(20)  INIT(' '),
+        2 H11_DELIM       CHAR(01)  INIT('|') ,
+        2 H12             CHAR(31)  INIT('     епитувеис вяеысеис'),
+        2 H12_DELIM       CHAR(01)  INIT('|') ,
+        2 H13             CHAR(31)  INIT('     амепитувеис вяеысеис'),
+        2 H13_DELIM       CHAR(01)  INIT('|') ;
+
+ DCL 1 HEADER3  BASED(ADDR(HEAD3))     ,
+        2 H31             CHAR(85)  INIT(' ');
+
+ DCL 1 HEADER2  BASED(ADDR(HEAD2))     ,
+        2 H21             CHAR(20)  INIT('ояцамислос'),
+        2 H21_DELIM       CHAR(01)  INIT('|') ,
+        2 H22             CHAR(07)  INIT('телавиа'),
+        2 H22_DELIM       CHAR(01)  INIT('|') ,
+        2 H23             CHAR(13)  INIT('    аниа'),
+        2 H23_DELIM       CHAR(01)  INIT('|') ,
+        2 H24             CHAR(09)  INIT('  л.о.'),
+        2 H24_DELIM       CHAR(01)  INIT('|') ,
+        2 H25             CHAR(07)  INIT('телавиа'),
+        2 H25_DELIM       CHAR(01)  INIT('|') ,
+        2 H26             CHAR(13)  INIT('    аниа'),
+        2 H26_DELIM       CHAR(01)  INIT('|') ,
+        2 H27             CHAR(09)  INIT('  л.о.'),
+        2 H27_DELIM       CHAR(01)  INIT('|') ;
+
+
+         H11 = '';
+         H12 = '     епитувеис вяеысеис';
+         H13 = '     амепитувеис вяеысеис';
+
+         H21 = '     ояцамислос'  ;
+         H22 = 'TEMAXIA'     ;
+         H23 = '    Aниа'    ;
+         H24 = '  л.о.'      ;
+         H25 = 'TEMAXIA'     ;
+         H26 = '    Aниа'    ;
+         H27 = '  л.о.'      ;
+    H11_DELIM = '|';H12_DELIM = '|';H13_DELIM = '|';
+
+    H21_DELIM = '|';H22_DELIM = '|';H23_DELIM = '|';
+    H24_DELIM = '|';H25_DELIM = '|';
+    H26_DELIM = '|';H27_DELIM = '|';
+
+   H31 =(85)'-';
+   PAGES = DIVIDE(LINES1,60,4,0) + 1;
+   BANK = 0;
+                          /*BRAN = CC_BRANCH;*/
+   BRAN = 917;
+   PROG = 'DDREP04   ' ;
+   CALL COBRANC(BANK,BRAN,PROG,HDR1,HDR2);
+   ERLIN1 = '1';
+   ERLIN2 = HDR1;
+   WRITE FILE (PRT) FROM (ERLINE);                                      BK301680
+
+   ERLIN1 = ' ';
+   ERLIN2 = HDR2;
+   WRITE FILE (PRT) FROM (ERLINE);                                      BK301680
+
+   ERLIN1 = ' ';
+   ERLIN2 = 'ейтупысг епитувым-амепитувым вяеысеым '
+               !! 'апо : '!!
+               SUBSTR(CC_DATEFROM,9,2)!!'.'!!
+               SUBSTR(CC_DATEFROM,6,2)!!'.'!!SUBSTR(CC_DATEFROM,1,4)
+               !!' еыс : '!!
+               SUBSTR(CC_DATETO  ,9,2)!!'.'!!
+               SUBSTR(CC_DATETO  ,6,2)!!'.'!!SUBSTR(CC_DATETO  ,1,4)
+               !! ' HM/NIA ейтупысгс : '!!SUBSTR(SYS_DATE,5,2)!!'.'
+               !!SUBSTR(SYS_DATE,3,2)!!'.'!!'20'
+               !!SUBSTR(SYS_DATE,1,2)!! ' ыPA: '
+               !!SUBSTR(SYS_TIME,1,2)!! ':'
+               !!SUBSTR(SYS_TIME,3,2)!! ':'
+               !!SUBSTR(SYS_TIME,5,2);
+
+   WRITE FILE(PRT) FROM(ERLINE);
+   ERLIN2 = (73)' '!! 'аяихлос секидас : '!!PAGES;
+   WRITE FILE(PRT ) FROM(ERLINE);
+   ERLIN2 = (130)'=';
+
+   WRITE FILE(PRT) FROM(ERLINE);
+
+   ERLIN1 = ' ';
+   ERLIN2 = HEAD1   ;
+   WRITE FILE(PRT) FROM(ERLINE);
+   ERLIN2 = HEAD3;
+   WRITE FILE(PRT) FROM(ERLINE);
+   ERLIN2 = HEAD2 ;
+   WRITE FILE(PRT) FROM(ERLINE);
+
+   ERLIN2 = (130)'=';
+   WRITE FILE(PRT) FROM(ERLINE);
+
+   LINES1 =LINES1 + 8;
+ END HEADER;
+ /*  ---------------------------------------------  */
+ /*  ---------------------------------------------  */
+ PRINT_REPORT:PROC;
+ DCL   DTL     CHAR(132);
+ DCL 1 DETAIL1 BASED(ADDR(DTL))     ,
+        2 D11             CHAR(20)  ,
+        2 D11_DELIM       CHAR(01)  INIT('|') ,
+        2 D12             PIC'ZZZ.ZZ9',
+        2 D12_DELIM       CHAR(01)  INIT('|') ,
+        2 D13             PIC'ZZ.ZZZ.ZZ9V,99',
+        2 D13_DELIM       CHAR(01)  INIT('|') ,
+        2 D14             PIC'ZZ.ZZ9V,99',
+        2 D14_DELIM       CHAR(01)  INIT('|') ,
+        2 D15             PIC'ZZZ.ZZ9',
+        2 D15_DELIM       CHAR(01)  INIT('|'),
+        2 D16             PIC'ZZ.ZZZ.ZZ9V,99',
+        2 D16_DELIM       CHAR(01)  INIT('|') ,
+        2 D17             PIC'ZZ.ZZ9V,99',
+        2 D17_DELIM       CHAR(01)  INIT('|') ;
+
+       D11 =  SUBSTR(OUT_CR_NAME,1,20);
+       D12 =  MY_VOLUME1;
+       D13 =  DIVIDE(MY_AMT1,100,15,2);
+       IF(MY_VOLUME1 >0) THEN
+          D14 =  DIVIDE(MY_AMT1,MY_VOLUME1*100,15,2);
+       ELSE
+          D14 =  0 ;
+       D15 =  MY_VOLUME2;
+       D16 =  DIVIDE(MY_AMT2,100,15,2);
+
+       IF(MY_VOLUME2 >0) THEN
+          D17 =  DIVIDE(MY_AMT2,MY_VOLUME2*100,15,2);
+       ELSE
+          D17 =  0 ;
+
+       D11_DELIM ='|';
+       D12_DELIM ='|';
+       D13_DELIM ='|';
+       D14_DELIM ='|';
+       D15_DELIM ='|';
+       D16_DELIM ='|';
+       D17_DELIM ='|';
+   ERLIN2 = DTL ;
+   WRITE FILE(PRT) FROM(ERLINE);
+   LINES1 = LINES1 + 1;
+   CALL NEXT_LINE;
+ END PRINT_REPORT;
+ /*  ---------------------------------------------  */
+ /*  ---------------------------------------------  */
+ NEXT_LINE: PROC;
+     IF MOD(LINES1,60)=0  THEN
+     DO;
+        CALL HEADER;
+        ERLIN1 = ' ';
+     END;
+ END NEXT_LINE;
+ /*  ---------------------------------------------  */
+ /*  ---------------------------------------------  */
+ HEADER2: PROC;
+ DCL   HEAD1   CHAR(132) ;
+ DCL   HEAD2   CHAR(132) ;
+ DCL   HEAD3   CHAR(132) ;
+ DCL 1 HEADER1  BASED(ADDR(HEAD1))     ,
+        2 H11             CHAR(20)  INIT(' '),
+        2 H11_DELIM       CHAR(01)  INIT('|') ,
+        2 H12             CHAR(31)  INIT('                       '),
+        2 H12_DELIM       CHAR(01)  INIT('|') ,
+        2 H13             CHAR(31)  INIT('                         '),
+        2 H13_DELIM       CHAR(01)  INIT('|') ;
+
+ DCL 1 HEADER3  BASED(ADDR(HEAD3))     ,
+        2 H31             CHAR(85)  INIT(' ');
+
+ DCL 1 HEADER2  BASED(ADDR(HEAD2))     ,
+        2 H21             CHAR(20)  INIT('ояцамислос'),
+        2 H21_DELIM       CHAR(01)  INIT('|') ,
+        2 H22             CHAR(07)  INIT('телавиа'),
+        2 H22_DELIM       CHAR(01)  INIT('|') ,
+        2 H23             CHAR(13)  INIT('    аниа'),
+        2 H23_DELIM       CHAR(01)  INIT('|') ,
+        2 H24             CHAR(09)  INIT('  л.о.'),
+        2 H24_DELIM       CHAR(01)  INIT('|') ,
+        2 H25             CHAR(07)  INIT('телавиа'),
+        2 H25_DELIM       CHAR(01)  INIT('|') ,
+        2 H26             CHAR(13)  INIT('    аниа'),
+        2 H26_DELIM       CHAR(01)  INIT('|') ,
+        2 H27             CHAR(09)  INIT('  л.о.'),
+        2 H27_DELIM       CHAR(01)  INIT('|') ;
+
+
+         H11 = '';
+         H12 = '   амепитувеис вяеысеис';
+         H13 = '                         ';
+
+         H21 = '     ояцамислос'  ;
+         H22 = 'TEMAXIA'     ;
+         H23 = '    Aниа'    ;
+         H24 = '  л.о.'      ;
+         H25 = '       '     ;
+         H26 = '        '    ;
+         H27 = '     .'      ;
+    H11_DELIM = '|';H12_DELIM = '|';H13_DELIM = '|';
+
+    H21_DELIM = '|';H22_DELIM = '|';H23_DELIM = '|';
+    H24_DELIM = '|';H25_DELIM = '|';
+    H26_DELIM = '|';H27_DELIM = '|';
+
+   H31 =(85)'-';
+   PAGES2 = DIVIDE(LINES2,60,4,0) + 1;
+   BANK = 0;
+                          /*BRAN = CC_BRANCH;*/
+   BRAN = 917;
+   PROG = 'DDREP04   ' ;
+   CALL COBRANC(BANK,BRAN,PROG,HDR1,HDR2);
+   ERLIN1 = '1';
+   ERLIN2 = HDR1;
+   WRITE FILE (PRT2) FROM (ERLINE);                                     BK301680
+
+   ERLIN1 = ' ';
+   ERLIN2 = HDR2;
+   WRITE FILE (PRT2) FROM (ERLINE);                                     BK301680
+
+   ERLIN1 = ' ';
+   ERLIN2 = 'амепитувеис вяеысеис коцы йкеистым коцаяиAслым '
+               !! 'апо : '!!
+               SUBSTR(CC_DATEFROM,9,2)!!'.'!!
+               SUBSTR(CC_DATEFROM,6,2)!!'.'!!SUBSTR(CC_DATEFROM,1,4)
+               !!' еыс : '!!
+               SUBSTR(CC_DATETO  ,9,2)!!'.'!!
+               SUBSTR(CC_DATETO  ,6,2)!!'.'!!SUBSTR(CC_DATETO  ,1,4)
+               !! ' HM/NIA ейтупысгс : '!!SUBSTR(SYS_DATE,5,2)!!'.'
+               !!SUBSTR(SYS_DATE,3,2)!!'.'!!'20'
+               !!SUBSTR(SYS_DATE,1,2)!! ' ыPA: '
+               !!SUBSTR(SYS_TIME,1,2)!! ':'
+               !!SUBSTR(SYS_TIME,3,2)!! ':'
+               !!SUBSTR(SYS_TIME,5,2);
+   WRITE FILE(PRT2) FROM(ERLINE);
+
+   ERLIN2 = (82)' '!! 'аяихлос секидас : '!!PAGES2;
+   WRITE FILE(PRT2) FROM(ERLINE);
+
+   ERLIN2 = (130)'=';
+   WRITE FILE(PRT2) FROM(ERLINE);
+
+   ERLIN1 = ' ';
+   ERLIN2 = HEAD1   ;
+   WRITE FILE(PRT2) FROM(ERLINE);
+
+   ERLIN2 = HEAD3;
+   WRITE FILE(PRT2) FROM(ERLINE);
+
+   ERLIN2 = HEAD2 ;
+   WRITE FILE(PRT2) FROM(ERLINE);
+
+   ERLIN2 = (130)'=';
+   WRITE FILE(PRT2) FROM(ERLINE);
+
+   LINES2 =LINES2 + 8;
+ END HEADER2;
+ /*  ---------------------------------------------  */
+ /*  ---------------------------------------------  */
+ PRINT_REPORT2:PROC;
+ DCL   DTL     CHAR(132);
+ DCL 1 DETAIL1 BASED(ADDR(DTL))     ,
+        2 D11             CHAR(20)  ,
+        2 D11_DELIM       CHAR(01)  INIT('|') ,
+        2 D12             PIC'ZZZ.ZZ9',
+        2 D12_DELIM       CHAR(01)  INIT('|') ,
+        2 D13             PIC'ZZ.ZZZ.ZZ9V,99',
+        2 D13_DELIM       CHAR(01)  INIT('|') ,
+        2 D14             PIC'ZZ.ZZ9V,99',
+        2 D14_DELIM       CHAR(01)  INIT('|') ;
+
+       D11 =  SUBSTR(OUT_CR_NAME,1,20);
+       D12 =  MY_VOLUME3;
+       D13 =  DIVIDE(MY_AMT3,100,15,2);
+       IF(MY_VOLUME3 >0) THEN
+          D14 =  DIVIDE(MY_AMT3,MY_VOLUME3*100,15,2);
+       ELSE
+          D14 =  0 ;
+
+       D11_DELIM ='|';
+       D12_DELIM ='|';
+       D13_DELIM ='|';
+       D14_DELIM ='|';
+   ERLIN2 = DTL ;
+   WRITE FILE(PRT2) FROM(ERLINE);
+   LINES2 = LINES2 + 1;
+   CALL NEXT_LINE2;
+ END PRINT_REPORT2;
+ /*  ---------------------------------------------  */
+ /*  ---------------------------------------------  */
+ NEXT_LINE2: PROC;
+     IF MOD(LINES2,60)=0  THEN
+     DO;
+        CALL HEADER2;
+        ERLIN1 = ' ';
+     END;
+ END NEXT_LINE2;
+ /*  ---------------------------------------------  */
+ TELOS:
+       ERLIN1= '1';
+       ERLIN2= ' Tекос пяоцяаллатос DDREP04 THN = '!!DATETIME();
+       CLOSE FILE(PRT),FILE(OUTFILE),FILE(READER);
+ END DDREP04;
+

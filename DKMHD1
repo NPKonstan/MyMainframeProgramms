@@ -1,0 +1,514 @@
+* PROCESS XOPTS(DLI);                                                   00010011
+ /* PROCESS INCLUDE,XOPTS(DLI),AG,A,M,MAP,NEST,GOSTMT,OPT(2),X,OF;    */00020011
+ /*DKMHD1   ÄHMIOYPÃIA 1. D/B KËEIÓMENÙN - MHÄENIÓMENÙN ËOÃAPIAÓMÙN  */ 00030011
+ /*                    2. D/B ENEPÃÙN ËOÃAPIAÓMÙN                    */ 00040011
+ /*                          Y2000                                   */ 00050011
+ /*                                                                  */ 00060011
+ /********************************************************************/ 00070011
+ /*                     D K M H D 1                                  */ 00080011
+ /*                                                                  */ 00090011
+ /*  INPUT      : 1. CONTROL KAPTA   ­­­( READER )                   */ 00100011
+ /*               2. D/B KATAÈEÓEÙN  ­­­                             */ 00110011
+ /*                                                                  */ 00120011
+ /*  OUTPUT     : 1. D/B KËEIÓMENÙN - MHÄENIÓÈENTÙN ËOÃAPIAÓMÙN      */ 00130011
+ /*               2. D/B ENEPÃÙN ËOÃAPIAÓMÙN                         */ 00140011
+ /*               3. EKTYÐÙÓH ÓYMÖÙNIAÓ                              */ 00150011
+ /*                                                                  */ 00160011
+ /*                                                  Ð. ÐANAÃOÐOYËOÓ */ 00170011
+ /*                                                                  */ 00180011
+ /*  UPDATED      15.5.96 Ó.A.                                       */ 00190011
+ /*               AËËAÃH PCB ÃIA TO MVS                              */ 00200011
+ /*  UPDATED      13.11.98 Ó.A.               Y2000-WORK AREA        */ 00210011
+ /*                                                                  */ 00220011
+ /*  UPDATED      09.09.04 THEODOG                                   */ 00230011
+ /*               ÁËËÁÃÅÓ ÓÔÇ ÄÉÁÄÉÊÁÓÉÁ ÁÖÁÉÑÅÓÇÓ ÊËÅÉÓ/ÌÇÄ. ËÏÃ.   */ 00240011
+ /*               1.ÁËËÁÃÇ ÓÔÇ C.C (ÐÑÏÓÈÇÊÇ 2ÇÓ ÇÌÍÉÁÓ)             */ 00250011
+ /*               2.AËËÁÃÇ ÓÔÏ ÐÑÏÓÄÉÏÑÉÓÌÏ ÔÙÍ ÊËÅÉÓ./ÌÇÄ. ËÏÃ.     */ 00260011
+ /*               3.ÄÇÌÉÏÕÑÃÉÁ ÄÕÏ ÍÅÙÍ ÁÑ×ÅÉÙÍ.                     */ 00270011
+ /*  UPDATED      21.05.07 KONSTAN CHANGES FOR ENTERPRICE PLI        */ 00271014
+ /********************************************************************/ 00280011
+                                                                        00290011
+ DLITDLI: PROCEDURE OPTIONS(MAIN);                                      00300011
+ /*****       VSE/MVS TRANSLATION PROCESSED BY MVS-MS       *****/      00310011
+ /*****          SATURDAY  96/05/11  AT  22.22.46           *****/      00320011
+ /*** PL/1 OPTIMIZER EXECUTION TIME OPTIONS ***/                        00330011
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');                    00340011
+ /*** MVS-MS DATE SIMULATION VARIABLES ***/                             00350011
+ DCL CZX3VDAT CHAR(6); FETCH CZXDATEP;                                  00360011
+ DCL CZXDATEP ENTRY OPTIONS(INTER,ASM) ;                                00370011
+ /***            END OF MVS-MS INSERT            ***/                   00380011
+ /* ---------------------- A P X E I A ----------------------------- */ 00390011
+   DCL   READER  FILE RECORD INPUT                                      00400011
+                 ENV (                                                  00410011
+                       FB                                               00420011
+                       RECSIZE ( 80 )                                   00430011
+                                      ) ;                               00440011
+                                                                        00450011
+   DCL   PRINT   FILE RECORD OUTPUT                                     00460011
+                 ENV (                                                  00470011
+                       FB                                               00480011
+                       RECSIZE ( 133 )                                  00490011
+                                                                        00500011
+                       CTLASA  ) ;                                      00510011
+                                                                        00520011
+   DCL   RMTAM20 FILE RECORD OUTPUT                                     00530011
+                 ENV (                                                  00540011
+                       FB                                               00550011
+                       RECSIZE ( 024 )                                  00560011
+                                      ) ;                               00570011
+                                                                        00580011
+   DCL   RMVRSEG FILE RECORD OUTPUT                                     00590011
+                 ENV (                                                  00600011
+                       FB                                               00610011
+                       RECSIZE ( 400 )                                  00620011
+                                      ) ;                               00630011
+ /* ---------------------------------------------------------------- */ 00640011
+ /*                                                                  */ 00650011
+ /* ---------------------------------------------------------------- */ 00660011
+                                                                        00670011
+ % INCLUDE   KSDBMAP  ;                                                 00680011
+ % INCLUDE   RECTAM24 ;                                                 00690011
+                                                                        00700011
+ %PAGE;                                                                 00710011
+                                                                        00720011
+  DCL 1 CTL_CARD,                                                       00730011
+        2 CTL_OPT         CHAR ( 02 ),                                  00740011
+        2 F1              CHAR ( 01 ),                                  00750011
+        2 CTL_DATE1,      /* ÇÌÅÑÏÌÇÍÉÁ ÃÉÁ ÊËÅÉÓÈÅÍÔÅÓ   */            00760011
+          3 CTL_DD1       CHAR ( 02 ),                                  00770011
+          3 CTL_MM1       CHAR ( 02 ),                                  00780011
+          3 CTL_YY1       CHAR ( 02 ),                                  00790011
+        2 F2              CHAR ( 01 ),                                  00800011
+        2 CTL_DATE2,      /* ÇÌÅÑÏÌÇÍÉÁ ÃÉÁ ÌÇÄÅÍÉÓÈÅÍÔÅÓ */            00810011
+          3 CTL_DD2       CHAR ( 02 ),                                  00820011
+          3 CTL_MM2       CHAR ( 02 ),                                  00830011
+          3 CTL_YY2       CHAR ( 02 ),                                  00840011
+        2 FILLER          CHAR ( 64 );                                  00850011
+                                                                        00860011
+ DCL    CTL_DTA_1         PIC '(06)9'  BASED ( ADDR ( CTL_DATE1 ) );    00870011
+ DCL    CTL_DTA_2         PIC '(06)9'  BASED ( ADDR ( CTL_DATE2 ) );    00880011
+ DCL    CTL_DTA1          FIXED (  7 ) INIT ( 0 );                      00890011
+ DCL    CTL_DTA2          FIXED (  7 ) INIT ( 0 );                      00900011
+                                                                        00910011
+ % INCLUDE  DAYATNS;                                      /* Y2000 */   00920011
+                                                                        00930011
+ DCL    WRK_DD            CHAR ( 02 );                                  00940011
+ DCL    LIN               CHAR ( 133 ) INIT ( (133) ' ' );              00950011
+ DCL    ( PRIORITY,ADDR,STG)BUILTIN;                                    00960011
+ /****  DATE SIMULATION DEFINED FUNCTION  ****/                         00970011
+ DATE: PROC IRREDUCIBLE RETURNS(CHAR(6)) ;                              00980011
+       CALL CZXDATEP          ( CZX3VDAT) ;                             00990011
+       RETURN (CZX3VDAT) ;                                              01000011
+       END DATE ;                                                       01010011
+ /****        END OF MVS-MS INSERT        ****/                         01020011
+ DCL    ( J, I )   BIN      FIXED ( 15 ) INIT ( 0 );                    01030011
+ DCL    ( KFIOROOT, KFIOSADD ) POINTER;                                 01040011
+                                                                        01050011
+ DCL  1 ADD_VARS ( 05 ),                                                01060011
+        2 TTL_SEGMNTS,                                                  01070011
+          3 BLNC_TTL      FIXED ( 15, 2 ) ,                             01080011
+          3 NUM_OF_TTL    FIXED ( 10 )    ,                             01090011
+        2 DLT_SEGMNTS,                                                  01100011
+          3 BLNC_DLT      FIXED ( 15, 2 ) ,                             01110011
+          3 NUM_OF_DLT    FIXED ( 10 )    ,                             01120011
+        2 NO_DLT_SEGMNTS,                                               01130011
+          3 BLNC_NO_DLT   FIXED ( 15, 2 ) ,                             01140011
+          3 NUM_OF_NO_DLT FIXED ( 10 )    ;                             01150011
+                                                                        01160011
+ /* DCL  WRKAREA             CHAR ( 400 );    */                        01170011
+ DCL  WRKAREA             CHAR ( 450 );                   /* Y2000 */   01180011
+                                                                        01190011
+ DCL PG_LENGTH         PIC '9999'     INIT ( 45 );                      01200011
+ DCL LN_CNTR           PIC '99'       INIT (  1 );                      01210011
+ DCL REMOVED_ROOTS     PIC '9999999'  INIT (  0 );                      01220011
+                                                                        01230011
+ DCL  EOF              BIT  ( 01 ) INIT ( '0'B );                       01240011
+                                                                        01250011
+ DCL 1 SAFETY  BASED ( ADDR ( KSRKATMA ) ),                             01260011
+      2 IONIKH    BIT ( 08 ) ,                                          01270011
+      2 SAF3      BIT ( 08 ) ,                                          01280011
+      2 SAF       BIT ( 08 ) ;                                          01290011
+                                                                        01300011
+ DCL 1 BINZWR     BIT ( 08 ) BASED ( ADDR ( KSRKLOG ) );                01310011
+                                                                        01320011
+ DCL LINE              CHAR (133)   INIT(' ');                          01330011
+                                                                        01340011
+ DCL 1 LINE1 BASED(ADDR(LINE)),                                         01350011
+       2  CTLCHR1  CHAR(1)  INIT(' '),                                  01360011
+       2  GRAMMH  CHAR(132)  INIT((132)' ');                            01370011
+                                                                        01380011
+ %PAGE;                                                                 01390011
+ /******************************************************************/   01400011
+ /*                                                                */   01410011
+ /*******************  MAIN PROCEDURE  *****************************/   01420011
+ /*                                                                */   01430011
+ /******************************************************************/   01440011
+                                                                        01450011
+  OPEN FILE ( READER ), FILE ( PRINT );                                 01460011
+                                                                        01470011
+  KFIOROOT = ADDR ( WRKAREA );                                          01480011
+  KFIOSADD = ADDR ( WRKAREA );                                          01490011
+                                                                        01500011
+  ON ENDFILE ( READER )                                                 01510011
+     BEGIN;                                                             01520011
+        EOF = '1'B;                                                     01530011
+     END;                                                               01540011
+                                                                        01550011
+  I = 0;                                                                01560011
+                                                                        01570011
+  ADD_VARS = '';    /* INITIAL  VALUE                                */ 01580011
+                                                                        01590011
+  READ FILE ( READER ) INTO ( CTL_CARD );                               01600011
+                                                                        01610011
+                                                                        01620011
+  CTL_DTA1 = DAYS6F7(CTL_DTA_1);                       /* Y2000 */      01630011
+  CTL_DTA2 = DAYS6F7(CTL_DTA_2);                       /* Y2000 */      01640011
+                                                                        01650011
+  DO WHILE ( DIBSTAT ^= 'GB' );                                         01660011
+                                                                        01670011
+        EXEC DLI                                                        01680011
+             GN       USING PCB ( 2 )                                   01690011
+             INTO   ( WRKAREA );                                        01700011
+                                                                        01710011
+        SELECT ( DIBSTAT );          /* ONLY FOR GET OR GET NEXT   */   01720011
+                                                                        01730011
+           WHEN ( 'GA', 'GK', '  ' ) /* GA : HIGHER LEVEL SEGMENT  */   01740011
+                                     /* GK : SAME LEVEL BUT        */   01750011
+                                     /*      DIFFERENT TYPE SEGMENT*/   01760011
+                                     /*'  ': VALID NEXT SEGMENT    */   01770011
+                                     /*      SAME TYPE, SAME LEVEL */   01780011
+              DO;                                                       01790011
+                 SELECT ( DIBSEGM ); /* APIÈMHÓH SEGMENT D/B       */   01800011
+                    WHEN ( 'KROOTSEG' ) J = 1;                          01810011
+                    WHEN ( 'KCHKBSEG' ) J = 2;                          01820011
+                    WHEN ( 'KSUSPSEG' ) J = 3;                          01830011
+                    WHEN ( 'KSTATSEG' ) J = 4;                          01840011
+                    WHEN ( 'KINTRSEG' ) J = 5;                          01850011
+                 END; /* SELECT */                                      01860011
+                 CALL CRT_DB ( WHICH_DB ( I ) );                        01870011
+              END;                                                      01880011
+           WHEN ( 'GB' )             /* GB : END OF DATA BASE      */   01890011
+              DO;                    /* CONTINUE ...               */   01900011
+                 CALL CRT_RPT;                                          01910011
+              END;                                                      01920011
+           OTHERWISE                 /*      UBNORMAL CONDITION    */   01930011
+              DO;                                                       01940011
+                  LIN = '0'!!'ERROR READING D/B KAT ' !! KSRARLOG!! ' ' 01950011
+                                                      !! DIBSTAT;       01960011
+                  WRITE FILE ( PRINT )                                  01970011
+                  FROM       ( LIN   );                                 01980011
+                  SIGNAL FINISH;                                        01990011
+              END;                                                      02000011
+        END; /* SELECT */                                               02010011
+  END; /* DO */                                                         02020011
+  CLOSE FILE ( READER) , FILE ( PRINT );                                02030011
+  SIGNAL FINISH;                                                        02040011
+                                                                        02050011
+ %PAGE;                                                                 02060011
+ /******************************************************************/   02070011
+ /*                                                                */   02080011
+ /*******************  WHICH DATA BASE *****************************/   02090011
+ /*                                                                */   02100011
+ /******************************************************************/   02110011
+ WHICH_DB : PROC ( DB ) RETURNS(BIN FIXED ( 15, 0 ) );                  02120014
+                                                                        02130011
+ DCL    DB      BIN FIXED ( 15, 0 );                                    02140011
+ DCL    DB_NPK  BIN FIXED ( 15, 0 ) INIT (0);                           02141014
+                                                                        02150011
+ DCL    INV_DTA BIT ( 01 ) INIT ( '0'B );                               02160011
+                                                                        02170011
+    INV_DTA = '0'B;                                                     02180011
+                                                                        02190011
+    /*****************************************************************/ 02200011
+    /* EËEÃXOÓ ÃIA TO ÐOY ÈA ÃPAÖOYN TA SEGMENTS                     */ 02210011
+    /* DB = 3 : DIACPAUOMMENO SEGMENT    4 - MVS                     */ 02220011
+    /* DB = 2 : PAPAMENXN SEGMENT        3 - MVS                     */ 02230011
+    /*****************************************************************/ 02240011
+                                                                        02250011
+    IF J = 1 THEN                                                       02260011
+       DO;                                                              02270011
+          DB = 4;                 /* ÅÓÔÙ ÄÉÁÃÑÁÖÏÌÅÍÏ  SEGMENT      */ 02280011
+                                                                        02290011
+          /* EËEÃXOÓ ÃIA SEGMENTS ÐOY ÈA ÐAPAMEINOYN                 */ 02300011
+                                                                        02310011
+          IF ( KSRARLOG= 999999999   ) !                                02320011
+             ( BINZWR  = '00000000'B ) !                                02330011
+             ( SAF     = '00000000'B ) THEN                             02340011
+             DO;                                                        02350011
+                DB      = 3;      /* ÃÑÁØÅ ÁËËÁ ...                  */ 02360011
+                INV_DTA = '1'B;   /* MHN ÐPOÓÈEÓHÓ                   */ 02370011
+             END;                                                       02380011
+          ELSE                                                          02390011
+             DO;                                                        02400011
+                IF ( KSRKATMA  = 431 ) ! ( KSRKATHO = 5116 ) !          02410013
+                   ( KSRDYPOL ^= 0   ) !                                02420011
+                   ( KSREKKRE ^= 0   ) THEN                             02430011
+                   DO;                                                  02440011
+                      DB = 3;                                           02450011
+                   END;                                                 02460011
+                ELSE                                                    02470011
+                   DO;                                                  02480011
+                      IF KSRDYPOL = 0 &                                 02490011
+                         KSREKKRE = 0 THEN                              02500011
+                         DO;                                            02510011
+                            IF KSRAKYR = '1' THEN                       02520011
+                               DO ;                                     02530011
+                               IF KSRATMFL = '1' THEN DB = 3;           02540011
+                               IF KSRHMTS >  CTL_DTA1 !                 02550011
+                                  KSRHMTA >  CTL_DTA1 THEN DB = 3 ;     02560011
+                               END;                                     02570011
+                           ELSE                                         02580011
+                               DO;                                      02590011
+                                  IF KSRHMTS <= CTL_DTA2 &              02600011
+                                     KSRHMTA <= CTL_DTA2 THEN           02610011
+                                     DO;                                02620011
+                                        IF KSRATMFL  = '1'              02630011
+                                         ! KSRPOSPR ^= 0                02640011
+                                         ! KSRPOBLK ^= 0  THEN DB = 3;  02650011
+                                     END;                               02660011
+                                  ELSE                                  02670011
+                                     DO;                                02680011
+                                        DB = 3;                         02690011
+                                     END;                               02700011
+                               END;                                     02710011
+                         END;                                           02720011
+                   END;                                                 02730011
+             END;                                                       02740011
+       END;                                                             02750011
+    /*****************************************************************/ 02760011
+    /* AÈPOIÓMATA ÃIA ÓYMÖÙNIA                                       */ 02770011
+    /*****************************************************************/ 02780011
+                                                                        02790011
+    IF J = 1 & ( ^INV_DTA ) THEN DO;  /*  OËIKA AÈPOIÓMATA           */ 02800011
+       BLNC_TTL              ( J ) = BLNC_TTL      ( J ) +              02810011
+                                     KSRDYPOL            + KSREKKRE;    02820011
+    END;                                                                02830011
+    NUM_OF_TTL               ( J ) = NUM_OF_TTL    ( J ) + 1;           02840011
+    IF DB = 4 THEN                    /* AHPOIRMATA CIA RYMUXNIA     */ 02850011
+       DO;                                                              02860011
+          IF J = 1 & ( ^INV_DTA ) THEN DO;                              02870011
+             BLNC_DLT        ( J ) = BLNC_DLT      ( J ) +              02880011
+                                     KSRDYPOL            + KSREKKRE;    02890011
+          END;                                                          02900011
+          NUM_OF_DLT         ( J ) = NUM_OF_DLT    ( J ) + 1;           02910011
+       END;                                                             02920011
+    ELSE                                                                02930011
+       DO;                                                              02940011
+          IF J = 1 & ( ^INV_DTA ) THEN DO;                              02950011
+             BLNC_NO_DLT ( J ) = BLNC_NO_DLT       ( J ) +              02960011
+                                 KSRDYPOL                + KSREKKRE;    02970011
+          END;                                                          02980011
+          NUM_OF_NO_DLT      ( J ) = NUM_OF_NO_DLT ( J ) + 1;           02990011
+       END;                                                             03000011
+    I = DB;                    /* EÐIÓTPOÖH TOY SEGMENT ÓE GLB VAR   */ 03010011
+                               /* OYÓIAÓTIKA TO ÄIATHPOYME MEXPI TO  */ 03020011
+                               /* EÐOMENO ROOT SEGMENT ....          */ 03030011
+    DB_NPK = DB; /*NPK CHANGES FOR ENTERPISE PLI 21-05-2007*/           03040014
+    RETURN ( DB_NPK );                                                  03050014
+                                                                        03060011
+ END WHICH_DB;                                                          03070011
+                                                                        03080011
+ /********************************************************************/ 03090011
+ /*                                                                  */ 03100011
+ /*******************  CREATE DATA BASE ******************************/ 03110011
+ /*                                                                  */ 03120011
+ /********************************************************************/ 03130011
+ CRT_DB : PROC ( DB );                                                  03140011
+                                                                        03150011
+ DCL    DB   BIN FIXED ( 15, 0 );                                       03160011
+                                                                        03170011
+   IF ( DB=3 & CTL_OPT='C1' ) !                                         03180011
+      ( DB=4 & CTL_OPT='C2' ) THEN DO;                                  03190011
+                                                                        03200011
+      SELECT ( J );                                                     03210011
+         WHEN ( 1 )                                                     03220011
+            DO;                                                         03230011
+               EXEC DLI                                                 03240011
+                    ISRT USING   PCB ( 3        )                       03250011
+                         SEGMENT     ( KROOTSEG )                       03260011
+                         FROM        ( WRKAREA  );                      03270011
+               IF DB = 4 & CTL_OPT = 'C2' THEN                          03280011
+                  DO ;                                                  03290011
+                  ARLOG      = KSRARLOG ;                               03300011
+                  KATMA      = KSRKATMA ;                               03310011
+                  EPAGELMA   = KSRKWDEP ;                               03320011
+                  POSON      = KSRDYPOL + KSREKKRE ;                    03330011
+                  HMEROMHNIA = DAYA6F7(DATE) ;                          03340011
+                  KATHO      = KSRKATHO ;                               03350011
+                  WRITE FILE(RMTAM20) FROM(RECTAM20) ;                  03360011
+                  WRITE FILE(RMVRSEG) FROM(KSROOTDS) ;                  03370011
+                  REMOVED_ROOTS = REMOVED_ROOTS + 1 ;                   03380011
+                  END;                                                  03390011
+            END;                                                        03400011
+         WHEN ( 2 )                                                     03410011
+            DO;                                                         03420011
+               EXEC DLI                                                 03430011
+                    ISRT USING   PCB ( 3        )                       03440011
+                         SEGMENT     ( KCHKBSEG )                       03450011
+                         FROM        ( WRKAREA  );                      03460011
+            END;                                                        03470011
+         WHEN ( 3 )                                                     03480011
+            DO;                                                         03490011
+               EXEC DLI                                                 03500011
+                    ISRT USING   PCB ( 3        )                       03510011
+                         SEGMENT     ( KSUSPSEG )                       03520011
+                         FROM        ( WRKAREA  );                      03530011
+            END;                                                        03540011
+         WHEN ( 4 )                                                     03550011
+            DO;                                                         03560011
+               EXEC DLI                                                 03570011
+                    ISRT USING   PCB ( 3        )                       03580011
+                         SEGMENT     ( KSTATSEG )                       03590011
+                         FROM        ( WRKAREA  );                      03600011
+            END;                                                        03610011
+         WHEN ( 5 )                                                     03620011
+            DO;                                                         03630011
+               EXEC DLI                                                 03640011
+                    ISRT USING   PCB ( 3        )                       03650011
+                         SEGMENT     ( KINTRSEG )                       03660011
+                         FROM        ( WRKAREA  );                      03670011
+            END;                                                        03680011
+      END; /* SELECT */                                                 03690011
+      IF DIBSTAT ^= '  ' THEN     /*      UBNORMAL CONDITION      */    03700011
+         DO;                                                            03710011
+            LIN = '0'!!'ERROR INSERTING SEGMENT ' !! ' ' !! J !! ' '    03720011
+                                                         !! DIBSTAT;    03730011
+            WRITE FILE ( PRINT )                                        03740011
+            FROM       ( LIN   );                                       03750011
+            SIGNAL FINISH;                                              03760011
+         END;                                                           03770011
+   END;                                                                 03780011
+                                                                        03790011
+ END CRT_DB;                                                            03800011
+ /******************************************************************/   03810011
+ /*                                                                */   03820011
+ /*******************  CREATE REPORT   *****************************/   03830011
+ /*                                                                */   03840011
+ /******************************************************************/   03850011
+ CRT_RPT  : PROC;                                                       03860011
+                                                                        03870011
+   /*DCL 1 HDR_LIN                                         ,            03880011
+           2   HDR_CHAR    CHAR ( 01 ) INIT ( ' ' )        ,            03890011
+           2   HL_1        CHAR ( 08 ) INIT ( ' SEGMENT' ) ,            03900011
+           2   HL_2        CHAR ( 12 ) INIT ( ( 12 ) ' ' ) ,            03910011
+           2   HL_3        CHAR ( 07 ) INIT ( '  TOTAL' )  ,            03920011
+           2   HL_4        CHAR ( 12 ) INIT ( ( 12 ) ' ' ) ,            03930011
+           2   HL_5        CHAR ( 07 ) INIT ( 'DELETED' )  ,            03940011
+           2   HL_6        CHAR ( 11 ) INIT ( ( 11 ) ' ' ) ,            03950011
+           2   HL_7        CHAR ( 08 ) INIT ( ' WRITTEN' ) ,            03960011
+           2   HL_8        CHAR ( 67 ) INIT ( ( 67 ) ' ' ) ;*/          03970011
+                                                                        03980011
+   DCL 1 HDR_LIN1                                        ,              03990011
+         2   HDR_CHAR1   CHAR ( 01 ) INIT ( ' ' )        ,              04000011
+         2   HL_1        CHAR ( 08 ) INIT ( ' SEGMENT' ) ,              04010011
+         2   HL_3        CHAR ( 19 ) INIT ( '        ÄÉÁÂÁÓÔÇÊÁÍ' )  ,  04020011
+         2   HL_5        CHAR ( 19 ) INIT ( ' ÃÑÁÖÔÇÊÁÍ (ÊÁÔÁÈ.)' )  ,  04030011
+         2   HL_6        CHAR ( 11 ) INIT ( ( 11 ) ' ' ) ,              04040011
+         2   HL_7        CHAR ( 08 ) INIT ( ( 08 ) ' ' ) ,              04050011
+         2   HL_8        CHAR ( 67 ) INIT ( ( 67 ) ' ' ) ;              04060011
+                                                                        04070011
+   DCL 1 HDR_LIN2                                        ,              04080011
+         2   HDR_CHAR2   CHAR ( 01 ) INIT ( ' ' )        ,              04090011
+         2   HL_1        CHAR ( 08 ) INIT ( ' SEGMENT' ) ,              04100011
+         2   HL_3        CHAR ( 19 ) INIT ( '        ÄÉÁÂÁÓÔÇÊÁÍ' )  ,  04110011
+         2   HL_5        CHAR ( 19 ) INIT ( ' ÃÑÁÖÔÇÊÁÍ (ÊËÅÉÓ.)' )  ,  04120011
+         2   HL_6        CHAR ( 11 ) INIT ( ( 11 ) ' ' ) ,              04130011
+         2   HL_7        CHAR ( 08 ) INIT ( ( 08 ) ' ' ) ,              04140011
+         2   HL_8        CHAR ( 67 ) INIT ( ( 67 ) ' ' ) ;              04150011
+                                                                        04160011
+   DCL 1 BSE_LIN                                         ,              04170011
+         2   BSE_CHAR    CHAR ( 01 )                     ,              04180011
+         2   L_SEGMENT   CHAR ( 08 )                     ,              04190011
+         2   F0          CHAR ( 12 ) INIT ( ( 12 ) ' ' ) ,              04200011
+         2   L_TTL       PIC 'ZZZZ999'                   ,              04210011
+         2   F1          CHAR ( 12 ) INIT ( ( 12 ) ' ' ) ,              04220011
+         2   L_NUM       PIC 'ZZZZ999'                   ,              04230011
+         2   F3          CHAR ( 86 ) INIT ( ( 67 ) ' ' ) ;              04240011
+       /*2   L_DLT       PIC 'ZZZZ999'                   ,              04250011
+         2   F2          CHAR ( 12 ) INIT ( ( 12 ) ' ' ) ,              04260011
+         2   L_NO_DLT    PIC 'ZZZZ999'                   ,              04270011
+         2   F3          CHAR ( 67 ) INIT ( ( 67 ) ' ' ) ;*/            04280011
+                                                                        04290011
+   DCL 1 BSE_LIN_1                                       ,              04300011
+         2   BSE_CHAR_1  CHAR ( 01 )                     ,              04310011
+         2   L0          CHAR ( 09 ) INIT ( ( 09 ) ' ' ) ,              04320011
+         2   L_BLNC_TTL  PIC 'ZZZ.ZZ9.999.999V,99'       ,              04330011
+         2   L1          CHAR ( 01 ) INIT ( ' ' )        ,              04340011
+         2   L_BLNC      PIC 'ZZZ.ZZZ.999.999V,99'       ,              04350011
+         2   L3          CHAR ( 86 ) INIT ( ( 86 ) ' ' ) ;              04360011
+       /*2   L_BLNC_DLT  PIC 'ZZZ.ZZZ.999.999V,99'       ,              04370011
+         2   L2          CHAR ( 01 ) INIT ( ' ' )        ,              04380011
+         2   L_BLNC_NO_DLT  PIC 'ZZZ.ZZZ.999.999V,99'    ,              04390011
+         2   L3          CHAR ( 67 ) INIT ( ( 67 ) ' ' ) ;*/            04400011
+                                                                        04410011
+   DCL 1 DEL_LIN                                         ,              04420011
+         2   DL_1        CHAR ( 01 ) INIT ( ' ' )        ,              04430011
+         2   DL_2        CHAR ( 08 ) INIT ( ( 08 ) '-' ) ,              04440011
+         2   DL_3        CHAR ( 01 ) INIT ( ' ' )        ,              04450011
+         2   DL_4        CHAR ( 18 ) INIT ( ( 18 ) '-' ) ,              04460011
+         2   DL_5        CHAR ( 01 ) INIT ( ' ' )        ,              04470011
+         2   DL_6        CHAR ( 18 ) INIT ( ( 18 ) '-' ) ,              04480011
+         2   DL_7        CHAR ( 01 ) INIT ( ' ' )        ,              04490011
+         2   DL_8        CHAR ( 18 ) INIT ( ( 18 ) ' ' ) ,              04500011
+         2   DL_9        CHAR ( 67 ) INIT ( ( 67 ) ' ' ) ;              04510011
+                                                                        04520011
+   DCL   I               FIXED ( 02) INIT ( 0 );                        04530011
+                                                                        04540011
+     IF CTL_OPT='C1' THEN DO;                                           04550011
+        HDR_CHAR1 = ' ';                                                04560011
+        WRITE FILE ( PRINT ) FROM ( HDR_LIN1 );                         04570011
+     END;                                                               04580011
+                                                                        04590011
+     IF CTL_OPT='C2' THEN DO;                                           04600011
+        HDR_CHAR2 = ' ';                                                04610011
+        WRITE FILE ( PRINT ) FROM ( HDR_LIN2 );                         04620011
+     END;                                                               04630011
+                                                                        04640011
+     DL_1 = ' ';                                                        04650011
+     WRITE FILE ( PRINT ) FROM ( DEL_LIN );                             04660011
+                                                                        04670011
+     DO I = 1 TO 5 BY 1;                                                04680011
+        BSE_LIN = '';                                                   04690011
+        SELECT ( I );                                                   04700011
+           WHEN ( 1 ) L_SEGMENT = 'KROOTSEG';                           04710011
+           WHEN ( 2 ) L_SEGMENT = 'KCHKBSEG';                           04720011
+           WHEN ( 3 ) L_SEGMENT = 'KSUSPSEG';                           04730011
+           WHEN ( 4 ) L_SEGMENT = 'KSTATSEG';                           04740011
+           WHEN ( 5 ) L_SEGMENT = 'KINTRSEG';                           04750011
+        END; /* SELECT */                                               04760011
+        L_TTL                   = NUM_OF_TTL    ( I );                  04770011
+        IF CTL_OPT='C1' THEN DO;                                        04780011
+           L_NUM                   = NUM_OF_NO_DLT    ( I );            04790011
+        END;                                                            04800011
+        IF CTL_OPT='C2' THEN DO;                                        04810011
+           L_NUM                   = NUM_OF_DLT       ( I );            04820011
+        END;                                                            04830011
+      /*L_DLT                   = NUM_OF_DLT    ( I );                  04840011
+        L_NO_DLT                = NUM_OF_NO_DLT ( I );*/                04850011
+                                                                        04860011
+        WRITE FILE ( PRINT ) FROM ( BSE_LIN );                          04870011
+        IF I = 1 THEN                                                   04880011
+           DO;                                                          04890011
+              BSE_LIN_1     = '';                                       04900011
+              L_BLNC_TTL    = BLNC_TTL      ( I );                      04910011
+              IF CTL_OPT='C1' THEN DO;                                  04920011
+                 L_BLNC        = BLNC_NO_DLT      ( I );                04930011
+              END;                                                      04940011
+              IF CTL_OPT='C2' THEN DO;                                  04950011
+                 L_BLNC        = BLNC_DLT         ( I );                04960011
+              END;                                                      04970011
+            /*L_BLNC_DLT    = BLNC_DLT      ( I );                      04980011
+              L_BLNC_NO_DLT = BLNC_NO_DLT   ( I );*/                    04990011
+                                                                        05000011
+              WRITE FILE ( PRINT ) FROM ( BSE_LIN_1 );                  05010011
+           END;                                                         05020011
+     END; /* DO */                                                      05030011
+                                                                        05040011
+     GRAMMH   = ' ÓÔA ÁÑ×ÅÉA RMTAM20, RMVRSEG ÃÑÁÖÔÇÊÁÍ : ' !!          05050011
+                  REMOVED_ROOTS ;                                       05060011
+     WRITE FILE(PRINT) FROM(LINE);                                      05070011
+                                                                        05080011
+ END CRT_RPT;                                                           05090011
+                                                                        05100011
+ END DLITDLI;                                                           05110011
+

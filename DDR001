@@ -1,0 +1,208 @@
+*PROCESS LIMITS (FIXEDDEC(15,31));
+ /*********************************************************************/
+ /* аутH г яоутима екецвеи йыдийо ояцамислоу                          */
+ /* паиямеи   INPUT  CREDITOR_CODE = йыдийо ояцамислоу CHAR(35)       */
+ /*                                                                   */
+ /* йаи епистяежеи 0 ам еимаи VALID KAI 1 ам еимаи кахос              */
+ /*********************************************************************/
+ /* г.1 йыдийопо╨гсг ояцамисло╬                                       */
+ /* 1 1-2 COUNTRY CODE 2X   о йыдий╪с йат╒ ISO 3166 тгс в©яас         */
+ /*                         стгм опо╨а едяе╬еи  O Oяцамислос          */
+ /* 2 3-4 CHECK DIGITS 2N   CHECK DIGITS                              */
+ /*                                                                   */
+ /* 3 5-7 CREDITOR BUSINESS CODE 3X                                   */
+ /*   то л╦яос аут╪ вягсилопоие╨таи апойкеистий╒ ап╪ том              */
+ /*   ояцамисл╪ циа тг диажояопо╨гсг тым упгяеси©м поу                */
+ /*   пяосж╦яеи стоус йатамакыт╦с тоу. еж╪сом дем ояисхе╨             */
+ /*   сулпкгя©метаи ле "ZZZ". то л╦яос аут╪ дем суллет╦веи            */
+ /*   о╬те стом упокоцисл╪ тым ьгж╨ым ек╦цвоу, о╬те стом              */
+ /*   ╦кецво тгс ломадий╪тгтас тым амах╦сеым.                         */
+ /*                                                                   */
+ /* 4 8-35 COUNTRY SPECIFIC IDENTIFIER 28X                            */
+ /*   то л╦яос аут╪ пяосдиоя╨феи то ломадий╪ йыдий╪                   */
+ /*   ояцамисло╬ ам╒ в©яа.                                            */
+ /*   циа тоус йыдийо╬с поу ейд╨домтаи ап╪ тг диас,                   */
+ /*   апотеке╨таи ап╪ 5 ьгж╨а.                                        */
+ /*                                                                   */
+ /*                                                                   */
+ /*********************************************************************/
+ /* мпй 01-06-2009                                                    */
+ /*********************************************************************/
+ DDR001 : PROC(CREDITOR_CODE)
+           OPTIONS(FETCHABLE)  RETURNS( FIXED (1));
+ DCL CREDITOR_CODE CHAR(35) ;
+ DCL RC  FIXED (1);
+ DCL 1 CREDITOR_CODEXX BASED(ADDR(CREDITOR_CODE)),
+       2 COUNTRY_CODE            CHAR(02),
+       2 CHECK_DIGITS            PIC'99',
+       2 CREDITOR_BUSINESS_CODE  CHAR(03),
+       2 COUNTRY_SPECIFIC_ID     CHAR(28);
+ DCL  CNTRY_SPECIF_ID  (28) CHAR(1); CNTRY_SPECIF_ID= '';
+ DCL  C_S_ID  CHAR(28) BASED(ADDR(CNTRY_SPECIF_ID));
+ DCL  MY_STR           CHAR(32);
+ DCL  RESULT           CHAR(62);/*32*2-2=*/
+ DCL  I FIXED(3) INIT(0);
+ DCL  J FIXED(3) INIT(0);
+ DCL  BIG    PIC'(31)9';
+ DCL ADDR   BUILTIN ;
+ DCL ONCODE BUILTIN ;
+
+    ON ERROR BEGIN;
+        ON ERROR SYSTEM;
+    END;
+
+ /*put skip list('CREDITOR_CODE = ',CREDITOR_CODE);*/
+ /*дЕМ КАЛБэМОМТАИ УПЭЬИМ вАЯАЙТчЯЕР,ПОУ ДЕМ ЕъМАИ аЦЦКИЙэ йЕЖАКАъА  */
+ /*ЦЯэЛЛАТА ч аЯИХЛОъ                                                */
+   J = 1;
+   DO I=1 TO 28                         ;
+      SELECT(SUBSTR(COUNTRY_SPECIFIC_ID,I,1));
+      WHEN('0','1','2','3','4','5','6','7','8','9','W','E','R',
+           'T','Y','U','I','O','P','A','S','D','F','G','H','J',
+           'K','L','Z','X','C','V','B','N','M','Q') DO;
+
+      CNTRY_SPECIF_ID(J) = SUBSTR(COUNTRY_SPECIFIC_ID,I,1);
+      J=J+1;
+      END;/*WHEN END*/
+      OTHERWISE DO;
+        ;
+      END;
+    END;/*SELECT END*/
+   END;/*DO END*/
+   /*                                   */
+
+   DO I=1 TO  LENGTH(C_S_ID);
+     IF SUBSTR(C_S_ID,I,1) = ' ' THEN DO;
+         GOTO OUT;
+     END;
+
+   END;
+    OUT:;
+  /*UT SKIP LIST (SUBSTR(C_S_ID,1,I-1));
+   PUT SKIP LIST (I                   );*/
+   MY_STR = SUBSTR(C_S_ID,1,I-1)!!COUNTRY_CODE!!CHECK_DIGITS;
+   /*put skip list('MY_STR   = ',MY_STR    ); */
+   /*
+    A/a = 10 G/g = 16 M/m = 22 S/s = 28 Y/y = 34
+    B/b = 11 H/h = 17 N/n - 23 T/t = 29 Z/z = 35
+    C/c = 12 I/i = 18 O/o = 24 U/u = 30
+    D/d = 13 J/j = 19 P/p = 25 V/v = 31
+    E/e = 14 K/k = 20 Q/q = 26 W/w = 32
+    F/f = 15 L/l = 21 R/r = 27 X/x = 33
+    */
+
+
+ /*                                                                  */
+ /*                                                                  */
+   RESULT = '';
+   J = 1;
+   DO I=1 TO LENGTH(MY_STR);
+      SELECT(SUBSTR(MY_STR,I,1));
+      WHEN('A','a')   DO;
+        SUBSTR(RESULT,J             ,2)='10';J=J+2;
+      END;
+      WHEN('B','b')   DO;
+        SUBSTR(RESULT,J             ,2) = '11';J=J+2;
+      END;
+      WHEN('C','c')   DO;
+        SUBSTR(RESULT,J             ,2)= '12';J=J+2;
+      END;
+      WHEN('D','d')   DO;
+        SUBSTR(RESULT,J             ,2)= '13';J=J+2;
+      END;
+      WHEN('E','e')   DO;
+        SUBSTR(RESULT,J             ,2)= '14';J=J+2;
+      END;
+      WHEN('F','f')   DO;
+        SUBSTR(RESULT,J            ,2 )= '15';J=J+2;
+      END;
+      WHEN('G','g')   DO;
+        SUBSTR(RESULT,J             ,2)= '16';J=J+2;
+      END;
+      WHEN('H','h')   DO;
+        SUBSTR(RESULT,J            ,2 )= '17';J=J+2;
+      END;
+      WHEN('I','i')   DO;
+        SUBSTR(RESULT,J            ,2 )= '18';J=J+2;
+      END;
+      WHEN('J','j')   DO;
+        SUBSTR(RESULT,J            ,2 )= '19';J=J+2;
+      END;
+      WHEN('K','k')   DO;
+        SUBSTR(RESULT,J            ,2 )= '20';J=J+2;
+      END;
+      WHEN('L','l')   DO;
+        SUBSTR(RESULT,J            ,2 )= '21';J=J+2;
+      END;
+      WHEN('M','m')   DO;
+        SUBSTR(RESULT,J            ,2 )= '22';J=J+2;
+      END;
+      WHEN('N','n')   DO;
+        SUBSTR(RESULT,J            ,2 )= '23';J=J+2;
+      END;
+      WHEN('O','o')   DO;
+        SUBSTR(RESULT,J            ,2 )= '24';J=J+2;
+      END;
+      WHEN('P','p')   DO;
+        SUBSTR(RESULT,J            ,2 )= '25';J=J+2;
+      END;
+      WHEN('Q','q')   DO;
+        SUBSTR(RESULT,J            ,2 )= '26';J=J+2;
+      END;
+      WHEN('R','r')   DO;
+        SUBSTR(RESULT,J            ,2 )= '27';J=J+2;
+      END;
+      WHEN('S','s')   DO;
+        SUBSTR(RESULT,J            ,2 )= '28';J=J+2;
+      END;
+      WHEN('T','t')   DO;
+        SUBSTR(RESULT,J            ,2 )= '29';J=J+2;
+      END;
+      WHEN('U','u')   DO;
+        SUBSTR(RESULT,J            ,2 )= '30';J=J+2;
+      END;
+      WHEN('V','v')   DO;
+        SUBSTR(RESULT,J            ,2 )= '31';J=J+2;
+      END;
+      WHEN('W','w')   DO;
+        SUBSTR(RESULT,J            ,2 )= '32';J=J+2;
+      END;
+      WHEN('X','x')   DO;
+        SUBSTR(RESULT,J            ,2 )= '33';J=J+2;
+      END;
+      WHEN('Y','y')   DO;
+        SUBSTR(RESULT,J            ,2 )= '34';J=J+2;
+      END;
+      WHEN('Z','z')   DO;
+        SUBSTR(RESULT,J           ,2  )= '35';J=J+2;
+      END;
+      WHEN('0','1','2','3','4','5','6','7','8','9')
+      DO;
+        SUBSTR(RESULT,J,1) = SUBSTR(MY_STR,I,1);J=J+1;
+      END;
+      OTHERWISE DO;
+        ;
+      END;
+    END;/*SELECT*/
+
+   END;/*Do End*/
+ /*
+ put skip list('RESULT        = ',RESULT       );
+ put skip list('J             = ',J            );
+  */
+
+ /*SUBSTR(RESULT,J,2) = CHECK_DIGITS;*/
+ BIG = SUBSTR(RESULT,1,9);
+ /*
+ PUT SKIP LIST('MOD = ',CHAR(MOD(BIG,97))!!SUBSTR(RESULT,10));*/
+ BIG = CHAR(MOD(BIG,97))!!SUBSTR(RESULT,10);
+
+
+ BIG=CHAR(MOD(BIG,97));
+ /*  PUT SKIP LIST('FINAL MOD1= ',BIG); */
+ IF BIG = 1 THEN RC=0;
+ ELSE            RC=1;
+
+ RETURN (RC);
+ END  DDR001           ;
+

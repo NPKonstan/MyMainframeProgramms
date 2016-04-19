@@ -1,0 +1,445 @@
+*PROCESS LIMITS (FIXEDDEC(15,31));
+ DDREP08: PROC OPTIONS (MAIN);
+ /***********************************************************/
+ /*          MEMBER = DDREP08 PLI + DB2                     */
+ /***********************************************************/
+ /*                                                         */
+ /***********************************************************/
+ /*                                                         */
+ /*npk 02-10-2010 циа том амтымопоуко                       */
+ /***********************************************************/
+ DCL PLIXOPT CHAR(39) VAR EXT    INIT('ERRCOUNT(0)');
+ DCL READER  FILE RECORD INPUT   ENV (  FB RECSIZE(080) ) ;
+ DCL PRT     FILE RECORD OUTPUT  ENV (  FB RECSIZE(133) CTLASA) ;
+ DCL OUTFILE FILE RECORD OUTPUT  ENV (  FB RECSIZE(140) ) ;
+
+ %INCLUDE COBRANDS ;
+ DCL   ADDR      BUILTIN;
+ DCL   DATE      BUILTIN;
+ DCL   TIME      BUILTIN;
+ DCL   SUBSTR    BUILTIN;
+ DCL   VALIDDATE BUILTIN;
+ DCL   DATETIME  BUILTIN;
+ DCL   PLIRETC   BUILTIN;
+ DCL   EOC           BIT(1)    INIT('0'B);
+ DCL   TOT_FETCHED   PIC'ZZZ.ZZZ.ZZ9'    INIT(0);
+ DCL   TOT_ANATH     PIC'ZZZ.ZZZ.ZZ9'    INIT(0);
+ DCL   TOT_REJECT    PIC'ZZZ.ZZZ.ZZ9'    INIT(0);
+ DCL   WS_POSO       FIXED(15,2)  INIT(0);
+
+ DCL OUTREC      CHAR(140);
+ DCL 1 OUTREC1   BASED(ADDR(OUTREC )) ,
+       2 OUT_DAT_REF        CHAR(10),
+       2 OUT_DELIM_1        CHAR(01)  INIT(';') ,
+       2 OUT_DAT_REQ_COLLCT PIC '9999.99.99',
+       2 OUT_DELIM_2        CHAR(01)  INIT(';') ,
+       2 OUT_DAT_VALCR      PIC '9999.99.99',
+       2 OUT_DELIM_3        CHAR(01)  INIT(';') ,
+       2 OUT_INTERB_SETTL   PIC 'ZZZZ.Z9V,99',
+       2 OUT_DELIM_4        CHAR(01)  INIT(';') ,
+       2 OUT_DB_NAME        CHAR(15),
+       2 OUT_DELIM_5        CHAR(01)  INIT(';') ,
+       2 OUT_ARLOG          PIC 'ZZZ99999999',
+       2 OUT_DELIM_6        CHAR(01)  INIT(';') ,
+       2 OUT_INFORMATION    PIC 'ZZZ99999999',
+       2 OUT_DELIM_7        CHAR(01)  INIT(';') ,
+       2 OUT_MANDAT_ID      CHAR(20)   ,
+       2 OUT_DELIM_8        CHAR(01)  INIT(';') ,
+       2 OUT_CR_NAME        CHAR(15),
+       2 OUT_DELIM_9        CHAR(01)  INIT(';') ,
+       2 OUT_CR_S_I_I_328   CHAR(03)   ,
+       2 OUT_DELIM_10       CHAR(01)  INIT(';') ;
+
+ DCL 1 CC_REC1 ,      /*CONTROL CARD RECORD */
+        2 FILLER0     CHAR(01), /*C                     */
+        2 CC_DATEFROM CHAR(08),  /*YYYYMMDD*//*DATE FROM */
+        2 FILLER1     CHAR(01),
+        2 CC_DATETO   CHAR(08),  /*YYYYMMDD*//*DATE TO   */
+        2 FILLER2     CHAR(62);
+
+ DCL 1   ERLINE              ,
+      2  ERLIN1       CHAR(1)      INIT('1'),
+      2  ERLIN2       CHAR(132)    INIT(' ');
+
+ DCL    LINES1            PIC '999999';
+ DCL    PAGES             PIC '9999';
+ DCL    L00               FIXED(1) INIT(0) ;
+ DCL    RC                BIT(1) INIT('1'B);
+ DCL    SYS_DATE          CHAR(6)    INIT(' ');
+ DCL    SYS_TIME          CHAR(9)    INIT(' ');
+ DCL    WS_DATE           CHAR(10);
+ DCL    WS_DATE_TO        CHAR(08);
+ DCL    WS_DATE_FROM      CHAR(08);
+ DCL    WS_MYDATE         CHAR(10);
+ DCL    WS_TOTAL          PIC 'ZZZ.ZZZ.Z9V,99'   INIT(0);
+ /*
+ */
+ /*  == ==== == ======== =========================  */
+   EXEC SQL INCLUDE CTDDMV01;
+   EXEC SQL INCLUDE SQLCA;
+  ON ENDFILE(READER)
+  BEGIN ;
+       ERLIN1= ' ';
+       ERLIN2= ' дем упаявеи йаята    ' ;
+       WRITE FILE(PRT) FROM(ERLINE);
+       L00 = DIVIDE(10,L00,1,0);
+  END;
+
+  OPEN FILE(PRT),FILE(READER),FILE(OUTFILE);
+
+  SYS_DATE = DATE();
+  SYS_TIME = TIME();
+  LINES1 = 0; PAGES = 0;
+
+  READ  FILE(READER) INTO(CC_REC1);
+  IF(CC_DATEFROM = '00000000') THEN DO;
+     CC_DATEFROM ='20'!!SYS_DATE;
+     CC_DATETO   = CC_DATEFROM;
+  END;
+
+  RC = VALIDDATE(CC_DATEFROM        ,'YYYYMMDD');
+  IF RC = '0'B THEN DO ;
+       ERLIN1= ' ';
+       ERLIN2= ' кахос глеяолгмиа стгм йаята      = '!!CC_DATEFROM;
+       WRITE FILE(PRT) FROM(ERLINE);
+       GOTO TELOS;
+  END;
+  RC = VALIDDATE(CC_DATETO          ,'YYYYMMDD');
+  IF RC = '0'B THEN DO ;
+       ERLIN1= ' ';
+       ERLIN2= ' кахос глеяолгмиа стгм йаята      = '!!CC_DATETO ;
+       WRITE FILE(PRT) FROM(ERLINE);
+       GOTO TELOS;
+  END;
+
+  WS_DATE_FROM = CC_DATEFROM                    ;
+  WS_DATE_TO   = CC_DATETO                      ;
+  PUT SKIP LIST('WS_DATE_FROM = ',WS_DATE_FROM );
+  PUT SKIP LIST('WS_DATE_TO   = ',WS_DATE_TO   );
+
+  CALL DECLARE_CUR2;
+  CALL OPEN_CUR2;
+  CALL HEADER;
+  CALL FETCH_ROWS2;
+  DO WHILE(^EOC);
+     CALL FETCH_ROWS2;
+  END; /*DO WHILE END*/
+ /*  =============================================  */
+ DECLARE_CUR2:    PROC;
+    EXEC SQL
+    DECLARE CUR2 CURSOR WITH HOLD FOR SELECT
+    CHR_DAT_REF,
+    DEC_DAT_REQ_COLLCT,
+    DEC_DAT_VALCR,
+    AMT_INTERB_SETTL,
+    CHR_DB_NAME,
+    DEC_ARLOG,
+    CHR_INFORMATION,
+    CHR_MANDAT_ID,
+    CHR_CR_NAME,
+    CHR_CR_S_I_I_328
+    FROM CTDDMV01
+    WHERE FLG_REFUND_AUTHOR = 'R'
+          AND FLG_STATUS_REFUND  =  '1'
+          AND CHR_DAT_REF >= :WS_DATE_FROM
+          AND CHR_DAT_REF <= :WS_DATE_TO
+          ORDER BY CHR_DAT_REF
+    WITH UR;
+ END DECLARE_CUR2;
+ /*  =============================================  */
+ OPEN_CUR2:    PROC;
+    EXEC SQL OPEN CUR2;
+    IF SQLCODE ^= 0 THEN DO;
+       ERLIN1= '1';
+       ERLIN2= ' ERROR OPENING CURSOR CUR2 SQLCODE= '!!SQLCODE;
+       WRITE FILE(PRT) FROM(ERLINE);
+       GOTO TELOS;
+    END;
+ END OPEN_CUR2;
+ /*  ---------------------------------------------  */
+ FETCH_ROWS2: PROC;
+    EXEC SQL FETCH CUR2 INTO
+      :CTDDMV01.CHR_DAT_REF,
+      :CTDDMV01.DEC_DAT_REQ_COLLCT,
+      :CTDDMV01.DEC_DAT_VALCR,
+      :CTDDMV01.AMT_INTERB_SETTL,
+      :CTDDMV01.CHR_DB_NAME,
+      :CTDDMV01.DEC_ARLOG,
+      :CTDDMV01.CHR_INFORMATION,
+      :CTDDMV01.CHR_MANDAT_ID,
+      :CTDDMV01.CHR_CR_NAME,
+      :CTDDMV01.CHR_CR_S_I_I_328 ;
+
+    IF ( SQLCODE ^= 0 ) & ( SQLCODE ^= 100) THEN DO;
+       ERLIN1= ' ';
+       ERLIN2= ' ERROR FETCHING CURSOR CUR2 SQLCODE= '!!SQLCODE;
+       WRITE FILE(PRT) FROM(ERLINE);
+       GOTO TELOS;
+    END;
+    ELSE DO;
+        IF SQLCODE = 100 THEN DO;
+           EOC='1'B;
+           CALL CLOSE_CUR2;
+           RETURN;
+        END;
+        ELSE              DO;
+             OUT_DELIM_1  =';';  OUT_DELIM_6  =';';
+             OUT_DELIM_2  =';';  OUT_DELIM_7  =';';
+             OUT_DELIM_3  =';';  OUT_DELIM_8  =';';
+             OUT_DELIM_4  =';';  OUT_DELIM_9  =';';
+             OUT_DELIM_5  =';';  OUT_DELIM_10 =';';
+
+             OUT_DAT_REF        =
+             SUBSTR(CTDDMV01.CHR_DAT_REF,1,4)!!'.'!!
+             SUBSTR(CTDDMV01.CHR_DAT_REF,5,2)!!'.'!!
+             SUBSTR(CTDDMV01.CHR_DAT_REF,7,2);
+             OUT_DAT_REQ_COLLCT = CTDDMV01.DEC_DAT_REQ_COLLCT;
+             OUT_DAT_VALCR      = CTDDMV01.DEC_DAT_VALCR;
+             OUT_INTERB_SETTL   =
+             DIVIDE(CTDDMV01.AMT_INTERB_SETTL ,100,15,2);
+             WS_TOTAL           = WS_TOTAL + OUT_INTERB_SETTL ;
+
+             OUT_DB_NAME       = SUBSTR(CTDDMV01.CHR_DB_NAME,1,15);
+             OUT_ARLOG         = CTDDMV01.DEC_ARLOG;
+             OUT_INFORMATION   = SUBSTR(CTDDMV01.CHR_INFORMATION,20,8);
+             OUT_MANDAT_ID     = SUBSTR(CTDDMV01.CHR_MANDAT_ID,1,20);
+             OUT_CR_NAME       = SUBSTR(CTDDMV01.CHR_CR_NAME,1,15);
+             OUT_CR_S_I_I_328  = SUBSTR(CTDDMV01.CHR_CR_S_I_I_328,10,3);
+             WRITE FILE(OUTFILE) FROM(OUTREC);
+             CALL PRINT_REPORT;
+             TOT_FETCHED = TOT_FETCHED+1;
+        END;
+   END;
+
+ END FETCH_ROWS2;
+ /*  ---------------------------------------------  */
+ /*  ---------------------------------------------  */
+ CLOSE_CUR2:    PROC;
+    EXEC SQL  CLOSE CUR2;
+    IF SQLCODE ^= 0 THEN DO;
+       ERLIN1= ' ';
+       ERLIN2= ' ERROR CLOSING CURSOR CUR2 SQLCODE= '!!SQLCODE;
+       WRITE FILE(PRT) FROM(ERLINE);
+       GOTO TELOS;
+    END;
+ END CLOSE_CUR2;
+ /*  ---------------------------------------------  */
+ HEADER: PROC;
+ DCL   HEAD1   CHAR(132) ;
+ DCL   HEAD2   CHAR(132) ;
+ DCL 1 HEADER1  BASED(ADDR(HEAD1))  ,
+        2 H11             CHAR(10)  ,
+        2 H11_DELIM       CHAR(01)  ,
+        2 H12             CHAR(10)  ,
+        2 H12_DELIM       CHAR(01)  ,
+        2 H13             CHAR(10)  ,
+        2 H13_DELIM       CHAR(01)  ,
+        2 H14             CHAR(10)  ,
+        2 H14_DELIM       CHAR(01)  ,
+        2 H15             CHAR(15)  ,
+        2 H15_DELIM       CHAR(01)  ,
+        2 H16             CHAR(11)  ,
+        2 H16_DELIM       CHAR(01)  ,
+        2 H17             CHAR(11)  ,
+        2 H17_DELIM       CHAR(01)  ,
+        2 H18             CHAR(20)  ,
+        2 H18_DELIM       CHAR(01)  ,
+        2 H19             CHAR(15)  ,
+        2 H19_DELIM       CHAR(01)  ,
+        2 H110            CHAR(10)  ,
+        2 H110_DELIM      CHAR(01)  ;
+
+
+ DCL 1 HEADER2  BASED(ADDR(HEAD2))     ,
+        2 H21             CHAR(10)  ,
+        2 H21_DELIM       CHAR(01)  ,
+        2 H22             CHAR(10)  ,
+        2 H22_DELIM       CHAR(01)  ,
+        2 H23             CHAR(10)  ,
+        2 H23_DELIM       CHAR(01)  ,
+        2 H24             CHAR(10)  ,
+        2 H24_DELIM       CHAR(01)  ,
+        2 H25             CHAR(15)  ,
+        2 H25_DELIM       CHAR(01) ,
+        2 H26             CHAR(11)  ,
+        2 H26_DELIM       CHAR(01)  ,
+        2 H27             CHAR(11)  ,
+        2 H27_DELIM       CHAR(01)  ,
+        2 H28             CHAR(20)  ,
+        2 H28_DELIM       CHAR(01)  ,
+        2 H29             CHAR(15)  ,
+        2 H29_DELIM       CHAR(01)  ,
+        2 H210            CHAR(10)  ,
+        2 H210_DELIM      CHAR(01)  ;
+    /*
+    CHR_DAT_REF,                  глея.апаитгсгс вяглатым
+    DEC_DAT_REQ_COLLCT,           глея.вяеысгс
+    DEC_DAT_VALCR,                глея. пистысгс
+    AMT_INTERB_SETTL,             посо
+    SUBSTR(CHR_DB_NAME,1,20),     дийаиоувос
+    DEC_ARLOG,                    коцаяиаслос     вяеысгс
+    SUBSTR(CHR_INFORMATION,20,8), коцаяиаслос     пистысгс
+    SUBSTR(CHR_MANDAT_ID,1,20),   йыдийос         амахесгс
+    SUBSTR(CHR_CR_NAME,1,14),     омоласиа        ояцамислоу
+    SUBSTR(CHR_CR_S_I_I_328,10,3) йыдийос         ояцамислоу
+    */
+    H11 = 'глеяOMHNIA';
+    H21 = 'апаитгсгс ';
+    H12 = 'глеяOMHNIA';
+    H22 = 'вяеысгс   ';
+    H13 = 'глеяOMHNIA';
+    H23 = 'пистысгс  ';
+    H14 = 'посо      ';
+    H24 = 'епистяожгс';
+    H15 = 'дийаиоувос';
+    H25 = 'епистяожгс';
+    H16 = 'коцаяиаслос';
+    H26 = 'вяеысгс   ';
+    H17 = 'коцаяиаслос';
+    H27 = 'пистысгс  ';
+    H18 = 'йыдийос   ';
+    H28 = 'амахесгс  ';
+    H19 = 'омоласиа  ';
+    H29 = 'ояцамислоу';
+    H110= 'йыдийос   ';
+    H210= 'ояцамислоу';
+
+
+    H11_DELIM = '|';H12_DELIM = '|';H13_DELIM = '|';
+    H14_DELIM = '|';H15_DELIM = '|';
+    H16_DELIM = '|';H17_DELIM = '|';H18_DELIM = '|';
+    H19_DELIM = '|';H110_DELIM = '|';
+
+    H21_DELIM = '|';H22_DELIM = '|';H23_DELIM = '|';
+    H24_DELIM = '|';H25_DELIM = '|';
+    H26_DELIM = '|';H27_DELIM = '|';H28_DELIM = '|';
+    H29_DELIM = '|';H210_DELIM = '|';
+
+   PAGES = DIVIDE(LINES1,60,4,0) + 1;
+   BANK = 0;
+                          /*BRAN = CC_BRANCH;*/
+   BRAN = 917;
+   PROG = 'DDREP08   ' ;
+   CALL COBRANC(BANK,BRAN,PROG,HDR1,HDR2);
+   ERLIN1 = '1';
+   ERLIN2 = HDR1;
+   WRITE FILE (PRT) FROM (ERLINE);                                      BK301680
+
+   ERLIN1 = ' ';
+   ERLIN2 = HDR2;
+   WRITE FILE (PRT) FROM (ERLINE);                                      BK301680
+
+   ERLIN1 = ' ';
+   ERLIN2 = 'ейтупысг епистяожым вяглатым  '
+               !! 'апо : '!!
+               SUBSTR(CC_DATEFROM,1,4)!!'.'!!
+               SUBSTR(CC_DATEFROM,5,2)!!'.'!!SUBSTR(CC_DATEFROM,7,2)
+               !!' еыс : '!!
+               SUBSTR(CC_DATETO  ,1,4)!!'.'!!
+               SUBSTR(CC_DATETO  ,5,2)!!'.'!!SUBSTR(CC_DATETO ,7,2)
+               !! ' HM/NIA ейтупысгс : '!!SUBSTR(SYS_DATE,5,2)!!'.'
+               !!SUBSTR(SYS_DATE,3,2)!!'.'!!'20'
+               !!SUBSTR(SYS_DATE,1,2)!! ' ыPA: '
+               !!SUBSTR(SYS_TIME,1,2)!! ':'
+               !!SUBSTR(SYS_TIME,3,2)!! ':'
+               !!SUBSTR(SYS_TIME,5,2);
+
+   WRITE FILE(PRT) FROM(ERLINE);
+   ERLIN2 = (78)' '!! 'аяихлос секидас : '!!PAGES;
+   WRITE FILE(PRT ) FROM(ERLINE);
+   ERLIN2 = (132)'=';
+
+   WRITE FILE(PRT) FROM(ERLINE);
+
+   ERLIN1 = ' ';
+   ERLIN2 = HEAD1   ;
+   WRITE FILE(PRT) FROM(ERLINE);
+   ERLIN2 = HEAD2 ;
+   WRITE FILE(PRT) FROM(ERLINE);
+
+   ERLIN2 = (130)'=';
+   WRITE FILE(PRT) FROM(ERLINE);
+
+   LINES1 =LINES1 + 7;
+ END HEADER;
+ /*  ---------------------------------------------  */
+ /*  ---------------------------------------------  */
+ PRINT_REPORT:PROC;
+ DCL   DTL     CHAR(132);
+ DCL 1 DETAIL1 BASED(ADDR(DTL))     ,
+       2 DTL_DAT_REF        CHAR(10),
+       2 D1_DELIM           CHAR(01)  INIT('|') ,
+       2 DTL_DAT_REQ_COLLCT PIC '9999.99.99',
+       2 D2_DELIM           CHAR(01)  INIT('|') ,
+       2 DTL_DAT_VALCR      PIC '9999.99.99',
+       2 D3_DELIM           CHAR(01)  INIT('|') ,
+       2 DTL_INTERB_SETTL   PIC 'ZZZZ.Z9V,99',
+       2 D4_DELIM           CHAR(01)  INIT('|') ,
+       2 DTL_DB_NAME        CHAR(15),
+       2 D5_DELIM           CHAR(01)  INIT('|') ,
+       2 DTL_ARLOG          PIC 'ZZZ99999999',
+       2 D6_DELIM           CHAR(01)  INIT('|') ,
+       2 DTL_INFORMATION    PIC 'ZZZ99999999',
+       2 D7_DELIM           CHAR(01)  INIT('|') ,
+       2 DTL_MANDAT_ID      CHAR(20)   ,
+       2 D8_DELIM           CHAR(01)  INIT('|') ,
+       2 DTL_CR_NAME        CHAR(15),
+       2 D9_DELIM           CHAR(01)  INIT('|') ,
+       2 DTL_CR_S_I_I_328   CHAR(03)   ,
+       2 D10_DELIM          CHAR(01)  INIT('|') ;
+
+   DTL_DAT_REF        = OUT_DAT_REF        ;
+   DTL_DAT_REQ_COLLCT = OUT_DAT_REQ_COLLCT ;
+   DTL_DAT_VALCR      = OUT_DAT_VALCR      ;
+   DTL_INTERB_SETTL   = OUT_INTERB_SETTL   ;
+   DTL_DB_NAME        = OUT_DB_NAME        ;
+   DTL_ARLOG          = OUT_ARLOG          ;
+   DTL_INFORMATION    = OUT_INFORMATION    ;
+   DTL_MANDAT_ID      = OUT_MANDAT_ID      ;
+   DTL_CR_NAME        = OUT_CR_NAME        ;
+   DTL_CR_S_I_I_328   = OUT_CR_S_I_I_328   ;
+
+   D1_DELIM ='|';
+   D2_DELIM ='|';
+   D3_DELIM ='|';
+   D4_DELIM ='|';
+   D5_DELIM ='|';
+   D6_DELIM ='|';
+   D7_DELIM ='|';
+   D8_DELIM ='|';
+   D9_DELIM ='|';
+   D10_DELIM ='|';
+
+   ERLIN2 = DTL ;
+   WRITE FILE(PRT) FROM(ERLINE);
+   LINES1 = LINES1 + 1;
+   CALL NEXT_LINE;
+ END PRINT_REPORT;
+ /*  ---------------------------------------------  */
+ /*  ---------------------------------------------  */
+ NEXT_LINE: PROC;
+     IF MOD(LINES1,60)=0  THEN
+     DO;
+        CALL HEADER;
+        ERLIN1 = ' ';
+     END;
+ END NEXT_LINE;
+ /*  ---------------------------------------------  */
+ /*  ---------------------------------------------  */
+ TELOS:
+       ERLIN1= '1';
+       ERLIN2= ' ******************************************** ' ;
+       WRITE FILE(PRT) FROM(ERLINE);
+       ERLIN2= ' сумока пяоцяаллатос DDREP08 THN = '
+               !!SUBSTR(SYS_DATE,5,2)!!'.'
+               !!SUBSTR(SYS_DATE,3,2)!!'.'!!'20'
+               !!SUBSTR(SYS_DATE,1,2);
+       WRITE FILE(PRT) FROM(ERLINE);
+       ERLIN1= ' ';
+       ERLIN2= ' сумоко епистяожгс = '!!WS_TOTAL;
+       WRITE FILE(PRT) FROM(ERLINE);
+       ERLIN2= ' ******************************************** ' ;
+       WRITE FILE(PRT) FROM(ERLINE);
+       CLOSE FILE(PRT),FILE(OUTFILE),FILE(READER);
+ END DDREP08;
+

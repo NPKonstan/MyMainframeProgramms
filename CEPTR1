@@ -1,0 +1,690 @@
+*PROCESS XOPTS(CICS);                                                   00010000
+ /********************************************************************/ 00020000
+ /* ONLINE –—œ√—¡ÃÃ¡ PLI KAI DB2                                     */ 00021000
+ /********************************************************************/ 00021100
+ /*           PROGRAM NAME: CEPTR1     LOAD MODULE: CEPTR1           */ 00021200
+ /********************************************************************/ 00021300
+ /* —œ’‘…Õ¡ ≈ ‘’–Ÿ”«” SWIFT M«N’MATOS.                               */ 00021400
+ /*  ¡À≈…‘¡… ¡–œ ‘œ –—œ√—¡ÃÃ¡ CEPGM004                               */ 00021500
+ /********************************************************************/ 00021600
+ /* –—œ”œ◊« –—œ”œ◊« –—œ”œ◊«                                          */ 00021700
+ /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  */ 00021800
+ /* ◊—«”…Ãœ–œ…≈… ‘«Õ —œ’‘…Õ¡ ≈ ‘’–Ÿ”«” ZRPRTQ1 –œ’ ¡–¡…‘≈… ‘«Õ ƒπÀŸ”«*/ 00021900
+ /* ‘≈Àœ’” ≈ ‘’–Ÿ”«”.ƒ≈”: PRN_LEND                                   */ 00022000
+ /********************************************************************/ 00023000
+ /* 27-08-2012 NPK                                                   */ 00023100
+ /********************************************************************/ 00023200
+ CEPTR1: PROC(MY_PTR) OPTIONS (MAIN,REENTRANT);                         00023300
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');                    00023400
+ /********************************************************************/ 00023500
+ /***** COMMON AREA TO COMMUNICATE WITH CALLING PROGRAM          *****/ 00023600
+ /********************************************************************/ 00023700
+ DCL MY_PTR POINTER;                                                    00023800
+                                                                        00023900
+ DCL  COUNT_PAGES  PIC'ZZ9'      INIT(0);                               00024000
+                                                                        00025000
+ DCL 1 MY_AREA BASED(MY_PTR),                                           00026000
+      2 INPUT_PRINTER CHAR(04),     /* PRINTER NAME      */             00027000
+      2 FILEIN_REC CHAR(16000)     ;                                    00028000
+                                                                        00029000
+   DCL LINE           CHAR(131)    INIT((131)' ');                      00030000
+   DCL BIC_FILE   CHAR(855) INIT((855)' ');                             00040000
+   DCL 1 B_FILE BASED(ADDR(BIC_FILE)),                                  00050000
+        2 FIL_BIC1     CHAR(3),                                         00060000
+        2 BIC_CODE     CHAR(11),                                        00070000
+        2 BIC_NAME     CHAR(35),                                        00080000
+        2 FIL_BIC2     CHAR(70),                                        00090000
+        2 BIC_BRANCH   CHAR(35),                                        00100000
+        2 FIL_BIC3     CHAR(35),                                        00110000
+        2 BIC_CITY     CHAR(35),                                        00120000
+        2 FIL_BIC4     CHAR(35);                                        00130000
+                                                                        00140000
+   DCL SEND_BIC_NAME   CHAR(35) INIT((35)' ');                          00150000
+   DCL SEND_BIC_BRANCH CHAR(35) INIT((35)' ');                          00160000
+   DCL SEND_BIC_CITY   CHAR(35) INIT((35)' ');                          00170000
+                                                                        00180000
+   DCL RECEI_BIC_NAME   CHAR(35) INIT((35)' ');                         00190000
+   DCL RECEI_BIC_BRANCH CHAR(35) INIT((35)' ');                         00200000
+   DCL RECEI_BIC_CITY   CHAR(35) INIT((35)' ');                         00210000
+                                                                        00220000
+   DCL BASIC_HEAD CHAR(25) INIT((25)' ');                               00230000
+   DCL 1 BASIC BASED(ADDR(BASIC_HEAD)),                                 00240000
+        2 B1 CHAR(1),                                                   00250000
+        2 B2 CHAR(2),                                                   00260000
+        2 B3 CHAR(12),                                                  00270000
+        2 B4 CHAR(4),                                                   00280000
+        2 B5 CHAR(6);                                                   00290000
+                                                                        00300000
+   DCL APPLIC_HEAD CHAR(47) INIT((47)' ');                              00310000
+   DCL 1 APPLIC BASED(ADDR(APPLIC_HEAD)),                               00320000
+        2 A1  CHAR(1),                                                  00330000
+        2 A2  CHAR(3),                                                  00340000
+        2 A3  CHAR(4),                                                  00350000
+        2 A4  CHAR(6),                                                  00360000
+        2 A5  CHAR(12),                                                 00370000
+        2 A6  CHAR(4),                                                  00380000
+        2 A7  CHAR(6),                                                  00390000
+        2 A8  CHAR(6),                                                  00400000
+        2 A9  CHAR(4),                                                  00410000
+        2 A10 CHAR(1);                                                  00420000
+                                                                        00430000
+   DCL 1 WARNING,                                                       00440000
+        2 WRN_H1   CHAR(1)       INIT('1'),                             00450000
+        2 WRN_MSG  CHAR(81)                                             00460000
+        INIT                                                            00470000
+ ('BEWARE !!! THIS IS A COPY OF AN ORIGINAL MESSAGE, DO NOT PROCESS IT')00480000
+  ;                                                                     00490000
+   DCL 1 HEADER1,                                                       00500000
+        2 CNT_H1   CHAR(1)       INIT(' '),                             00510000
+        2 DD_H1    CHAR(2)       INIT('  '),                            00520000
+        2 FIL1_H1  CHAR(1)       INIT('/'),                             00530000
+        2 MM_H1    CHAR(2)       INIT('  '),                            00540000
+        2 FIL2_H1  CHAR(1)       INIT('/'),                             00550000
+        2 YY_H1    CHAR(4)       INIT('    '),                          00560000
+        2 FIL3_H1  CHAR(23)      INIT((23)' '),                         00570000
+        2 FIL4_H1  CHAR(8)       INIT('PRINTER:'),                      00580000
+        2 PRINT_H1 CHAR(4)       INIT('    '),                          00590000
+        2 FIL5_H1  CHAR(28)      INIT((28)' '),                         00600000
+        2 SEL_OUT  PIC'ZZ9'      INIT(0),                               00610000
+        2 FIL6_H1  CHAR(4)       INIT((4)' ');                          00620000
+                                                                        00630000
+   DCL 1 KENH,                                                          00640000
+        2 CNT_K1    CHAR(1)       INIT(' '),                            00650000
+        2 KENO      CHAR(81)      INIT((81)' ');                        00660000
+                                                                        00670000
+   DCL 1 GRAMMH1,                                                       00680000
+        2 CNT_G1    CHAR(1)       INIT(' '),                            00690000
+        2 GRAM1     CHAR(81)      INIT((81)'-');                        00700000
+                                                                        00710000
+   DCL 1 GRAMMH2,                                                       00720000
+        2 CNT_G2   CHAR(1)       INIT(' '),                             00730000
+        2 GRAM2    CHAR(25)      INIT((25)'-'),                         00740000
+        2 FIL_G2   CHAR(30)      INIT('INSTANCE TYPE AND TRANSMISSION'),00750000
+        2 GRAM2A   CHAR(25)      INIT((25)'-');                         00760000
+                                                                        00770000
+   DCL 1 GRAMMH3,                                                       00780000
+        2 CNT_G3   CHAR(1)       INIT(' '),                             00790000
+        2 GRAM3    CHAR(33)      INIT((33)'-'),                         00800000
+        2 FIL_G3   CHAR(14)      INIT('MESSAGE HEADER'),                00810000
+        2 GRAM3A   CHAR(33)      INIT((33)'-');                         00820000
+                                                                        00830000
+   DCL 1 GRAMMH4,                                                       00840000
+        2 CNT_G4   CHAR(1)       INIT(' '),                             00850000
+        2 GRAM4    CHAR(34)      INIT((34)'-'),                         00860000
+        2 FIL_G4   CHAR(12)      INIT('MESSAGE TEXT'),                  00870000
+        2 GRAM4A   CHAR(34)      INIT((34)'-');                         00880000
+                                                                        00890000
+   DCL 1 GRAMMH5,                                                       00900000
+        2 CNT_G5   CHAR(1)       INIT(' '),                             00910000
+        2 GRAM5    CHAR(33)      INIT((33)'-'),                         00920000
+        2 FIL_G5   CHAR(15)      INIT('MESSAGE TRAILER'),               00930000
+        2 GRAM5A   CHAR(32)      INIT((32)'-');                         00940000
+                                                                        00950000
+   DCL       NU CHAR(6)      INIT((6)' ');                              00960000
+                                                                        00970000
+   DCL SEPA  BIT(24) INIT('0000110100100101');/*0D25*/                  00980000
+   DCL CRLF  CHAR(2) BASED(ADDR(SEPA));                                 00990000
+                                                                        01000000
+   DCL SEPA1 BIT(8)  INIT('01111010');/*7A*/                            01010000
+   DCL CRLF1 CHAR(1) BASED(ADDR(SEPA1));                                01020000
+                                                                        01030000
+   DCL SEPA2 BIT(8)  INIT('01100000');/*60*/                            01040000
+   DCL CRLF2 CHAR(1) BASED(ADDR(SEPA2));                                01050000
+                                                                        01060000
+   DCL ONCODE     BUILTIN;                                              01070000
+   DCL SUBSTR     BUILTIN;                                              01080000
+   DCL ADDR       BUILTIN;                                              01090000
+   DCL PRIORITY   BUILTIN;                                              01100000
+   DCL INDEX      BUILTIN;                                              01110000
+   DCL VERIFY     BUILTIN;                                              01120000
+   DCL NULL       BUILTIN;                                              01130000
+   DCL DATETIME   BUILTIN;                                              01140000
+                                                                        01150000
+   DCL HMERA CHAR(8) INIT(' ');                                         01160000
+   DCL 1 HME BASED(ADDR(HMERA)),                                        01170000
+        2 YY   CHAR(4),                                                 01180000
+        2 MM   CHAR(2),                                                 01190000
+        2 DD   CHAR(2);                                                 01200000
+                                                                        01210000
+   DCL HMEROM  CHAR(17) INIT(' ');                                      01220000
+   DCL 1 DAT   BASED(ADDR(HMEROM)),                                     01230000
+        2  DATYYYY   CHAR(8),                                           01240000
+        2  DATTIME   CHAR(9);                                           01250000
+   DCL  ACTION      CHAR(30)        INIT(' ');                          01260000
+   DCL  NUMS        CHAR(10)        INIT('0123456789');                 01270000
+   DCL  RMSG        FIXED(9)        INIT(0);                            01280000
+   DCL  EGR         PIC'999999999'  INIT(0);                            01290000
+   DCL  L           PIC'99'         INIT(0);                            01300000
+   DCL  L_0         PIC'999'        INIT(0);                            01310000
+   DCL  (X,K,I,M)   FIXED(5)        INIT(0);                            01320000
+   DCL  (W,Y)       FIXED(5)        INIT(0);                            01330000
+   DCL  COUNT       FIXED(5)        INIT(0);                            01340000
+   DCL  EOF_FILE    FIXED(5)        INIT(0);                            01350000
+   DCL  EOF_BIC     FIXED(5)        INIT(0);                            01360000
+   DCL  W_SEND      PIC'9'          INIT(0);                            01370000
+   DCL  W_RECEI     PIC'9'          INIT(0);                            01380000
+   DCL  W_BLOCK_3   PIC'9'          INIT(0);                            01390000
+   DCL  CNT_LINES   PIC'999'        INIT(0);                            01400000
+   DCL  SELIS       PIC'999'        INIT(1);                            01410000
+   DCL  W_PEDIO     CHAR(3)         INIT('   ');                        01420000
+   DCL  PREV_PEDIO  CHAR(3)         INIT('   ');                        01430000
+                                                                        01440000
+   DCL  W_PERIGR         CHAR(50)        INIT((50)' ');                 01450000
+   DCL  W_PERIGR_MESS    CHAR(50)        INIT((50)' ');                 01460000
+   DCL  W_CHARS          PIC'9'          INIT(0);                       01470000
+   DCL  XS               FIXED(3)        INIT(0);                       01480000
+   DCL  EKATO            FIXED(3)        INIT(100);                     01490000
+                                                                        01500000
+ /*********************************************************************/01510000
+ /*–—œ”œ◊« œ…  œ…Õœ… ◊¡—¡ ‘«—≈” ”‘¡ À¡‘…Õ… ¡ */                         01520000
+   DCL PRN_LEND  CHAR(131)   INIT('TEÀO” EKTY–Ÿ”H”.');                  01530000
+ /********************************************************************/ 01540000
+ DCL PRNT_AREA            CHAR(7340);                                   01550000
+ DCL TD_AREA_LENGTH       FIXED BIN(15) INIT(7340);                     01560000
+ DCL 1 TD_AREA            BASED(ADDR(PRNT_AREA)),                       01570000
+      5 HLA_PRINTER       CHAR(4)    INIT(''),                          01580000
+      5 PRINT_AREA_TD(56) CHAR(131)  INIT('');                          01590000
+ /********************************************************************/ 01600000
+ EXEC SQL INCLUDE SQLCA;                                                01610000
+ EXEC SQL INCLUDE CTCEFLD;                                              01620000
+ EXEC SQL INCLUDE CTCEFIN;                                              01630000
+ EXEC SQL INCLUDE CTCEBIC;                                              01640000
+ /******************************************************************/   01650000
+                                                                        01660000
+ HMEROM = DATETIME;                                                     01670000
+ HMERA = DATYYYY;                                                       01680000
+                                                                        01690000
+ /*                                                                     01700000
+ PUT SKIP LIST("NPK CEPTR1 STATED AT : " !!HMEROM);                     01710000
+ PUT SKIP LIST("NPK NAME OF PRINTER IS : " !!INPUT_PRINTER);            01720000
+                                                                        01730000
+ PUT SKIP LIST("NPK : " !!FILEIN_REC );                                 01740000
+ */                                                                     01750000
+    HLA_PRINTER =  INPUT_PRINTER ;/*LOAD PRINTER*/                      01760000
+                                                                        01770000
+    NU       = ((6)' ');                                                01780000
+    DD_H1    = DD;                                                      01790000
+    MM_H1    = MM;                                                      01800000
+    YY_H1    = YY;                                                      01810000
+    PRINT_H1 = HLA_PRINTER;                                             01820000
+    SELIS    = 1;                                                       01830000
+    SEL_OUT  = SELIS;                                                   01840000
+                                                                        01840100
+    LINE = STRING(GRAMMH1);                                             01840200
+    CALL WRITE_LINE(LINE );                                             01840300
+    LINE = STRING(WARNING);                                             01840400
+    CALL WRITE_LINE(LINE   );                                           01840500
+    LINE = STRING(GRAMMH1);                                             01840600
+    CALL WRITE_LINE(LINE );                                             01840700
+    LINE = STRING(HEADER1);                                             01840800
+    CALL WRITE_LINE(LINE   );                                           01840900
+    LINE = STRING(GRAMMH1);                                             01841000
+    CALL WRITE_LINE(LINE );                                             01842000
+                                                                        01843000
+    DO I = 1 TO 16000;                                                  01844000
+       IF SUBSTR(FILEIN_REC,I,5) = '}{PDE' !                            01845000
+          SUBSTR(FILEIN_REC,I,5) = '}{PDM'                              01846000
+          THEN DO;                                                      01847000
+                 LINE = ' '!!'POSSIBLE DUPLICATE DELIVERY';             01848000
+                 CALL WRITE_LINE(LINE);                                 01849000
+                 I = 16001;                                             01850000
+               END;                                                     01860000
+    END;                                                                01870000
+                                                                        01880000
+    DO I = 1 TO 16000;                                                  01890000
+       IF SUBSTR(FILEIN_REC,I,6) = '{1:A01' !                           01900000
+          SUBSTR(FILEIN_REC,I,6) = '{1:F01'                             01910000
+          THEN DO;                                                      01920000
+                 I = I + 3;                                             01930000
+                 BASIC_HEAD = SUBSTR(FILEIN_REC,I,25);                  01940000
+                 LINE = ' '!!'   SESSION         : '!!B4;               01950000
+                 CALL WRITE_LINE(LINE);                                 01960000
+                 LINE = ' '!!'   SEQUENCE        : '!!B5;               01970000
+                 CALL WRITE_LINE(LINE);                                 01980000
+                 LINE = ' '!!'   DELIVERY STATUS : NETWORK ACK';        01990000
+                 CALL WRITE_LINE(LINE);                                 02000000
+                 I = 16001;                                             02010000
+               END;                                                     02020000
+    END;                                                                02030000
+                                                                        02040000
+    DO I = 1 TO 16000;                                                  02050000
+       IF SUBSTR(FILEIN_REC,I,5) = '}{2:O'                              02060000
+          THEN DO;                                                      02070000
+                 I = I + 4;                                             02080000
+                 LINE = STRING(GRAMMH2);                                02090000
+                 CALL WRITE_LINE(LINE );                                02100000
+                 LINE = ' '!!'ORIGINAL RECEIVED FROM SWIFT';            02110000
+                 CALL WRITE_LINE(LINE);                                 02120000
+                 APPLIC_HEAD = SUBSTR(FILEIN_REC,I,47);                 02130000
+                 IF A10 = 'N'                                           02140000
+                    THEN NU = 'NORMAL';                                 02150000
+                 IF A10 = 'U'                                           02160000
+                    THEN NU = 'URGENT';                                 02170000
+                 LINE = ' '!!'PRIORITY                      : '!!NU;    02180000
+                 CALL WRITE_LINE(LINE);                                 02190000
+                 LINE = ' '!!'MESSAGE OUTPUT REFERENCE      : '!!       02200000
+                        A9!!' '!!A8!!B3!!B4!!B5;                        02210000
+                 CALL WRITE_LINE(LINE);                                 02220000
+                 LINE = ' '!!'CORRESPONDENT INPUT REFERENCE : '!!       02230000
+                        A3!!' '!!A4!!A5!!A6!!A7;                        02240000
+                 CALL WRITE_LINE(LINE);                                 02250000
+                 I = 16001;                                             02260000
+               END;                                                     02270000
+    END;                                                                02280000
+                                                                        02290000
+    W_BLOCK_3 = 0;                                                      02300000
+                                                                        02310000
+    DO I = 1 TO 16000;                                                  02320000
+       IF SUBSTR(FILEIN_REC,I,5) = '}{3:{'                              02330000
+          THEN DO;                                                      02340000
+                 W_BLOCK_3 = 1;                                         02350000
+                 LINE =STRING(GRAMMH3) ;                                02360000
+                 CALL WRITE_LINE(LINE);                                 02370000
+                 CALL PRINT_MESSAGE_PERIG;                              02380000
+                 LINE = ' '!!'SWIFT OUTPUT :  FIN '!!A2!!'  '!!         02390000
+                        W_PERIGR_MESS;                                  02400000
+                 CALL WRITE_LINE(LINE);                                 02410000
+                 CALL FIND_ADDRESS;                                     02420000
+                 LINE = ' '!!'SENDER       :  '!!SUBSTR(A5,1,8)!!       02430000
+                                                 SUBSTR(A5,10,3);       02440000
+                 CALL WRITE_LINE(LINE);                                 02450000
+                 LINE = ' '!!'                '!!SEND_BIC_NAME;         02460000
+                 CALL WRITE_LINE(LINE);                                 02470000
+                 LINE = ' '!!'                '!!SEND_BIC_BRANCH;       02480000
+                 CALL WRITE_LINE(LINE);                                 02490000
+                 LINE = ' '!!'                '!!SEND_BIC_CITY;         02500000
+                 CALL WRITE_LINE(LINE);                                 02510000
+                 LINE = STRING(KENH) ;                                  02520000
+                 CALL WRITE_LINE(LINE);                                 02530000
+                 LINE = ' '!!'RECEIVER     :  '!!SUBSTR(B3,1,8)!!       02540000
+                                                 SUBSTR(B3,10,3);       02550000
+                 CALL WRITE_LINE(LINE);                                 02560000
+                 LINE = ' '!!'                '!!RECEI_BIC_NAME;        02570000
+                 CALL WRITE_LINE(LINE);                                 02580000
+                 LINE = ' '!!'                '!!RECEI_BIC_BRANCH;      02590000
+                 CALL WRITE_LINE(LINE);                                 02600000
+                 LINE = ' '!!'                '!!RECEI_BIC_CITY;        02610000
+                 CALL WRITE_LINE(LINE);                                 02620000
+                 I = I + 4;                                             02630000
+                 DO WHILE (SUBSTR(FILEIN_REC,I,3) ^= '}}{');            02640000
+                    M     = I;                                          02650000
+                    COUNT = 0;                                          02660000
+                    DO WHILE (SUBSTR(FILEIN_REC,I,1) ^= '}');           02670000
+                       IF SUBSTR(FILEIN_REC,I,1) = '{'                  02680000
+                          THEN DO;                                      02690000
+                                 I = I + 1;                             02700000
+                                 M = I;                                 02710000
+                               END;                                     02720000
+                          ELSE DO;                                      02730000
+                                 COUNT = COUNT + 1;                     02740000
+                                 I = I + 1;                             02750000
+                               END;                                     02760000
+                    END;                                                02770000
+                    LINE = ' '!!SUBSTR(FILEIN_REC,M,COUNT);             02780000
+                    CALL WRITE_LINE(LINE);                              02790000
+                    IF SUBSTR(FILEIN_REC,I,3) = '}}{'                   02800000
+                       THEN;                                            02810000
+                       ELSE I = I + 1;                                  02820000
+                 END;                                                   02830000
+                 I = 16001;                                             02840000
+               END;                                                     02850000
+    END;                                                                02860000
+                                                                        02870000
+    IF W_BLOCK_3 = 0                                                    02880000
+       THEN DO;                                                         02890000
+                 LINE = STRING(GRAMMH3);                                02900000
+                 CALL WRITE_LINE(LINE);                                 02910000
+                 CALL PRINT_MESSAGE_PERIG;                              02920000
+                 LINE = ' '!!'SWIFT OUTPUT :  FIN '!!A2!!'  '!!         02930000
+                        W_PERIGR_MESS;                                  02940000
+                 CALL WRITE_LINE(LINE);                                 02950000
+                 CALL FIND_ADDRESS;                                     02960000
+                 LINE = ' '!!'SENDER       :  '!!SUBSTR(A5,1,8)!!       02970000
+                                                 SUBSTR(A5,10,3);       02980000
+                 CALL WRITE_LINE(LINE);                                 02990000
+                 LINE = ' '!!'                '!!SEND_BIC_NAME;         03000000
+                 CALL WRITE_LINE(LINE);                                 03010000
+                 LINE = ' '!!'                '!!SEND_BIC_BRANCH;       03020000
+                 CALL WRITE_LINE(LINE);                                 03030000
+                 LINE = ' '!!'                '!!SEND_BIC_CITY;         03040000
+                 CALL WRITE_LINE(LINE);                                 03050000
+                 LINE=STRING(KENH) ;                                    03060000
+                 CALL WRITE_LINE(LINE);                                 03070000
+                 LINE = ' '!!'RECEIVER     :  '!!SUBSTR(B3,1,8)!!       03080000
+                                                 SUBSTR(B3,10,3);       03090000
+                 CALL WRITE_LINE(LINE);                                 03100000
+                 LINE = ' '!!'                '!!RECEI_BIC_NAME;        03110000
+                 CALL WRITE_LINE(LINE);                                 03120000
+                 LINE = ' '!!'                '!!RECEI_BIC_BRANCH;      03130000
+                 CALL WRITE_LINE(LINE);                                 03140000
+                 LINE = ' '!!'                '!!RECEI_BIC_CITY;        03150000
+                 CALL WRITE_LINE(LINE);                                 03160000
+            END;                                                        03170000
+                                                                        03180000
+                                                                        03190000
+    LINE=STRING(GRAMMH4) ;                                              03200000
+    CALL WRITE_LINE(LINE);                                              03210000
+    LINE=STRING(KENH);                                                  03220000
+    CALL WRITE_LINE(LINE);                                              03230000
+                                                                        03240000
+    IF SUBSTR(A2,1,1) = '0' THEN                                        03250000
+       CALL ANALYZE_FLD_0;                                              03260000
+    ELSE                                                                03270000
+       CALL ANALYZE_FLD;                                                03280000
+                                                                        03290000
+                                                                        03300000
+ TELOS:                                                                 03310000
+                                                                        03320000
+                                                                        03330000
+ /********************************************************************/ 03340000
+ FIND_ADDRESS: PROC;                                                    03350000
+   CTCEBIC = '';                                                        03360000
+   CTCEBIC.BIC_CODE = SUBSTR(A5,1,8)!!SUBSTR(A5,10,3);                  03370000
+   EXEC SQL                                                             03380000
+       SELECT  BIC_CODE,                                                03390000
+               INST_NAME_A,                                             03400000
+               BRANCH_INFO_A,                                           03410000
+               CITY_HEAD                                                03420000
+         INTO :CTCEBIC.BIC_CODE,                                        03430000
+              :CTCEBIC.INST_NAME_A,                                     03440000
+              :CTCEBIC.BRANCH_INFO_A,                                   03450000
+              :CTCEBIC.CITY_HEAD                                        03460000
+         FROM CTCEBIC                                                   03470000
+       WHERE  BIC_CODE = :CTCEBIC.BIC_CODE                              03480000
+         WITH UR;                                                       03490000
+   IF SQLCODE = 0                                                       03500000
+      THEN DO;                                                          03510000
+             SEND_BIC_NAME   = CTCEBIC.INST_NAME_A;                     03520000
+             SEND_BIC_BRANCH = CTCEBIC.BRANCH_INFO_A;                   03530000
+             SEND_BIC_CITY   = CTCEBIC.CITY_HEAD;                       03540000
+      END;                                                              03550000
+  ELSE     DO;                                                          03560000
+             SEND_BIC_NAME   = ((35)'*');                               03570000
+             SEND_BIC_BRANCH = ((35)'*');                               03580000
+             SEND_BIC_CITY   = ((35)'*');                               03590000
+           END;                                                         03600000
+                                                                        03610000
+   CTCEBIC = '';                                                        03620000
+   CTCEBIC.BIC_CODE = SUBSTR(B3,1,8)!!SUBSTR(B3,10,3);                  03630000
+   EXEC SQL                                                             03640000
+       SELECT  BIC_CODE,                                                03650000
+               INST_NAME_A,                                             03660000
+               BRANCH_INFO_A,                                           03670000
+               CITY_HEAD                                                03680000
+         INTO :CTCEBIC.BIC_CODE,                                        03690000
+              :CTCEBIC.INST_NAME_A,                                     03700000
+              :CTCEBIC.BRANCH_INFO_A,                                   03710000
+              :CTCEBIC.CITY_HEAD                                        03720000
+         FROM CTCEBIC                                                   03730000
+       WHERE  BIC_CODE = :CTCEBIC.BIC_CODE                              03731000
+         WITH UR;                                                       03732000
+   IF SQLCODE = 0                                                       03733000
+      THEN DO;                                                          03734000
+             RECEI_BIC_NAME   = CTCEBIC.INST_NAME_A;                    03735000
+             RECEI_BIC_BRANCH = CTCEBIC.BRANCH_INFO_A;                  03736000
+             RECEI_BIC_CITY   = CTCEBIC.CITY_HEAD;                      03737000
+           END;                                                         03738000
+   ELSE    DO;                                                          03739000
+             RECEI_BIC_NAME   = ((35)'*');                              03740000
+             RECEI_BIC_BRANCH = ((35)'*');                              03741000
+             RECEI_BIC_CITY   = ((35)'*');                              03741100
+           END;                                                         03741200
+ END FIND_ADDRESS;                                                      03741300
+ /********************************************************************/ 03741400
+ PRINT_PEDIO_PERIG: PROC;                                               03741500
+    W_PERIGR = ((50)' ');                                               03741600
+                                                                        03741700
+    CTCEFLD.FIN_MSG  = A2      ;                                        03741800
+    CTCEFLD.FLD_CODE = W_PEDIO ;                                        03741900
+    EXEC SQL  SELECT                                                    03742000
+             FIN_MSG,                                                   03743000
+             FLD_CODE,                                                  03744000
+             FLD_DESCR                                                  03745000
+         INTO                                                           03746000
+            :CTCEFLD.FIN_MSG,                                           03747000
+            :CTCEFLD.FLD_CODE,                                          03748000
+            :CTCEFLD.FLD_DESCR                                          03749000
+    FROM CTCEFLD                                                        03750000
+    WHERE                                                               03760000
+    FIN_MSG  = :CTCEFLD.FIN_MSG                                         03770000
+    AND                                                                 03780000
+    FLD_CODE = :CTCEFLD.FLD_CODE                                        03790000
+    ;                                                                   03800000
+    IF SQLCODE = 0 THEN DO;                                             03810000
+          W_PERIGR = CTCEFLD.FLD_DESCR;                                 03820000
+    END;                                                                03830000
+                                                                        03840000
+    IF W_CHARS = 2  THEN                                                03850000
+            LINE = ' '!!'  '!!SUBSTR(W_PEDIO,1,2)!!':'!!' '!!W_PERIGR;  03860000
+       ELSE                                                             03870000
+            LINE = ' '!!' '!!W_PEDIO!!':'!!' '!!W_PERIGR;               03880000
+ END PRINT_PEDIO_PERIG;                                                 03890000
+ /********************************************************************/ 03900000
+ PRINT_MESSAGE_PERIG: PROC;                                             03910000
+    W_PERIGR_MESS = ((50)' ');                                          03920000
+    CTCEFIN.FIN_MSG  = A2 ;                                             03930000
+    EXEC SQL SELECT                                                     03940000
+        FIN_MSG,                                                        03950000
+        MSG_DESCR                                                       03960000
+        INTO                                                            03970000
+            :CTCEFIN.FIN_MSG,                                           03980000
+            :CTCEFIN.MSG_DESCR                                          03990000
+    FROM CTCEFIN                                                        04000000
+    WHERE                                                               04010000
+            FIN_MSG  = :CTCEFIN.FIN_MSG                                 04020000
+    ;                                                                   04030000
+                                                                        04040000
+    IF SQLCODE = 0 THEN DO;                                             04050000
+         W_PERIGR_MESS = CTCEFIN.MSG_DESCR;                             04060000
+    END;                                                                04070000
+                                                                        04080000
+    IF W_CHARS = 2 THEN                                                 04090000
+         LINE = ' '!!'  '!!SUBSTR(W_PEDIO,1,2)!!':'!!' '!!W_PERIGR_MESS;04100000
+    ELSE                                                                04110000
+         LINE = ' '!!' '!!W_PEDIO!!':'!!' '!!W_PERIGR_MESS;             04120000
+                                                                        04130000
+ END PRINT_MESSAGE_PERIG;                                               04140000
+                                                                        04150000
+ /********************************************************************/ 04160000
+ ANALYZE_FLD: PROC;                                                     04170000
+    X = 1;                                                              04180000
+    DO I = X TO 16000;                                                  04190000
+       IF SUBSTR(FILEIN_REC,I,3) = CRLF!!CRLF2                          04200000
+          THEN DO;                                                      04210000
+                 X = 16001;                                             04220000
+                 GOTO END_DO_LOOP;                                      04230000
+               END;                                                     04240000
+       NEXT_PEDIO:                                                      04250000
+       IF SUBSTR(FILEIN_REC,I,3) = CRLF!!CRLF1                          04260000
+          THEN DO;                                                      04270000
+                 I  = I + 3;                                            04280000
+                 IF VERIFY(SUBSTR(FILEIN_REC,I,2),NUMS) ^= 0            04290000
+                    THEN DO;                                            04300000
+                           I = I - 1;                                   04310000
+                           GOTO CURRENT_PEDIO;                          04320000
+                         END;                                           04330000
+                 L  = SUBSTR(FILEIN_REC,I,2);                           04340000
+                 I = I + 2;                                             04350000
+                 IF SUBSTR(FILEIN_REC,I,1) = ':'                        04360000
+                    THEN DO;                                            04370000
+                           W_PEDIO = L!!' ';                            04380000
+                           W_CHARS = 2;                                 04390000
+                           CALL PRINT_PEDIO_PERIG;                      04400000
+                           CALL WRITE_LINE(LINE);                       04410000
+                           I = I + 1;                                   04420000
+                         END;                                           04430000
+                    ELSE DO;                                            04440000
+                           W_PEDIO = L!!SUBSTR(FILEIN_REC,I,1);         04450000
+                           W_CHARS = 3;                                 04460000
+                           CALL PRINT_PEDIO_PERIG;                      04470000
+                           CALL WRITE_LINE(LINE);                       04480000
+                           I = I + 2;                                   04490000
+                         END;                                           04500000
+                 IF SUBSTR(FILEIN_REC,I,3) = CRLF!!CRLF1                04510000
+                    THEN GOTO NEXT_PEDIO;                               04520000
+                 CURRENT_PEDIO:                                         04530000
+                 K = I;                                                 04540000
+                 DO WHILE (SUBSTR(FILEIN_REC,K,3) ^= CRLF!!CRLF2 &      04550000
+                           SUBSTR(FILEIN_REC,K,3) ^= CRLF!!CRLF1);      04560000
+                    COUNT = 0;                                          04570000
+                    M     = K;                                          04580000
+                    DO WHILE (SUBSTR(FILEIN_REC,K,2)  ^= CRLF);         04590000
+                       COUNT = COUNT + 1;                               04600000
+                       K = K + 1;                                       04610000
+                    END;                                                04620000
+                                                                        04630000
+                    LINE = ' '!!'      '!!SUBSTR(FILEIN_REC,M,COUNT);   04640000
+                    CALL WRITE_LINE(LINE);                              04650000
+                    IF SUBSTR(FILEIN_REC,K,3) = CRLF!!CRLF1 !           04660000
+                       SUBSTR(FILEIN_REC,K,3) = CRLF!!CRLF2             04670000
+                       THEN;                                            04680000
+                       ELSE K = K + 2;                                  04690000
+                 END;                                                   04700000
+                 X = K;                                                 04710000
+               END;                                                     04720000
+          ELSE X = X + 1;                                               04730000
+    END_DO_LOOP:                                                        04740000
+    END;                                                                04750000
+                                                                        04760000
+    LINE=STRING(GRAMMH5);                                               04770000
+    CALL WRITE_LINE(LINE);                                              04780000
+    LINE=STRING(KENH) ;                                                 04790000
+    CALL WRITE_LINE(LINE);                                              04800000
+                                                                        04810000
+    DO I = 1 TO 16000;                                                  04820000
+       IF SUBSTR(FILEIN_REC,I,5) = '{CHK:'                              04830000
+          THEN DO;                                                      04840000
+                 I = I + 5;                                             04850000
+                 M = I;                                                 04860000
+                 K = 0;                                                 04870000
+                 DO X = I TO 16000;                                     04880000
+                    IF SUBSTR(FILEIN_REC,X,1) ^= '}'                    04890000
+                       THEN K = K + 1;                                  04900000
+                    IF SUBSTR(FILEIN_REC,X,1) = '}'                     04910000
+                       THEN X = 16001;                                  04920000
+                 END;                                                   04930000
+                 LINE = ' '!!'{CHK:'!!SUBSTR(FILEIN_REC,M,K)!!'}';      04940000
+                 CALL WRITE_LINE(LINE);                                 04950000
+                 I = 16001;                                             04960000
+               END;                                                     04970000
+    END;                                                                04980000
+ END ANALYZE_FLD;                                                       04990000
+ /********************************************************************/ 05000000
+ ANALYZE_FLD_0: PROC;                                                   05010000
+    Y = 0;                                                              05020000
+    DO W = 1 TO 16000;                                                  05030000
+       IF SUBSTR(FILEIN_REC,W,5) = '}{4:{'                              05040000
+          THEN DO;                                                      05050000
+                 Y = W + 4;                                             05060000
+                 W = 16001;                                             05070000
+               END;                                                     05080000
+    END;                                                                05090000
+    X = Y;                                                              05100000
+    DO I = X TO 16000;                                                  05110000
+       IF SUBSTR(FILEIN_REC,I,1) = '{'                                  05120000
+          THEN DO;                                                      05130000
+                 I = I + 1;                                             05140000
+                 IF SUBSTR(FILEIN_REC,I,6) = '5:{CHK'                   05150000
+                    THEN GOTO END_DO_LOOP_0;                            05160000
+                 L_0  = SUBSTR(FILEIN_REC,I,3);                         05170000
+                 I    = I + 3;                                          05180000
+                 W_PEDIO = L_0;                                         05190000
+                 W_CHARS = 3;                                           05200000
+                 CALL PRINT_PEDIO_PERIG;                                05210000
+                 CALL WRITE_LINE(LINE);                                 05220000
+                 I = I + 1;                                             05230000
+                 K = I;                                                 05240000
+                 DO WHILE (SUBSTR(FILEIN_REC,K,1) ^= '}');              05250000
+                    COUNT = 0;                                          05260000
+                    M     = K;                                          05270000
+                    DO WHILE ((SUBSTR(FILEIN_REC,K,1) ^= '}') &         05280000
+                              (SUBSTR(FILEIN_REC,K,2) ^= CRLF));        05290000
+                       COUNT = COUNT + 1;                               05300000
+                       K = K + 1;                                       05310000
+                    END;                                                05320000
+                    LINE = ' '!!'      '!!SUBSTR(FILEIN_REC,M,COUNT);   05330000
+                    CALL WRITE_LINE(LINE);                              05340000
+                    IF SUBSTR(FILEIN_REC,K,1) = '}'                     05350000
+                       THEN;                                            05360000
+                    IF SUBSTR(FILEIN_REC,K,2) = CRLF                    05370000
+                       THEN K = K + 2;                                  05380000
+                 END;                                                   05390000
+                 X = K;                                                 05400000
+               END;                                                     05410000
+          ELSE X = X + 1;                                               05420000
+    END;                                                                05430000
+                                                                        05440000
+    END_DO_LOOP_0:                                                      05450000
+                                                                        05460000
+    LINE=STRING(GRAMMH5);                                               05470000
+    CALL WRITE_LINE(LINE);                                              05480000
+    LINE=STRING(KENH);                                                  05490000
+    CALL WRITE_LINE(LINE);                                              05500000
+                                                                        05510000
+    DO I = 1 TO 16000;                                                  05520000
+       IF SUBSTR(FILEIN_REC,I,5) = '{CHK:'                              05530000
+          THEN DO;                                                      05540000
+                 I = I + 5;                                             05550000
+                 M = I;                                                 05560000
+                 K = 0;                                                 05570000
+                 DO X = I TO 16000;                                     05580000
+                    IF SUBSTR(FILEIN_REC,X,1) ^= '}'                    05590000
+                       THEN K = K + 1;                                  05600000
+                    IF SUBSTR(FILEIN_REC,X,1) = '}'                     05610000
+                       THEN X = 16001;                                  05620000
+                 END;                                                   05630000
+                 LINE = ' '!!'{CHK:'!!SUBSTR(FILEIN_REC,M,K)!!'}';      05640000
+                 CALL WRITE_LINE(LINE);                                 05650000
+                 I = 16001;                                             05660000
+               END;                                                     05670000
+    END;                                                                05680000
+ END ANALYZE_FLD_0;                                                     05690000
+ /********************************************************************/ 05700000
+  WRITE_LINE   : PROC(LN);                                              05710000
+    DCL LN       CHAR  (131)  ;                                         05720000
+                                                                        05730000
+    CNT_LINES  = CNT_LINES   + 1;                                       05740000
+                                                                        05750000
+    IF CNT_LINES = HBOUND(PRINT_AREA_TD) - 1 THEN DO;                   05760000
+                                                                        05770000
+         PRINT_AREA_TD(HBOUND(PRINT_AREA_TD)- 1 ) = LN;                 05780000
+   /*===============================================================*/  05790000
+   /*–—œ”œ◊«: « –…œ  ¡‘Ÿ ¡Õ¡»≈”« EINAI ¡–¡—¡…‘«‘« √…¡ Õ¡  ¡‘¡À¡¬≈…  */  05800000
+   /*         ‘œ –—œ√—¡ÃÃ¡ ≈ ‘’–Ÿ”«” –œ’ Õ¡ ”‘¡Ã¡‘«”≈…              */  05810000
+   /*===============================================================*/  05820000
+         PRINT_AREA_TD(HBOUND(PRINT_AREA_TD) ) = PRN_LEND;              05830000
+         EXEC CICS LINK PROGRAM('ZRPRTQ1') COMMAREA(PRNT_AREA) ;        05840000
+         /*PUT SKIP LIST('ALLAGI SELIDAS ‘’–œ»« ≈ ',CNT_LINES)  ;*/     05850000
+                                                                        05860000
+         PRNT_AREA = '';                                                05870000
+         SELIS    = SELIS + 1;                                          05880000
+         SEL_OUT  = SELIS;                                              05890000
+         HLA_PRINTER =  INPUT_PRINTER ;/*LOAD PRINTER*/                 05900000
+         PRINT_AREA_TD(1) = STRING(GRAMMH1);                            05910000
+         PRINT_AREA_TD(2) = STRING(WARNING);                            05920000
+         PRINT_AREA_TD(3) = STRING(GRAMMH1);                            05930000
+         PRINT_AREA_TD(4) = STRING(HEADER1);                            05940000
+         PRINT_AREA_TD(5) = STRING(GRAMMH1);                            05950000
+     /*  ROW_TBL(1).PRINT_AREA_TD = STRING(HEADER1);                    05960000
+         ROW_TBL(2).PRINT_AREA_TD = STRING(GRAMMH1);*/                  05970000
+         CNT_LINES    = 5;                                              05980000
+     END;                                                               05990000
+     ELSE DO;                                                           06000000
+        PRINT_AREA_TD(CNT_LINES) = LN;                                  06010000
+     END;                                                               06020000
+                                                                        06030000
+ END WRITE_LINE ;                                                       06040000
+ /****************************************************************/     06050000
+   /*===============================================================*/  06060000
+   /*–—œ”œ◊«: « –…œ  ¡‘Ÿ ¡Õ¡»≈”« EINAI ¡–¡—¡…‘«‘« √…¡ Õ¡  ¡‘¡À¡¬≈…  */  06070000
+   /*         ‘œ –—œ√—¡ÃÃ¡ ≈ ‘’–Ÿ”«” –œ’ Õ¡ ”‘¡Ã¡‘«”≈…              */  06080000
+   /*===============================================================*/  06090000
+ PRINT_AREA_TD(HBOUND(PRINT_AREA_TD) ) = PRN_LEND;                      06100000
+ EXEC CICS LINK PROGRAM('ZRPRTQ1') COMMAREA(PRNT_AREA) ;                06110000
+                                                                        06111000
+ /*PUT SKIP LIST("NPK CEPTR1 ENDED  AT : " !!HMEROM);*/                 06111100
+                                                                        06111200
+ EXEC CICS RETURN;                                                      06111300
+                                                                        06111400
+ END CEPTR1;                                                            06111500
+

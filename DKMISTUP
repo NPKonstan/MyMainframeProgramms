@@ -1,0 +1,277 @@
+ /* PROCESS A,GOSTMT,NEST,OPT(TIME),AG,MI('+'),MAP,M,OF,NIS;          */
+
+ /*********************** DKMISTUP*************************************//
+ /*  AUTHOR : BARBETAKI                                               */
+ /*      емглеяымеи стом пимайа DB2, CTDKMIST тис глеяолгмиес цеммг-  */
+ /*      сгс тым пекатым.                                             */
+ /*                                                                   */
+ /*********************************************************************/
+ /*npk changes for enterprise pli 21-05-2007 DIVIDE *******************/
+ /*********************************************************************/
+
+ MANT: PROC OPTIONS(MAIN);
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+ DCL CZX3VDAT CHAR(6); FETCH CZXDATEP;
+ DCL CZXDATEP ENTRY OPTIONS(INTER,ASM) ;
+ DCL READER FILE RECORD INPUT  ENV( FB RECSIZE(80) );
+ DCL LIST1  FILE RECORD OUTPUT ENV( FB RECSIZE(132) CTLASA);
+
+ %INCLUDE DAWATNS;
+ %INCLUDE DAYATNS;
+ %INCLUDE RECMIS2;
+
+ EXEC SQL INCLUDE CTDKMIST;
+ EXEC SQL INCLUDE T04CNV97;
+ EXEC SQL INCLUDE T04DBA01;
+ EXEC SQL INCLUDE SQLCA;
+
+ DCL 1 RECDATA,
+       2 LABEL1            CHAR(12) INIT ('гл/миа апо: '),
+       2 DATEFR            ,
+         3 DD1             PIC '99',
+         3 P11             CHAR(1)    INIT('.'),
+         3 MM1             PIC '99',
+         3 P21             CHAR(1) INIT('.'),
+         3 YYYY1           PIC '9999',
+       2 FILLER1           CHAR(3) INIT('   '),
+       2 LABEL2            CHAR(12) INIT ('гл/миа еыс: '),
+       2 DATETO            ,
+         3 DD2             PIC '99',
+         3 P12             CHAR(1)    INIT('.'),
+         3 MM2             PIC '99' ,
+         3 P22             CHAR(1)    INIT('.'),
+         3 YYYY2           PIC '9999',
+       2 FILLER2           CHAR(3) INIT('   '),
+       2 LABEL3            CHAR(9) INIT('амакусг: '),
+       2 ANALISI           CHAR(1) INIT('м'),
+       2 FILLER3           CHAR(20) INIT (' ');
+
+ DCL (ADDR,TRANSLATE,SUBSTR,LENGTH) BUILTIN;
+ DCL (BASED,VERIFY,PRIORITY) BUILTIN;
+ DCL TIME   BUILTIN;
+
+ DCL    COUNT_INP         FIXED(15)    INIT(0);
+ DCL    CNT_UPD           PIC '(15)9'  INIT(0);
+ DCL    CNT_UPD_INIT      PIC '(15)9'  INIT(0);
+ DCL    DEL_ROWS          PIC '(15)9'  INIT(0);
+ DCL    DCOUNT            PIC 'ZZZ.ZZZ.ZZZ.ZZ9' INIT(0);
+ DCL    FR_DATE           FIXED(7);
+ DCL    TO_DATE           FIXED(7);
+ DCL    DATEFROM          CHAR(10);
+ DCL    DATE_TO            CHAR(10);
+ DCL    ARLOG              PIC '(9)9';
+
+ DCL    SYS_DATE          CHAR(6)    INIT(' ');
+ DCL    SYS_TIME          CHAR(9)    INIT(' ');
+ DCL    WSYS_DATE         PIC '999999' BASED(ADDR(SYS_DATE));
+ DCL    W_DATE            PIC '999999';
+ DCL    LINES             PIC '999';
+ DCL    SWEOF             PIC '9' INIT (0);
+
+       /*-------------------------------*/
+       /* EXTERNAL PROCEDURE VALDAY     */
+       /*-------------------------------*/
+     DCL WRKDT            CHAR (6);
+     DCL WRKDATE          PIC '999999' BASED(ADDR(WRKDT));
+      DCL VALDAY  EXTERNAL ENTRY(CHAR(44))
+          OPTIONS(INTER,ASM);
+      FETCH VALDAY ;
+
+
+    DCL  ENA  CHAR(24)
+         INIT('ABcdEZHhIKkMNnOpPrTYuXwx');
+    DCL  DYO  CHAR(24)
+         INIT('абцдефгхийклмнопястужвьы');
+
+ DATE: PROC IRREDUCIBLE RETURNS(CHAR(6)) ;
+       CALL CZXDATEP          ( CZX3VDAT) ;
+       RETURN (CZX3VDAT) ;
+       END DATE ;
+
+ DCL  1 LINE,
+         2 L1            CHAR(1),
+         2 L2            CHAR(131);
+ DCL  L3                 CHAR(132);
+ DCL  L4                 CHAR(150);
+ DCL  DIVIDE BUILTIN;
+
+ DCL  1 P1            CHAR(7) ;
+ DCL  1 P2            PIC 'ZZZZ9';
+
+     OPEN FILE(LIST1);
+     OPEN FILE(READER);
+     ON ENDFILE(READER) BEGIN;
+        GO TO TELOS;
+        END;
+     /* амацмысг тгс йаятас */
+     READ FILE(READER) INTO(RECDATA);
+     P1 ='секида';
+     SYS_DATE = DATE;
+     SYS_TIME = TIME;
+     LINES = 0;
+     FR_DATE = '1'!!SUBSTR(YYYY1,3,2)!!MM1!!DD1;
+     TO_DATE = '1'!!SUBSTR(YYYY2,3,2)!!MM2!!DD2;
+
+     /*екецвос глеяолгмиым йаятас */
+     IF(FR_DATE > TO_DATE ) THEN DO;
+            L2 = ' кахос диастгла глеяолHмиым йаятас. ';
+            WRITE FILE(LIST1) FROM(LINE);
+            P2 = DIVIDE(LINES,0,1,1);/*npk changes for enterprise pli*/
+     END;
+
+
+     DATEFROM =DAYR8SA(DAYA6R8(SUBSTR(YYYY1,3,2)!!MM1!!DD1));
+     DATE_TO = DAYR8SA(DAYA6R8(SUBSTR(YYYY2,3,2)!!MM2!!DD2));
+
+     /* диабафеи тис еццяажес апо том CTDKMIST       */
+     EXEC SQL DECLARE DKMISTCUR CURSOR WITH HOLD FOR
+          SELECT COD_KATHO, KEY_ARLOG
+          FROM CTDKMIST
+          WHERE DAT_HMNIA BETWEEN :DATEFROM  AND :DATE_TO
+          FOR UPDATE OF DAT_BIRTH;
+
+     EXEC SQL OPEN DKMISTCUR;
+
+     IF SQLCODE ^= 0 THEN
+     DO;
+        L2 = 'DB2 ERROR: кахос сто амоицла тоу CURSOR тоу пимайа '!!
+             'CTDKMIST: '!!SQLCODE;
+        WRITE FILE(LIST1) FROM(LINE);
+        P2 = DIVIDE(LINES,0,1,1);/*npk changes for enterprise pli*/
+     END;
+
+     /* диабафеи тис еццяажес апо тоус пимайес T04CNV97 йаи T04DBA01 */
+     /* циа ма паяеи тгм глеяолгмиа цеммгсгс                         */
+     EXEC SQL DECLARE FINDPEL_CUR CURSOR WITH HOLD FOR
+          SELECT COALESCE(FEC_NACIMIENTO, '01.01.1900')
+          FROM T04CNV97
+          , T04DBA01
+          WHERE COD_PELATH = COD_PERSONA
+          AND COD_EFARM = :COD_EFARM
+          AND NUM_AR_LOGAR = :NUM_AR_LOGAR
+          WITH UR;
+
+
+ R1: /* диабафеи лиа лиа тис еццяажес тоу пимайа CTDKMIST    */
+     EXEC SQL FETCH DKMISTCUR INTO :COD_KATHO, :KEY_ARLOG;
+
+     IF (SQLCODE = 100) THEN DO;
+        EXEC SQL CLOSE DKMISTCUR; /*npk 21-05-2007*/
+        GOTO TELOS;
+     END;
+     ELSE IF SQLCODE ^= 0 THEN
+     DO;
+        L2 = 'DB2 ERROR: кахос сто FETCH тоу CURSOR тоу пимайа '!!
+             'CTDKMIST: '!!SQLCODE;
+        WRITE FILE(LIST1) FROM(LINE);
+        P2 = DIVIDE(LINES,0,1,1);/*npk changes for enterprise pli*/
+     END;
+
+     COUNT_INP = COUNT_INP + 1;
+
+     IF (COD_KATHO = '5300' ) THEN DO; /* коцаяиаслос талеиутгяиоу */
+        ARLOG =KEY_ARLOG;
+        NUM_AR_LOGAR = ARLOG!!'       01';
+        COD_EFARM = '90';
+     END;
+     ELSE DO; /* коцаяиаслос йатахесеым */
+        ARLOG =KEY_ARLOG;
+        NUM_AR_LOGAR =SUBSTR(ARLOG,2,LENGTH(ARLOG)-1)!!'        01';
+        COD_EFARM = '70';
+     END;
+
+     EXEC SQL OPEN FINDPEL_CUR;
+
+     IF SQLCODE ^= 0 THEN
+     DO;
+        L2 = 'DB2 ERROR: кахос сто амоицла тоу CURSOR тым пимайым '!!
+             'т04CNV97, T04DBA01: '!!SQLCODE;
+        WRITE FILE(LIST1) FROM(LINE);
+        P2 = DIVIDE(LINES,0,1,1);/*npk changes for enterprise pli*/
+     END;
+
+     EXEC SQL FETCH FINDPEL_CUR INTO :FEC_NACIMIENTO;
+
+     IF (SQLCODE = 100) THEN DO;
+        FEC_NACIMIENTO = '01.01.1900';
+        L2 = 'дем бяехгйам стоивеиа циа том коцаяиасло '!!KEY_ARLOG;
+        WRITE FILE(LIST1) FROM(LINE);
+     END;
+     ELSE IF (SQLCODE ^= 0) THEN DO;
+        L2 = 'DB2 ERROR: кахос сто FETCH тоу CURSOR тым пимайым '!!
+             'т04CNV97, T04DBA01: '!!SQLCODE!!' '!!KEY_ARLOG;
+        WRITE FILE(LIST1) FROM(LINE);
+        P2 = DIVIDE(LINES,0,1,1);/*npk changes for enterprise pli*/
+     END;
+     /* емглеяысг ле тгм гл/миа цеммгсгс */
+     EXEC SQL UPDATE CTDKMIST
+              SET DAT_BIRTH = :FEC_NACIMIENTO
+              WHERE CURRENT OF  DKMISTCUR;
+
+     IF SQLCODE ^= 0 THEN
+     DO;
+        L2 = 'DB2 ERROR: кахос сто UPDATE тоу пимайа '!!
+             'CTDKMIST: '!!SQLCODE !!' '!!NUM_AR_LOGAR;
+        WRITE FILE(LIST1) FROM(LINE);
+        P2 = DIVIDE(LINES,0,1,1);/*npk changes for enterprise pli*/
+     END;
+     IF (FEC_NACIMIENTO = '01.01.1900') THEN
+        CNT_UPD_INIT = CNT_UPD_INIT + 1;
+     ELSE CNT_UPD = CNT_UPD + 1;
+
+
+     EXEC SQL CLOSE FINDPEL_CUR;
+
+     IF ( MOD(CNT_UPD,1000) = 0 ) THEN
+         EXEC SQL COMMIT;
+
+   GOTO R1;
+
+
+ /*********************************************************************/
+ HEAD: PROC;
+     L1 = '1';
+     P2 = DIVIDE(LINES,60,4,0) + 1;
+     L2 = (3)' '!!'емглеяысг тоу пимайа CTDKMIST ле тгм гл/миа цеммгсгс'
+                 !! ' HM/NIA: '!!SUBSTR(SYS_DATE,5,2)!!'.'
+                 !!SUBSTR(SYS_DATE,3,2)!!'.'!!'20'
+                 !!SUBSTR(SYS_DATE,1,2)!! ' xPA: '
+                 !!SUBSTR(SYS_TIME,1,2)!! ':'
+                 !!SUBSTR(SYS_TIME,3,2)!! ':'
+                 !!SUBSTR(SYS_TIME,5,2)!!')*DKMISTUP* '!!
+                 (5)' '!!P1!!P2;
+   WRITE FILE(LIST1) FROM(LINE);
+   L1 = ' ';
+   L2 = (132)'=';
+   WRITE FILE(LIST1) FROM(LINE);
+   LINES =LINES + 2;
+ END HEAD;
+
+ /* ейтупымеи та сумока тгс ейтупысгс, INPUT RECORDS, лецакутеяг */
+ /* лийяотеяг глеяолгмиа                                         */
+ TELOS:;
+     EXEC SQL COMMIT;
+     LINES = LINES +60;
+     CALL HEAD;
+     L1 = ' ';
+
+     DCOUNT = COUNT_INP;
+     L2 = 'еццяажес пяос емглеяысг                  '!!DCOUNT;
+     WRITE FILE(LIST1) FROM(LINE);
+
+     DCOUNT = CNT_UPD;
+     L2 = 'Eццяажес поу емглеяыхгйам апо том пимайа '!!DCOUNT;
+     WRITE FILE(LIST1) FROM(LINE);
+
+     DCOUNT = CNT_UPD_INIT;
+     L2 = 'Eццяажес поу емглеяыхгйам ле 01.01.1900  '!!DCOUNT;
+     WRITE FILE(LIST1) FROM(LINE);
+
+     DCOUNT = CNT_UPD_INIT + CNT_UPD;
+     L2 = 'сумокийес еццяажес поу емглеяыхгйам      '!!DCOUNT;
+     WRITE FILE(LIST1) FROM(LINE);
+
+     CLOSE FILE(READER);
+     CLOSE FILE(LIST1);
+ END MANT;
+

@@ -1,0 +1,323 @@
+ /* PROCESS A,GOSTMT,NEST,OPT(TIME),INCLUDE,AG,MI('+'),S,X,OF,MAP;    */
+ /* DKTAM28W- RECORDS dI EKTYp.KATArT. EKKP.pPOBkEwExN & EpITAcxN  */
+ /* айуяысг CHECKBOOKS ле басг  емдеинг мол/тос апо CC, */
+ /* паяадеицла CC : C 1 DRS 311097 310598, */
+ /* ацмооумтаи ои глеяолгмиес. */
+ /* еам то CHEKBOOK дем еимаи еуяы, айуяыметаи.*/
+ /* еуаццекос йоукгс, септелбяиос 2004. */
+ /* ---------------------------------------------------------------*/
+ /* npk change for enterprice pli 21-05-2007 ----------------------*/
+ /* ---------------------------------------------------------------*/
+ DLITPLI: PROCEDURE (PCBIO,PCBPTRK)OPTIONS(MAIN);
+ /*****       VSE/MVS TRANSLATION PROCESSED BY MVS-MS       *****/
+ /*****          SATURDAY  96/05/11  AT  22.42.28           *****/
+ /*** PL/1 OPTIMIZER EXECUTION TIME OPTIONS ***/
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+ /*** MVS-MS DATE SIMULATION VARIABLES ***/
+ DCL CZX3VDAT CHAR(6); FETCH CZXDATEP;
+ DCL CZXDATEP ENTRY OPTIONS(INTER,ASM) ;
+ /***            END OF MVS-MS INSERT            ***/
+         /* --------------------------------------------*/
+         /*                                             */
+ DCL PLITDLI EXTERNAL ENTRY ;
+
+
+ /*----------------------------------------------------------------*/
+ /* BATCH Rоутима летатяопгс глеяолгмиас апо REVERSE ZONED DECIMAL */
+ /* се PACKED DECIMAL-7 DIGITS FOR Y2000                           */
+ /*----------------------------------------------------------------*/
+    % INCLUDE DAYATNS;
+
+
+ DCL  ISTOR  FILE RECORD SEQUENTIAL OUTPUT
+      ENV(FB RECSIZE(78)
+                );
+ DCL  PRIORITY BUILTIN;/****  DATE SIMULATION DEFINED FUNCTION  ****/
+ DATE: PROC IRREDUCIBLE RETURNS(CHAR(6)) ;
+       CALL CZXDATEP          ( CZX3VDAT) ;
+       RETURN (CZX3VDAT) ;
+       END DATE ;
+ /****        END OF MVS-MS INSERT        ****/
+ DCL  AT1  FIXED(7,0)  INIT(0);
+  DCL  DATEC  CHAR(6);
+ DCL DATED  PIC'999999'  BASED(ADDR(DATEC));
+ DCL  1 RECIST,
+      2 F17   CHAR(3)  INIT(' '),
+      2  KHMER  FIXED(7,0),
+      2  ONSEG  CHAR(8)  INIT('KCHKBSEG'),
+      2  LOGAR   FIXED(9,0)  INIT(0),
+      2  LOIPA  CHAR(58)  INIT(' ');
+ DCL  PER1  CHAR(29)  BASED(KFIOSADD);
+            DCL THREE STATIC FIXED BINARY(31) INIT(3);
+             DCL FUGHN CHAR(4) INIT ('GHN ')         ;
+                   DCL REPL CHAR(4) INIT('REPL')  ;
+             DCL PCBPTRK  POINTER                    ;
+         /*  -----------                    ------------*/
+             DCL 1 PCBK BASED(PCBPTRK), /* PCB FOR DEPOSITS DATA BASE */
+                     2  PCBDBDNM CHAR(8)      ,
+                     2  FA       CHAR(2)      ,
+                     2  PCBSC    CHAR(2)      ,
+                     2  PCBPROPT CHAR(4)      ,
+                     2  FB  FIXED BIN(31)      ,
+                     2  PCBSEGNM CHAR(8)      ,
+                     2  PCBLFBK  FIXED BIN(31),
+                     2  FC       FIXED BIN(31),
+                     2  PCBFBK   CHAR(32)      ;
+         /*                                                           */
+         /* ----------------------------------------------------------*/
+             DCL  IOAREA  CHAR(500)  ;
+         /* ----------------------------------------------------------*/
+             % INCLUDE  KSDBMAP  ;
+        /* ---------------------------------------------- */
+        /* --*/   KFIOROOT = ADDR(IOAREA) ;
+        /* --*/   KFIOSADD = ADDR(IOAREA) ;
+        /* ---------------------------------------------- */
+        /*  ********************************************************* */
+            DCL   LINE1  CHAR(100) ; /* cPAMMEr rYMuxNIAr      */
+            DCL 1 LINE2,
+                        2 F1  CHAR(20) INIT('0'),
+                        2 F2  CHAR(14) INIT('ENEcPAuHrAN='),
+                        2 METRHMER PIC 'Z9' INIT(0) ,
+                        2 F3  CHAR(64) INIT(' RECORDS HMEPOMHNIAr') ;
+            DCL 1 LINE3,
+                        2 F4  CHAR(29) INIT(' '),
+                        2 METRCHECK PIC 'ZZZ.ZZ9' INIT(0),
+                        2 F5  CHAR(20) INIT(' RECORDS EpITAcxN'),
+                        2 GF  CHAR(20) INIT('-DELETED CHECKBOOKS=')   ,
+                        2 DODO PIC'ZZZ.ZZ9' INIT(0),
+                        2 FHJK CHAR(17) INIT(' ') ;
+            DCL 1 LINE4,
+                        2 F6  CHAR(29) INIT(' ')             ,
+                        2 METRPROV  PIC 'ZZZ.ZZ9' INIT(0) ,
+                        2 F7  CHAR(64) INIT(' RECORDS pPOBkEwExN');
+        /* ********************************************************* */
+         DCL 1 DELTION,          /* IO-AREA  READER   */
+                         2  PAL CHAR(2)  ,  /*----------------------- */
+                         2  KWDIX CHAR(1),  /*KxdIn EPcArIAr :
+                                             AN - 0 - MONON PROVISIONS
+                                             AN - 1 - MONON CHECKS
+                                             AN - 2 - CHECKS & PROVIS */
+                                            /*------------------------*/
+                         2  KJIK  CHAR(1),
+                         2  EUR_FLG    CHAR(3),       /* EUR,DRS,ALL */
+                         2  EUR_FILL   CHAR(1),
+      /* STRAIGHT */     2  HMERCHEKS  PIC 'ZZZZZZB', /*HMER  CHECKS  */
+                         2  HMERCHTEL  PIC 'ZZZZZZB', /*HMER TEL.XRHS.*/
+                         2  HMERAPO    PIC 'ZZZZZZB', /*HMER.PROV. ApO*/
+                         2  HMEREWS    PIC 'ZZZZZZB', /*HMER.PROV.Exr */
+                         2  FILLER     CHAR(44)     ;
+                 /* --------------------------------------------------*/
+                     DCL 1 PER,      /* dI ANTIrTPOdHN HMEROMHNIxN    */
+                               2 MERA1  CHAR(2) ,
+                               2 MHNA1 CHAR(2) ,
+                               2 ETOS12 CHAR(2),
+                               2 MHNA2  CHAR(2) ,
+                               2 MERA2  CHAR(2)  ;
+                     DCL   PIC1  PIC '999999' BASED(ADDR(PER)) ;
+                     DCL   PIC2  PIC '999999' BASED(ADDR(ETOS12));
+             /*------------------------------------------------------ */
+             /*   dHMIOYPcOYMENA  RECORDS  - OUTPUT -                */
+             /*                                                       */
+                 DCL 1 RECORD,
+                              2 CODE  PIC'9', /* -0- RECORD HMEROMHN. */
+                                              /* -1- RECORD pPOBkEwExr*/
+                                              /* -2- RECORD pAk.EpITAc*/
+                              2 KATMA FIXED(5),/* BRANCH OF ACCOUNT   */
+                              2 ARLOG FIXED(9),/* ACCOUNT NUMBER      */
+                              2 NUMERON FIXED(9),/* NUMBER OF CHECK   */
+                              2 NAME  CHAR(31) ,
+                              2 HMEROM FIXED(7), /* HMEROM.XOP.rTEkEXOYr
+                                                  H
+                                                   HMEPOM. EKKPEMOYrHr
+                                                   pPOBkEwExr         */
+                              2 KATMASYN FIXED(5),/* KAT/MA rYNAkkAcHr*/
+                              2 POSON FIXED(11,2);/*pOrON MONON dIA pPOB
+                                                   kEwEIr             */
+             /* -----------------                                     */
+                 DCL 1 REC2A  BASED(ADDR(NAME)) ,
+                            2 HMEREKKRE  FIXED(7),
+                            2 HMERTELXRHS FIXED(7),
+                            2 HMERPROVLA FIXED(7),
+                            2 HMERPROVLE FIXED(7),
+                            2 KENA   CHAR(28) ;
+             /* ----------------------------------------------------- */
+ /* APXEIA  */
+             DCL READER FILE RECORD INPUT ENV(
+                        FB RECSIZE(80)          ) ;
+             DCL PRINTER FILE RECORD SEQUENTIAL OUTPUT ENV(FB RECSIZE(
+                                                                     100
+ )                                          CTLASA           )  ;
+             DCL DISK  FILE RECORD SEQUENTIAL OUTPUT ENV(FB RECSIZE(58)
+                                                                    ) ;
+ /* ----------------------------------------------------------------- */
+             DCL  PERONOMA CHAR(31) INIT('  ');
+             DCL  ARITHMOS  FIXED(9) INIT(0)  ;
+             DCL  BRANCH  FIXED(5)   INIT(0)  ;
+
+         DCL 1 PERIOPICA ,
+                          2 XWRISDIGIT PIC '9999999' ,
+                          2 DIGITA PIC '9';
+         DCL   PERIOPICB  PIC '99999999' BASED(ADDR(PERIOPICA)) ;
+ /* ***************************************************************** */
+ STAR:
+         OPEN FILE(DISK),FILE(READER) ;
+    OPEN  FILE(ISTOR);
+
+         READ FILE(READER) INTO(DELTION) ;
+
+  /* VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV*/
+ /*   EkEcXOr  OPhOTHTOr CONTROL CARD   */
+  /* VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV*/
+                     IF  PAL ^= 'C ' THEN GOTO LATHOS     ;
+                     IF KWDIX  >'2'  THEN GOTO LATHOS     ;
+                     IF  KWDIX <'0'  THEN GOTO LATHOS     ;
+                     IF (KWDIX ='0') THEN DO;
+                                         IF HMERAPO=0 THEN GOTO LATHOS;
+                                         IF HMEREWS=0 THEN GOTO LATHOS;
+                                         GOTO   ENTAXEI ;
+                                          END;
+                     IF KWDIX='2' THEN DO;
+                                      IF HMERCHEKS=0 THEN GOTO LATHOS;
+                                      IF HMERAPO  =0 THEN GOTO LATHOS;
+                                      IF HMEREWS  =0 THEN GOTO LATHOS;
+                                       END;
+                                      IF HMERCHEKS=0 THEN GOTO LATHOS;
+ ENTAXEI:
+         /* -------------- ** dHMIOYPcIA RECORD HMEPOMHNIAr ** ------ */
+          CODE = 0 ;
+                    KATMA= 0 ;
+                              ARLOG= 0;
+                                       NUMERON=0;
+          HMEREKKRE=HMERCHEKS;
+                             HMERPROVLA=HMERAPO;
+                                                HMERPROVLE=HMEREWS ;
+          KENA = '  ';        HMERTELXRHS = HMERCHTEL ;
+
+             WRITE FILE(DISK) FROM(RECORD)  ;  METRHMER =METRHMER+1 ;
+         /* --------------------------------------------------------- */
+  /* VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV*/
+ /*   ANAcNxrIr  DATA BASE            */
+  /* VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV*/
+  READDB:
+         CALL PLITDLI(THREE,FUGHN,PCBK,IOAREA) ;
+               IF  PCBSC = 'GB' THEN GOTO ENDDATABASE ;
+               IF  PCBSEGNM  ='KROOTSEG'  THEN DO;
+                                 BRANCH=KSRKATMA; PERONOMA=KSRONOMA;
+                                                 ARITHMOS=KSRARLOG;
+                                                 GOTO READDB;
+                                               END;
+               IF  PCBSEGNM ='KCHKBSEG'  THEN DO;
+                     IF (KWDIX='2' ! KWDIX='1')  THEN GO TO CHEKLAB;
+                                                 GO TO READDB ;
+                                             END;
+                 IF  PCBSEGNM='KSUSPSEG' THEN DO;
+                     IF (KWDIX='2' ! KWDIX='0')  THEN GOTO PROVLAB;
+                                             GOTO READDB ;
+                                             END;
+                 GOTO READDB;
+ /*-------------------------------------------------------------------*/
+ /*           E p E n E P c A r I A   CHECK-BOOK SEGMENT              */
+ /*================================================================== */
+ /* A- EkEcXETAI AN TO EYPEhEN CHECK-BOOK SEGMENT EXH HMEPOMHNIAN
+       EKdOrExr pPOcENErTEPAN THr CONTROL-CARD OTE KAI AKYPOYTAI
+    B- EkEcXONTAI OkEr OI EpITAcr TOY AKYPOYMENOY CHECK-BOOK AN EINAI
+     pkHPxhEIrAI dHk. KxdIKOr =9 KAI AN EINAI dIAuOPO TOY =9= TOTE
+       dHMIOYPcOYNTAI RECORDS TYpOY -2-                             */
+   /*------------------------------------------------------------*/
+     CHEKLAB:
+                 DCL 1 BAL  BASED(ADDR(IOAREA)),
+                                             2 TRO  CHAR(15),
+                                             2 PINAX(20) BIT(4);
+        DCL 1 TWTW BASED(ADDR(POSON)), 2 LWL BIT(44), 2 EPITKWD BIT(4);
+         IF KSCAKYR = '1' THEN GOTO READDB ;
+         IF KSCFLR = 'E' THEN  GOTO READDB;
+         ELSE  KSCAKYR = '1' ;       /*  DELETED SEGMENT  */
+    DATEC=DATE;
+    KHMER=DATED;
+    LOGAR=ARITHMOS;
+    LOIPA=PER1;
+    WRITE FILE(ISTOR)  FROM(RECIST);
+    AT1=AT1+1;
+    DODO = DODO +1;
+                 DO I=1 TO 20;
+                              IF PINAX (I) = '1001'B  THEN GOTO SYNEX;
+         PERIOPICB = KSCAREST ;  XWRISDIGIT=XWRISDIGIT + I - 1 ;
+   YPOL= MOD(XWRISDIGIT,7) ; DIGITA =0 ; NUMERON=PERIOPICB + YPOL ;
+                     CODE = 2 ;
+                     KATMA= BRANCH ;
+                     ARLOG=ARITHMOS;
+                     NAME =PERONOMA;
+                     HMEROM= KSCHMXST ;
+                     KATMASYN = 0 ;
+                     POSON    = 0 ;
+                         EPITKWD = PINAX(I) ;
+              WRITE FILE(DISK) FROM(RECORD) ;
+                             METRCHECK = METRCHECK + 1 ;
+     SYNEX: ;    END;
+          CALL PLITDLI(THREE,REPL,PCBK,IOAREA) ;
+                   IF PCBSC ^= '  ' THEN DO;
+                                     LINE1 ='1 dEN EcINE REPLACE ' ;
+                                     WRITE FILE(PRINTER) FROM(LINE1) ;
+                                     CALL PLIDUMP('TFCHB') ;
+                                     STOP ;
+                                  END ;
+     GOTO READDB ;
+ /*                                                                   */
+ /*  ===============================================================  */
+ /*      E p E n E P c A r I A  PROVISIONS SEGMENTS                   */
+ /*  ---------------------------------------------------------------  */
+     PROVLAB:    IF KSSEP ^='P'    THEN GOTO READDB ;
+                 IF KSSAKYR = '1' THEN GOTO READDB ;
+             PIC1 = HMEREWS ;
+                             MHNA2=MHNA1;
+                             MERA2=MERA1;
+           /*IF PIC2< KSSKHMER   THEN GOTO READDB ; */
+          IF DAYA6F7(PIC2) < KSSKHMER   THEN GOTO READDB ; /* Y2000*/
+             PIC1 = HMERAPO;
+                             MHNA2=MHNA1;
+                             MERA2=MERA1;
+         /*  IF PIC2>KSSKHMER    THEN GOTO READDB ; */
+         IF DAYA6F7(PIC2) > KSSKHMER    THEN GOTO READDB ; /*Y2000*/
+                     CODE = 1  ;
+                     KATMA= BRANCH;
+                     ARLOG= ARITHMOS;
+                     NAME = PERONOMA;
+                     HMEROM=KSSKHMER;
+                     KATMASYN=KSSAXIA;
+                     NUMERON =KSSAREP;
+                     POSON   = KSSPOSON;
+             WRITE FILE(DISK) FROM(RECORD) ;
+                                             METRPROV = METRPROV+1;
+                  GOTO READDB;
+ /*                                                                   */
+ /*  ===============================================================  */
+     LATHOS:
+             DISPLAY(' LATHOS CONTROL CARD - H ERGASIA PERATOUTAI') ;
+                     GOTO TELOS ;
+  /*                                                                  */
+ /*  ---------------------------------------------------------------  */
+     ERRCC :
+        DCL LINE0 CHAR(100) INIT((100)' ');/*npk for enterprice pli*/
+        LINE0 = ' ?????? пяосовг ,кахос стгм йкгсг тгс VALDAY ??????';
+        WRITE FILE (PRINTER) FROM(LINE0);
+        LINE0 = ' ****** NA еидопоигхеи о пяоця/стгс *******';
+        WRITE FILE (PRINTER) FROM(LINE0);
+        STOP;
+  /*                                                                  */
+ /*  ---------------------------------------------------------------  */
+     ENDDATABASE:
+                                             LINE1 ='1
+ *************** TPBTAM28 *******************************************';
+                     WRITE FILE(PRINTER) FROM(LINE1) ;
+                     WRITE FILE(PRINTER) FROM(LINE2) ;
+         IF KWDIX = '0' ! KWDIX='2' THEN WRITE FILE(PRINTER) FROM(LINE4
+ );   IF KWDIX='1' ! KWDIX='2' THEN WRITE FILE(PRINTER) FROM(LINE3) ;
+                                             LINE1='0
+ ********************************************************************';
+                     WRITE FILE(PRINTER) FROM(LINE1);
+ TELOS:  CLOSE FILE(DISK) ;
+    METRPROV=AT1;  F6='1';  F7='EGGRAFAI ISTORIKOY';
+    WRITE FILE(PRINTER)  FROM(LINE4);
+    CLOSE  FILE(ISTOR);
+         END;
+

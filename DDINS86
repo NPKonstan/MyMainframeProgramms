@@ -1,0 +1,1144 @@
+*PROCESS LIMITS (FIXEDDEC(15,31));                                      00010000
+ DDINS86: PROCEDURE OPTIONS(MAIN);                                      00020001
+ /********************************************************************/ 00030000
+ /* пяоцяалла PLI KAI DB2                                            */ 00040000
+ /********************************************************************/ 00050000
+ /*пяоцяалла  еисацыцг ояцамислым стом пимайа CTDDOR86 апо йаята     */ 00060001
+ /********************************************************************/ 00070000
+ /********************************************************************/ 00080000
+ /* Input :                                                          */ 00090000
+ /*      AЯВЕъО  CC-CARD                                             */ 00100001
+ /*  Output:     CTDDOR86                                            */ 00110000
+ /*                                                                  */ 00120000
+ /*                                                                  */ 00130000
+ /********************************************************************/ 00140000
+ /********************************************************************/ 00150000
+ /*           PROGRAM NAME: DDINS86    LOAD MODULE: DDINS86          */ 00160001
+ /********************************************************************/ 00170000
+ /* 30-10-2009                                                       */ 00180001
+ /* 21-02-2010 FLG_CANCEL UPDATE ADDED CC RECORD = 8                 */ 00181023
+ /* 15-03-2010 added 9 new record types                              */ 00182023
+ /********************************************************************/ 00190000
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');                    00200000
+ /*CREDITORS ID */    /*0=сысто,1=кахос*/                               00201019
+ /*                                                                     00210019
+ DCL DDR001 ENTRY (CHAR(35))                                            00220019
+     RETURNS(FIXED(1));                                                 00230019
+ FETCH DDR001 ;                                                         00240010
+ */                                                                     00241019
+ DCL READER   FILE RECORD INPUT  ENV(FB RECSIZE(80));                   00250001
+ DCL PRT      FILE SEQUENTIAL OUTPUT ENV(FB RECSIZE(133) CTLASA);       00260001
+                                                                        00270001
+                                                                        00280001
+ DCL     LINE                CHAR (133);                                00290000
+ DCL 1   LNX                 BASED(ADDR(LINE)),                         00300000
+      2  CTLCHR              CHAR(1)      INIT('1'),                    00310000
+      2  GRAMH               CHAR(132)    INIT(' ');                    00320000
+ DCL  GRAM                   CHAR(133)    INIT(' ');                    00330000
+ DCL  WNAME                  CHAR(70)    INIT(' ');                     00340000
+ DCL  WPRODUCT               CHAR(04)    INIT(' ');                     00350001
+                                                                        00360000
+  DCL 1 RECIN                CHAR(190) INIT (' ');                      00370000
+  DCL   MYCARD               CHAR(080) INIT (' ');                      00380008
+  DCL 1 CTL_CARD1  ,                                                    00390008
+        2 CTL_CHAR1          CHAR ( 01 ), /* I=INSERT,U=UPDATE   */     00400008
+        2 CTL_F1             CHAR ( 01 ), /* SPACE               */     00410008
+        2 CTL_FIELD1         CHAR ( 20 ), /*йыдийос ояцамислоу:  */     00420008
+        2 CTL_C_S_I_I_517    CHAR ( 35 ), /* йыдийос ояцамислоу  */     00430000
+        2 CTL_FILLER1        CHAR ( 23 );                               00440008
+                                                                        00450009
+  DCL 1 CTL_CARD2 ,                                                     00460008
+        2 CTL_CHAR2          CHAR ( 01 ), /* I=INSERT,U=UPDATE   */     00470008
+        2 CTL_F2             CHAR ( 01 ), /* SPACE               */     00480008
+        2 CTL_FIELD2         CHAR ( 20 ), /*омола ояцамислоу  :  */     00490008
+        2 CTL_NAME           CHAR ( 50 ), /* ONOMA ояцамислоу    */     00500007
+        2 CTL_FILLER2        CHAR ( 08 );                               00510012
+  DCL 1 CTL_CARD3  ,                                                    00520008
+        2 CTL_CHAR3          CHAR ( 01 ), /* I=INSERT,U=UPDATE   */     00530008
+        2 CTL_F3             CHAR ( 01 ), /* SPACE               */     00540008
+        2 CTL_FIELD3         CHAR ( 20 ), /*йыдийос пяоиомтос :  */     00550008
+        2 CTL_PRODUCT        CHAR ( 04 ), /* йыдийос пяоиомтос   */     00560004
+        2 CTL_FILLER3        CHAR ( 54 );                               00570008
+  DCL 1 CTL_CARD4  ,                                                    00590008
+        2 CTL_CHAR4          CHAR ( 01 ), /* I=INSERT,U=UPDATE   */     00600008
+        2 CTL_F4             CHAR ( 01 ), /* SPACE               */     00610008
+        2 CTL_FIELD4         CHAR ( 20 ), /*одос аяихлос      :  */     00620008
+        2 CTL_STREET         CHAR ( 30 ), /* одос аяихлос        */     00630008
+        2 CTL_FILLER4        CHAR ( 28 );                               00640008
+  DCL 1 CTL_CARD5  ,                                                    00660008
+        2 CTL_CHAR5          CHAR ( 01 ), /* I=INSERT,U=UPDATE   */     00670008
+        2 CTL_F5             CHAR ( 01 ), /* SPACE               */     00680008
+        2 CTL_FIELD5         CHAR ( 20 ), /*тавудяолийос йыд. :  */     00690009
+        2 CTL_TT             CHAR ( 05 ), /*                     */     00700009
+        2 CTL_FILLER5        CHAR ( 53 );                               00710009
+  DCL 1 CTL_CARD6  ,                                                    00730008
+        2 CTL_CHAR6          CHAR ( 01 ), /* I=INSERT,U=UPDATE   */     00740008
+        2 CTL_F6             CHAR ( 01 ), /* SPACE               */     00750008
+        2 CTL_FIELD6         CHAR ( 20 ), /*покг              :  */     00760008
+        2 CTL_CITY           CHAR ( 30 ), /* покг                */     00770008
+        2 CTL_FILLER6        CHAR ( 28 );                               00780008
+  DCL 1 CTL_CARD7  ,                                                    00790008
+        2 CTL_CHAR7          CHAR ( 01 ), /* I=INSERT,U=UPDATE   */     00800008
+        2 CTL_F7             CHAR ( 01 ), /* SPACE               */     00810008
+        2 CTL_FIELD7         CHAR ( 20 ), /*выяа              :  */     00820008
+        2 CTL_COUNTRY        CHAR ( 02 ), /*выяа                 */     00830010
+        2 CTL_FILLER7        CHAR ( 56 );                               00840008
+  DCL 1 CTL_CARD8  ,                                                    00841020
+        2 CTL_CHAR8          CHAR ( 01 ), /* I=INSERT,U=UPDATE   */     00842020
+        2 CTL_F8             CHAR ( 01 ), /* SPACE               */     00843020
+        2 CTL_FIELD8         CHAR ( 20 ), /*амемеяцос ояцамисл:  */     00844020
+        2 CTL_CANCEL         CHAR ( 01 ), /* 1=ANENERGOS         */     00845020
+        2 CTL_FILLER8        CHAR ( 57 );                               00846020
+  DCL 1 CTL_CARD9  ,                                                    00847822
+        2 CTL_CHAR9          CHAR ( 01 ), /* I=INSERT,U=UPDATE   */     00848022
+        2 CTL_F9             CHAR ( 01 ), /* SPACE               */     00849022
+        2 CTL_FIELD9         CHAR ( 20 ), /* лояжг йыдийоу амах.:*/     00849122
+        2 CTL_MODEL          CHAR ( 01 ), /* 1=                  */     00849222
+        2 CTL_FILLER9        CHAR ( 57 );                               00849322
+  DCL 1 CTL_CARD10 ,                                                    00849422
+        2 CTL_CHAR10         CHAR ( 01 ), /* I=INSERT,U=UPDATE   */     00849522
+        2 CTL_F10            CHAR ( 01 ), /* SPACE               */     00849622
+        2 CTL_FIELD10        CHAR ( 20 ), /* аяихлос лгтяыоу 19.:*/     00849722
+        2 CTL_19AM           CHAR ( 03 ), /* 0,1,2               */     00849822
+        2 CTL_FILLER10       CHAR ( 55 );                               00849922
+  DCL 1 CTL_CARD11 ,                                                    00850722
+        2 CTL_CHAR11         CHAR ( 01 ), /* I=INSERT,U=UPDATE   */     00850822
+        2 CTL_F11            CHAR ( 01 ), /* SPACE               */     00850922
+        2 CTL_FIELD11        CHAR ( 20 ), /* йуйкос диайамомисл.:*/     00851022
+        2 CTL_CYCLE          CHAR ( 05 ), /* '3','4','EBA'       */     00851122
+        2 CTL_FILLER11       CHAR ( 53 );                               00851222
+  DCL 1 CTL_CARD12 ,                                                    00851922
+        2 CTL_CHAR12         CHAR ( 01 ), /* I=INSERT,U=UPDATE   */     00852022
+        2 CTL_F12            CHAR ( 01 ), /* SPACE               */     00852122
+        2 CTL_FIELD12        CHAR ( 20 ), /* NATIONAL SET      .:*/     00852222
+        2 CTL_NATIONAL_CHAR  CHAR ( 01 ), /* 'N','O'             */     00852322
+        2 CTL_FILLER12       CHAR ( 57 );                               00852422
+  DCL 1 CTL_CARD13 ,                                                    00852522
+        2 CTL_CHAR13         CHAR ( 01 ), /* I=INSERT,U=UPDATE   */     00852622
+        2 CTL_F13            CHAR ( 01 ), /* SPACE               */     00852722
+        2 CTL_FIELD13        CHAR ( 20 ), /* упостгяинг DMF    .:*/     00852822
+        2 CTL_DMF            CHAR ( 01 ), /* 'N','O'             */     00852922
+        2 CTL_FILLER13       CHAR ( 57 );                               00853022
+  DCL 1 CTL_CARD14 ,                                                    00853522
+        2 CTL_CHAR14         CHAR ( 01 ), /* I=INSERT,U=UPDATE   */     00853622
+        2 CTL_F14            CHAR ( 01 ), /* SPACE               */     00853722
+        2 CTL_FIELD14        CHAR ( 20 ), /* упеухумос епийоим .:*/     00853822
+        2 CTL_RESPON_NAME    CHAR ( 50 ), /* 1=                  */     00853922
+        2 CTL_FILLER14       CHAR ( 08 );                               00854022
+  DCL 1 CTL_CARD15 ,                                                    00854122
+        2 CTL_CHAR15         CHAR ( 01 ), /* I=INSERT,U=UPDATE   */     00854222
+        2 CTL_F15            CHAR ( 01 ), /* SPACE               */     00854322
+        2 CTL_FIELD15        CHAR ( 20 ), /* хесг упеухумоу    .:*/     00854422
+        2 CTL_RESPON_TITLE   CHAR ( 50 ), /* 1=                  */     00854522
+        2 CTL_FILLER15       CHAR ( 08 );                               00854622
+  DCL 1 CTL_CARD16 ,                                                    00854722
+        2 CTL_CHAR16         CHAR ( 01 ), /* I=INSERT,U=UPDATE   */     00854822
+        2 CTL_F16            CHAR ( 01 ), /* SPACE               */     00854922
+        2 CTL_FIELD16        CHAR ( 20 ), /* тгкежымо упеухумоу.:*/     00855022
+        2 CTL_RESPON_TEL     CHAR ( 25 ), /* 1=                  */     00855122
+        2 CTL_FILLER16       CHAR ( 33 );                               00855222
+  DCL 1 CTL_CARD17 ,                                                    00855322
+        2 CTL_CHAR17         CHAR ( 01 ), /* I=INSERT,U=UPDATE   */     00855422
+        2 CTL_F17            CHAR ( 01 ), /* SPACE               */     00855522
+        2 CTL_FIELD17        CHAR ( 20 ), /* CIDB ояцамислоу   .:*/     00855622
+        2 CTL_CIDB           PIC '(9)9' , /*                     */     00855722
+        2 CTL_FILLER17       CHAR ( 49 );                               00855822
+  DCL 1 CTL_CARD18 ,                                                    00855929
+        2 CTL_CHAR18         CHAR ( 01 ), /* I=INSERT,U=UPDATE   */     00856029
+        2 CTL_F18            CHAR ( 01 ), /* SPACE               */     00856129
+        2 CTL_FIELD18        CHAR ( 20 ), /* пяолгхеиа пекатг  .:*/     00856229
+        2 CTL_COMM_CUST      PIC'99V.99', /*                     */     00856329
+        2 CTL_FILLER18       CHAR ( 53 );                               00856429
+  DCL 1 CTL_CARD19 ,                                                    00856529
+        2 CTL_CHAR19         CHAR ( 01 ), /* I=INSERT,U=UPDATE   */     00856629
+        2 CTL_F19            CHAR ( 01 ), /* SPACE               */     00856729
+        2 CTL_FIELD19        CHAR ( 20 ), /* пяолгх. ояцамислоу.:*/     00856829
+        2 CTL_COMM_COMP      PIC'99V.99', /*                     */     00856929
+        2 CTL_FILLER19       CHAR ( 53 );                               00857029
+                                                                        00857329
+  DCL 1 LITERALS,                                                       00858029
+        2 LIT_FIELD1         CHAR ( 20 )                                00860009
+          INIT('йыдийос ояцамислоу :'),                                 00870009
+        2 LIT_FIELD2         CHAR ( 20 )                                00880009
+          INIT('омола ояцамислоу   :'),                                 00890009
+        2 LIT_FIELD3         CHAR ( 20 )                                00900009
+          INIT('йыдийос пяоиомтос  :'),                                 00910009
+        2 LIT_FIELD4         CHAR ( 20 )                                00920009
+          INIT('одос аяихлос       :'),                                 00930009
+        2 LIT_FIELD5         CHAR ( 20 )                                00940009
+          INIT('тавудяолийос йыд.  :'),                                 00950009
+        2 LIT_FIELD6         CHAR ( 20 )                                00960009
+          INIT('покг               :'),                                 00970009
+        2 LIT_FIELD7         CHAR ( 20 )                                00980009
+          INIT('выяа               :'),                                 00990020
+        2 LIT_FIELD8         CHAR ( 20 )                                00991020
+          INIT('амемеяцос ояцамисл.:') ,                                00992022
+        2 LIT_FIELD9         CHAR ( 20 )                                00993022
+          INIT('лояжг йыдийоу амах.:') ,                                00994022
+        2 LIT_FIELD10        CHAR ( 20 )                                00995022
+          INIT('аяихлос лгтяыоу 19.:') ,                                00996022
+        2 LIT_FIELD11        CHAR ( 20 )                                00997022
+          INIT('йуйкос диайамомисл.:') ,                                00998022
+        2 LIT_FIELD12        CHAR ( 20 )                                00999022
+          INIT('NATIONAL SET      .:') ,                                00999122
+        2 LIT_FIELD13        CHAR ( 20 )                                00999222
+          INIT('упостгяинг DMF    .:') ,                                00999322
+        2 LIT_FIELD14        CHAR ( 20 )                                00999422
+          INIT('упеухумос епийоим .:') ,                                00999522
+        2 LIT_FIELD15        CHAR ( 20 )                                00999622
+          INIT('хесг упеухумоу    .:') ,                                00999722
+        2 LIT_FIELD16        CHAR ( 20 )                                00999822
+          INIT('тгкежымо упеухумоу.:') ,                                00999922
+        2 LIT_FIELD17        CHAR ( 20 )                                01000022
+          INIT('CIDB ояцамислоу   .:') ,                                01000129
+        2 LIT_FIELD18        CHAR ( 20 )                                01000229
+          INIT('пяолгхеиа пекатг  .:') ,                                01000329
+        2 LIT_FIELD19        CHAR ( 20 )                                01000429
+          INIT('пяолгх. ояцамислоу.:') ;                                01000529
+                                                                        01000629
+ DCL 1   ERLINE              ,                                          01001022
+      2  ERLIN1       CHAR(1)      INIT('1'),                           01010008
+      2  ERLIN2       CHAR(132)    INIT(' ');                           01020008
+       /*-------------------------------*/                              01030008
+       /*                               */                              01040008
+       /*-------------------------------*/                              01050008
+ DCL WS_MSG                  CHAR (132);                                01060000
+                                                                        01070000
+ /***************************/                                          01080000
+ /*DB2 DECLARATIONS         */                                          01090000
+ /***************************/                                          01100000
+ EXEC SQL INCLUDE CTDDOR86;                                             01110001
+ EXEC SQL INCLUDE SQLCA;                                                01120000
+                                                                        01130000
+                                                                        01140000
+ DCL 1   REC_COUNTERS,                                                  01150000
+      2  REC_APO             FIXED (15)  INIT(0),                       01160000
+      2  REC_CNT             FIXED (15)  INIT(0),                       01170000
+      2  REC_ROOT            FIXED (15)  INIT(0),                       01180000
+      2  REC_TOT             FIXED (15)  INIT(0),                       01190000
+      2  REC_ERROR           FIXED (15)  INIT(0),                       01200000
+      2  REC_CONTROL         FIXED (15)  INIT(0),                       01210000
+      2  TOT_NORMAL_REC      FIXED (15)  INIT(0),                       01220000
+      2  REC_OUT                FIXED (07)  INIT(0),                    01230000
+      2  CNT_AA                 FIXED (07)  INIT(0),                    01240000
+      2  CNT_Insert_DB2         FIXED (07)  INIT(0),                    01250000
+      2  CNT_UPDATE_DB2         FIXED (07)  INIT(0),                    01260000
+      2  CNT_UPDATE_MD10        FIXED (07)  INIT(0),                    01270000
+      2  CNT_Insert_MD10        FIXED (07)  INIT(0),                    01280000
+      2  CNT_DELETE_MD10        FIXED (07)  INIT(0),                    01282015
+      2  CNT_DETAIL_104         FIXED (07)  INIT(0),                    01290000
+      2  CNT_DETAIL_106         FIXED (07)  INIT(0),                    01300000
+      2  CNT_DETAIL_ALL         FIXED (07)  INIT(0),                    01310000
+      2  CNT_NOINSERT_MD10      FIXED (07)  INIT(0),                    01320000
+      2  CNT_NOUPDATE_MD10      FIXED (07)  INIT(0),                    01320115
+      2  CNT_NODELETE_MD10      FIXED (07)  INIT(0),                    01321015
+      2  CNT_DETAIL_030         FIXED (07)  INIT(0),                    01330000
+      2  CNT_DETAIL_030_OK      FIXED (07)  INIT(0),                    01340000
+      2  CNT_GROUP_102          FIXED (07)  INIT(0),                    01350000
+      2  CNT_GROUP_104          FIXED (07)  INIT(0),                    01360000
+      2  CNT_GROUP_106          FIXED (07)  INIT(0),                    01370000
+      2  CNT_GROUP_030          FIXED (07)  INIT(0),                    01380000
+      2  CNT_Records_Write      FIXED (07)  INIT(0),                    01390000
+      2  CNT_Records_READ       FIXED (07)  INIT(0),                    01400000
+      2  CNT_File_Header        FIXED (07)  INIT(0),                    01410000
+      2  CNT_GROUP_Header       FIXED (07)  INIT(0),                    01420000
+      2  CNT_Detail_Record      FIXED (07)  INIT(0),                    01430000
+      2  SAVE_Detail_Record     FIXED (07)  INIT(0),                    01440000
+      2  CNT_Detail_Record_Sup  FIXED (07)  INIT(0),                    01450000
+      2  SAVE_Detail_Record_Sup FIXED (07)  INIT(0),                    01460000
+      2  CNT_Group_Trailer      FIXED (07)  INIT(0),                    01470000
+      2  CNT_FILE_Trailer       FIXED (07)  INIT(0);                    01480000
+ DCL     CNT                    PIC   'Z.ZZZ.ZZZ' INIT(0);              01490000
+ DCL     MYPROC CHAR(40);                                               01500000
+ DCL     MYMSG CHAR(132);                                               01510000
+ DCL     MYLINE   PIC  '99999';                                         01520000
+ DCL     RC       BIT(1) INIT('1'B);                                    01530000
+                                                                        01540000
+ DCL   WS_LAST_DATE      CHAR(10) INIT('');                             01550000
+ DCL   OT_DATETIME       PIC '99999999999999';                          01560000
+       OT_DATETIME =     SUBSTR(DATETIME(),1,14) ;                      01570000
+ DCL     MY_DATE             PIC '(7)9' INIT(0);                        01580000
+ DCL 1   MY_DATEX            BASED(ADDR(MY_DATE)),                      01590000
+      2  MY_CENTURY         CHAR(01),                                   01600000
+      2  MY_YEAR            CHAR(02),                                   01610000
+      2  MY_MONTH           PIC '99',                                   01620000
+      2  MY_DAY             CHAR(02);                                   01630000
+                                                                        01640000
+                                                                        01650000
+ DCL  EOF_READER       PIC '9'  INIT(0);                                01660003
+ DCL TODAYX      CHAR(8);                                               01670000
+     TODAYX   =  SUBSTR(DATETIME(),1,8) ;                               01680000
+ DCL  1 SYSDATE  BASED(ADDR(TODAYX)),                                   01690000
+             2 SYSYY  CHAR(4),                                          01700000
+             2 SYSMM  CHAR(2),                                          01710000
+             2 SYSDD  CHAR(2);                                          01720000
+ DCL  1 PICDATE  BASED(ADDR(SYSDATE)),                                  01730000
+             2 PICYY  PIC'(4)9',                                        01740000
+             2 PICMM  PIC'(2)9',                                        01750000
+             2 PICDD  PIC'(2)9';                                        01760000
+ /****************************************/                             01770000
+ /*V                                     */                             01780001
+ /****************************************/                             01790000
+                                                                        01800000
+ DCL SUBSTR       BUILTIN;                                              01810000
+ DCL DATE         BUILTIN;                                              01820000
+ DCL TRANSLATE    BUILTIN;                                              01830000
+ DCL ADDR         BUILTIN;                                              01840000
+ DCL ABS          BUILTIN;                                              01850000
+ DCL DIVIDE       BUILTIN;                                              01860000
+ DCL ROUND        BUILTIN;                                              01870000
+ DCL DATETIME     BUILTIN;                                              01880000
+ DCL TIME         BUILTIN;                                              01890000
+ DCL FILEDDWORD   BUILTIN;                                              01900000
+ DCL PROCEDURENAME BUILTIN;                                             01910000
+ DCL SOURCELINE    BUILTIN;                                             01920000
+                                                                        01930000
+   ON ENDFILE (READER)                                                  01940010
+   BEGIN;                                                               01950010
+      EOF_READER = 1 ;                                                  01960010
+      GO TO TELOS;                                                      01980010
+   END;                                                                 01990010
+    /*----------------------------------------------------------*/      02010000
+    /*                    MAIN  PROGRAM                         */      02020000
+    /*----------------------------------------------------------*/      02030000
+    OPEN FILE(PRT) ;                                                    02040000
+    OPEN FILE ( READER  );                                              02050000
+                                                                        02060000
+   DO WHILE (EOF_READER = 0);                                           02070003
+      CALL READ_READER;                                                 02080013
+   END;                                                                 02090000
+                                                                        02100000
+   /**************************************************************/     02110008
+   /*READ_READER START                                           */     02120008
+   /**************************************************************/     02130008
+    READ_READER: PROC;                                                  02140003
+      DCL ERR_MSG CHAR(132);                                            02150008
+                                                                        02160008
+      READ  FILE ( READER  ) INTO ( CTL_CARD1 );                        02170003
+      IF EOF_READER = 1 THEN DO;                                        02171011
+         GOTO READ_TELOS;                                               02171111
+      END;                                                              02172011
+      CNT_Records_READ = CNT_Records_READ + 1;                          02180008
+      READ  FILE ( READER  ) INTO ( CTL_CARD2 );                        02190003
+      CNT_Records_READ = CNT_Records_READ + 1;                          02200008
+      READ  FILE ( READER  ) INTO ( CTL_CARD3 );                        02210003
+      CNT_Records_READ = CNT_Records_READ + 1;                          02220008
+      READ  FILE ( READER  ) INTO ( CTL_CARD4 );                        02230008
+      CNT_Records_READ = CNT_Records_READ + 1;                          02240008
+      READ  FILE ( READER  ) INTO ( CTL_CARD5 );                        02250008
+      CNT_Records_READ = CNT_Records_READ + 1;                          02260008
+      READ  FILE ( READER  ) INTO ( CTL_CARD6 );                        02270008
+      CNT_Records_READ = CNT_Records_READ + 1;                          02280008
+      READ  FILE ( READER  ) INTO ( CTL_CARD7 );                        02290008
+      CNT_Records_READ = CNT_Records_READ + 1;                          02300008
+      READ  FILE ( READER  ) INTO ( CTL_CARD8 );                        02301020
+      CNT_Records_READ = CNT_Records_READ + 1;                          02302020
+      READ  FILE ( READER  ) INTO ( CTL_CARD9 );                        02303022
+      CNT_Records_READ = CNT_Records_READ + 1;                          02304022
+      READ  FILE ( READER  ) INTO ( CTL_CARD10);                        02305022
+      CNT_Records_READ = CNT_Records_READ + 1;                          02306022
+      READ  FILE ( READER  ) INTO ( CTL_CARD11);                        02307022
+      CNT_Records_READ = CNT_Records_READ + 1;                          02308022
+      READ  FILE ( READER  ) INTO ( CTL_CARD12);                        02309022
+      CNT_Records_READ = CNT_Records_READ + 1;                          02309122
+      READ  FILE ( READER  ) INTO ( CTL_CARD13);                        02309222
+      CNT_Records_READ = CNT_Records_READ + 1;                          02309322
+      READ  FILE ( READER  ) INTO ( CTL_CARD14);                        02309422
+      CNT_Records_READ = CNT_Records_READ + 1;                          02309522
+      READ  FILE ( READER  ) INTO ( CTL_CARD15);                        02309622
+      CNT_Records_READ = CNT_Records_READ + 1;                          02309722
+      READ  FILE ( READER  ) INTO ( CTL_CARD16);                        02309822
+      CNT_Records_READ = CNT_Records_READ + 1;                          02309922
+      READ  FILE ( READER  ) INTO ( CTL_CARD17);                        02310022
+      CNT_Records_READ = CNT_Records_READ + 1;                          02310122
+      READ  FILE ( READER  ) INTO ( CTL_CARD18);                        02310229
+      CNT_Records_READ = CNT_Records_READ + 1;                          02310329
+      READ  FILE ( READER  ) INTO ( CTL_CARD19);                        02310429
+      CNT_Records_READ = CNT_Records_READ + 1;                          02310529
+                                                                        02311022
+      IF VALIDATE_READER(ERR_MSG) = 1 THEN                              02341024
+            CALL ERROR1(ERR_MSG);                                       02344024
+      ELSE                                                              02350024
+         IF CTL_CHAR1 = 'I' THEN                                        02351012
+            CALL INSERT_CTDDOR86 ;                                      02360012
+         ELSE                                                           02360112
+         IF CTL_CHAR1 = 'U' THEN                                        02360215
+            CALL UPDATE_CTDDOR86 ;                                      02360315
+   /*    ELSE                                                           02360420
+         IF CTL_CHAR1 = 'D' THEN                                        02360515
+            CALL DELETE_CTDDOR86 ; NPK 21-02-2010 DONT DELETE*/         02361020
+    READ_TELOS:                                                         02380011
+    END READ_READER;                                                    02381011
+   /**************************************************************/     02390008
+   /*READ_READER START                                           */     02400008
+   /**************************************************************/     02410008
+                                                                        02420008
+   /**************************************************************/     02430008
+   /*VALIDATE_READER START                                       */     02440008
+   /**************************************************************/     02450008
+                                                                        02460008
+    VALIDATE_READER: PROC (MSG) RETURNS(FIXED(1));                      02470008
+      DCL RC FIXED(1);                                                  02480008
+      DCL MSG CHAR(132);                                                02490008
+                                                                        02500008
+      MSG='';                                                           02510008
+      RC=0;                                                             02520008
+                                                                        02530008
+      IF (MOD(CNT_Records_READ,19 ) ^= 0) THEN DO;                      02540029
+         RC = 1;                                                        02550008
+         MSG='о аяихлос тым еццяажым поу диабасес дем еимаи 19'         02560029
+         !! ' акка : '!!MOD(CNT_Records_READ,19);                       02570029
+       ERLIN2=MSG;                                                      02571024
+         RETURN (RC) ;                                                  02580008
+      END;                                                              02590008
+                                                                        02600008
+      IF ( CTL_CHAR1 ^= 'I' & CTL_CHAR1 ^= 'U'                          02610020
+         )                   THEN DO;                                   02611020
+         RC = 1;                                                        02620008
+         MSG='епитяептои ваяайтгяес I (INSERT) H U (UPDATE) '!!         02630008
+             'OMыс есу диабасес CTL_CHAR1 = '!!CTL_CHAR1 ;              02640008
+       ERLIN2=MSG;                                                      02641024
+         RETURN (RC) ;                                                  02650008
+      END;                                                              02660008
+                                                                        02670008
+      IF ( CTL_CHAR2 ^= 'I' & CTL_CHAR2 ^= 'U' &                        02671016
+           CTL_CHAR2 ^= 'D' )                   THEN DO;                02672016
+         RC = 1;                                                        02690008
+         MSG='епитяептои ваяайтгяес I (INSERT) H U (UPDATE) '!!         02700008
+             'OMыс есу диабасес CTL_CHAR2 = '!!CTL_CHAR2 ;              02710008
+       ERLIN2=MSG;                                                      02711024
+         RETURN (RC) ;                                                  02720008
+      END;                                                              02730008
+                                                                        02740008
+      IF ( CTL_CHAR3 ^= 'I' & CTL_CHAR3 ^= 'U' &                        02741016
+           CTL_CHAR3 ^= 'D' )                   THEN DO;                02742016
+         RC = 1;                                                        02760008
+         MSG='епитяептои ваяайтгяес I (INSERT) H U (UPDATE) '!!         02770008
+             'OMыс есу диабасес CTL_CHAR3 = '!!CTL_CHAR3 ;              02780008
+       ERLIN2=MSG;                                                      02781024
+         RETURN (RC) ;                                                  02790008
+      END;                                                              02800008
+                                                                        02810008
+      IF ( CTL_CHAR4 ^= 'I' & CTL_CHAR4 ^= 'U' &                        02811016
+           CTL_CHAR4 ^= 'D' )                   THEN DO;                02812016
+         RC = 1;                                                        02830008
+         MSG='епитяептои ваяайтгяес I (INSERT) H U (UPDATE) '!!         02840008
+             'OMыс есу диабасес CTL_CHAR4 = '!!CTL_CHAR4 ;              02850008
+       ERLIN2=MSG;                                                      02851024
+         RETURN (RC) ;                                                  02860008
+      END;                                                              02870008
+                                                                        02880008
+      IF ( CTL_CHAR5 ^= 'I' & CTL_CHAR5 ^= 'U' &                        02881016
+           CTL_CHAR5 ^= 'D' )                   THEN DO;                02882016
+         RC = 1;                                                        02900008
+         MSG='епитяептои ваяайтгяес I (INSERT) H U (UPDATE) '!!         02910008
+             'OMыс есу диабасес CTL_CHAR5 = '!!CTL_CHAR5 ;              02920008
+       ERLIN2=MSG;                                                      02921024
+         RETURN (RC) ;                                                  02930008
+      END;                                                              02940008
+                                                                        02950008
+      IF ( CTL_CHAR6 ^= 'I' & CTL_CHAR6 ^= 'U' &                        02951016
+           CTL_CHAR6 ^= 'D' )                   THEN DO;                02952016
+         RC = 1;                                                        02970008
+         MSG='епитяептои ваяайтгяес I (INSERT) H U (UPDATE) '!!         02980008
+             'OMыс есу диабасес CTL_CHAR6 = '!!CTL_CHAR6 ;              02990008
+       ERLIN2=MSG;                                                      02991024
+         RETURN (RC) ;                                                  03000008
+      END;                                                              03010008
+                                                                        03020008
+      IF ( CTL_CHAR7 ^= 'I' & CTL_CHAR7 ^= 'U' &                        03021016
+           CTL_CHAR7 ^= 'D' )                   THEN DO;                03022016
+         RC = 1;                                                        03040008
+         MSG='епитяептои ваяайтгяес I (INSERT) H U (UPDATE) '!!         03050008
+             'OMыс есу диабасес CTL_CHAR7 = '!!CTL_CHAR7 ;              03060008
+       ERLIN2=MSG;                                                      03061024
+         RETURN (RC) ;                                                  03070008
+      END;                                                              03080008
+      IF ( CTL_CHAR8 ^= 'I' & CTL_CHAR8 ^= 'U' )                        03081020
+                                                THEN DO;                03082020
+         RC = 1;                                                        03083020
+         MSG='епитяептои ваяайтгяес I (INSERT) H U (UPDATE) '!!         03084020
+             'OMыс есу диабасес CTL_CHAR8 = '!!CTL_CHAR8 ;              03085020
+       ERLIN2=MSG;                                                      03085124
+         RETURN (RC) ;                                                  03086020
+      END;                                                              03087020
+      IF ( CTL_CHAR9 ^= 'I' & CTL_CHAR9 ^= 'U' )                        03088022
+                                                THEN DO;                03089022
+         RC = 1;                                                        03089122
+         MSG='епитяептои ваяайтгяес I (INSERT) H U (UPDATE) '!!         03089222
+             'OMыс есу диабасес CTL_CHAR9 = '!!CTL_CHAR9 ;              03089322
+       ERLIN2=MSG;                                                      03089424
+         RETURN (RC) ;                                                  03089622
+      END;                                                              03089722
+      IF ( CTL_CHAR10 ^= 'I' & CTL_CHAR10 ^= 'U' )                      03089822
+                                                THEN DO;                03089922
+         RC = 1;                                                        03090022
+         MSG='епитяептои ваяайтгяес I (INSERT) H U (UPDATE) '!!         03090122
+             'OMыс есу диабасес CTL_CHAR10= '!!CTL_CHAR10;              03090222
+         RETURN (RC) ;                                                  03090422
+      END;                                                              03090522
+      IF ( CTL_CHAR11 ^= 'I' & CTL_CHAR11 ^= 'U' )                      03090622
+                                                THEN DO;                03090722
+         RC = 1;                                                        03090822
+         MSG='епитяептои ваяайтгяес I (INSERT) H U (UPDATE) '!!         03090922
+             'OMыс есу диабасес CTL_CHAR11= '!!CTL_CHAR11 ;             03091022
+         RETURN (RC) ;                                                  03091222
+      END;                                                              03091322
+      IF ( CTL_CHAR12 ^= 'I' & CTL_CHAR12 ^= 'U' )                      03091422
+                                                THEN DO;                03091522
+         RC = 1;                                                        03091622
+         MSG='епитяептои ваяайтгяес I (INSERT) H U (UPDATE) '!!         03091722
+             'OMыс есу диабасес CTL_CHAR12 = '!!CTL_CHAR12 ;            03091822
+         RETURN (RC) ;                                                  03092022
+      END;                                                              03092122
+      IF ( CTL_CHAR13 ^= 'I' & CTL_CHAR13 ^= 'U' )                      03092222
+                                                THEN DO;                03092322
+         RC = 1;                                                        03092422
+         MSG='епитяептои ваяайтгяес I (INSERT) H U (UPDATE) '!!         03092522
+             'OMыс есу диабасес CTL_CHAR13 = '!!CTL_CHAR13 ;            03092622
+         RETURN (RC) ;                                                  03092822
+      END;                                                              03092922
+      IF ( CTL_CHAR14 ^= 'I' & CTL_CHAR14 ^= 'U' )                      03093022
+                                                THEN DO;                03093122
+         RC = 1;                                                        03093222
+         MSG='епитяептои ваяайтгяес I (INSERT) H U (UPDATE) '!!         03093322
+             'OMыс есу диабасес CTL_CHAR14 = '!!CTL_CHAR14 ;            03093422
+         RETURN (RC) ;                                                  03093622
+      END;                                                              03093722
+      IF ( CTL_CHAR15 ^= 'I' & CTL_CHAR15 ^= 'U' )                      03093822
+                                                THEN DO;                03093922
+         RC = 1;                                                        03094022
+         MSG='епитяептои ваяайтгяес I (INSERT) H U (UPDATE) '!!         03094122
+             'OMыс есу диабасес CTL_CHAR15 = '!!CTL_CHAR15 ;            03094222
+         RETURN (RC) ;                                                  03094422
+      END;                                                              03094522
+      IF ( CTL_CHAR16 ^= 'I' & CTL_CHAR16 ^= 'U' )                      03094622
+                                                THEN DO;                03094722
+         RC = 1;                                                        03094822
+         MSG='епитяептои ваяайтгяес I (INSERT) H U (UPDATE) '!!         03094922
+             'OMыс есу диабасес CTL_CHAR16 = '!!CTL_CHAR16 ;            03095022
+         RETURN (RC) ;                                                  03095222
+      END;                                                              03095322
+      IF ( CTL_CHAR17 ^= 'I' & CTL_CHAR17 ^= 'U' )                      03095422
+                                                THEN DO;                03095522
+         RC = 1;                                                        03095622
+         MSG='епитяептои ваяайтгяес I (INSERT) H U (UPDATE) '!!         03095722
+             'OMыс есу диабасес CTL_CHAR17 = '!!CTL_CHAR17 ;            03095822
+         RETURN (RC) ;                                                  03096022
+      END;                                                              03096122
+      IF ( CTL_CHAR18 ^= 'I' & CTL_CHAR18 ^= 'U' )                      03096229
+                                                THEN DO;                03096329
+         RC = 1;                                                        03096429
+         MSG='епитяептои ваяайтгяес I (INSERT) H U (UPDATE) '!!         03096529
+             'OMыс есу диабасес CTL_CHAR18 = '!!CTL_CHAR18 ;            03096629
+         RETURN (RC) ;                                                  03096729
+      END;                                                              03096829
+      IF ( CTL_CHAR19 ^= 'I' & CTL_CHAR19 ^= 'U' )                      03096929
+                                                THEN DO;                03097029
+         RC = 1;                                                        03097129
+         MSG='епитяептои ваяайтгяес I (INSERT) H U (UPDATE) '!!         03097229
+             'OMыс есу диабасес CTL_CHAR19 = '!!CTL_CHAR17 ;            03097329
+         RETURN (RC) ;                                                  03097429
+      END;                                                              03097529
+                                                                        03097629
+      DCL  COUNT_U   FIXED(3)  ;                                        03100026
+      DCL  COUNT_I   FIXED(3)  ;                                        03110026
+      DCL  COUNT_D   FIXED(3)  ;                                        03111026
+           COUNT_U   = 0       ;                                        03120008
+           COUNT_I   = 0       ;                                        03130008
+           COUNT_D   = 0       ;                                        03131016
+                                                                        03140008
+      IF   CTL_CHAR1 = 'I'  THEN                                        03150008
+           COUNT_I = COUNT_I +1;                                        03160008
+      IF   CTL_CHAR1 = 'U'  THEN                                        03161016
+           COUNT_U = COUNT_U +1;                                        03162016
+                                                                        03164116
+      IF   CTL_CHAR2 = 'I'  THEN                                        03165016
+           COUNT_I = COUNT_I +1;                                        03166016
+      IF   CTL_CHAR2 = 'U'  THEN                                        03167016
+           COUNT_U = COUNT_U +1;                                        03168016
+                                                                        03430008
+      IF   CTL_CHAR3 = 'I'  THEN                                        03431016
+           COUNT_I = COUNT_I +1;                                        03432016
+      IF   CTL_CHAR3 = 'U'  THEN                                        03433016
+           COUNT_U = COUNT_U +1;                                        03434016
+                                                                        03437016
+      IF   CTL_CHAR4 = 'I'  THEN                                        03438016
+           COUNT_I = COUNT_I +1;                                        03439016
+      IF   CTL_CHAR4 = 'U'  THEN                                        03439116
+           COUNT_U = COUNT_U +1;                                        03439216
+                                                                        03439516
+      IF   CTL_CHAR5 = 'I'  THEN                                        03439616
+           COUNT_I = COUNT_I +1;                                        03439716
+      IF   CTL_CHAR5 = 'U'  THEN                                        03439816
+           COUNT_U = COUNT_U +1;                                        03439916
+                                                                        03440216
+      IF   CTL_CHAR6 = 'I'  THEN                                        03440316
+           COUNT_I = COUNT_I +1;                                        03440416
+      IF   CTL_CHAR6 = 'U'  THEN                                        03440516
+           COUNT_U = COUNT_U +1;                                        03440616
+                                                                        03440916
+      IF   CTL_CHAR7 = 'I'  THEN                                        03441016
+           COUNT_I = COUNT_I +1;                                        03441116
+      IF   CTL_CHAR7 = 'U'  THEN                                        03441216
+           COUNT_U = COUNT_U +1;                                        03441316
+                                                                        03441616
+      IF   CTL_CHAR8 = 'I'  THEN                                        03441720
+           COUNT_I = COUNT_I +1;                                        03441820
+      IF   CTL_CHAR8 = 'U'  THEN                                        03441920
+           COUNT_U = COUNT_U +1;                                        03442020
+                                                                        03442129
+      IF   CTL_CHAR9 = 'I'  THEN                                        03442222
+           COUNT_I = COUNT_I +1;                                        03442322
+      IF   CTL_CHAR9 = 'U'  THEN                                        03442422
+           COUNT_U = COUNT_U +1;                                        03442522
+                                                                        03442629
+      IF   CTL_CHAR10 = 'I'  THEN                                       03442722
+           COUNT_I = COUNT_I +1;                                        03442822
+      IF   CTL_CHAR10 = 'U'  THEN                                       03442922
+           COUNT_U = COUNT_U +1;                                        03443022
+                                                                        03443129
+      IF   CTL_CHAR11 = 'I'  THEN                                       03443222
+           COUNT_I = COUNT_I +1;                                        03443322
+      IF   CTL_CHAR11 = 'U'  THEN                                       03443422
+           COUNT_U = COUNT_U +1;                                        03443522
+                                                                        03443629
+      IF   CTL_CHAR12 = 'I'  THEN                                       03443722
+           COUNT_I = COUNT_I +1;                                        03443822
+      IF   CTL_CHAR12 = 'U'  THEN                                       03443922
+           COUNT_U = COUNT_U +1;                                        03444022
+                                                                        03444129
+      IF   CTL_CHAR13 = 'I'  THEN                                       03444222
+           COUNT_I = COUNT_I +1;                                        03444322
+      IF   CTL_CHAR13 = 'U'  THEN                                       03444422
+           COUNT_U = COUNT_U +1;                                        03444522
+                                                                        03444629
+      IF   CTL_CHAR14 = 'I'  THEN                                       03444722
+           COUNT_I = COUNT_I +1;                                        03444822
+      IF   CTL_CHAR14 = 'U'  THEN                                       03444922
+           COUNT_U = COUNT_U +1;                                        03445022
+                                                                        03445129
+      IF   CTL_CHAR15 = 'I'  THEN                                       03445222
+           COUNT_I = COUNT_I +1;                                        03445322
+      IF   CTL_CHAR15 = 'U'  THEN                                       03445422
+           COUNT_U = COUNT_U +1;                                        03445522
+                                                                        03445629
+      IF   CTL_CHAR16 = 'I'  THEN                                       03445722
+           COUNT_I = COUNT_I +1;                                        03445822
+      IF   CTL_CHAR16 = 'U'  THEN                                       03445922
+           COUNT_U = COUNT_U +1;                                        03446022
+                                                                        03446129
+      IF   CTL_CHAR17 = 'I'  THEN                                       03446222
+           COUNT_I = COUNT_I +1;                                        03446322
+      IF   CTL_CHAR17 = 'U'  THEN                                       03446422
+           COUNT_U = COUNT_U +1;                                        03446522
+                                                                        03446629
+      IF   CTL_CHAR18 = 'I'  THEN                                       03446729
+           COUNT_I = COUNT_I +1;                                        03446829
+      IF   CTL_CHAR18 = 'U'  THEN                                       03446929
+           COUNT_U = COUNT_U +1;                                        03447029
+      IF   CTL_CHAR19 = 'I'  THEN                                       03447129
+           COUNT_I = COUNT_I +1;                                        03447229
+      IF   CTL_CHAR19 = 'U'  THEN                                       03447329
+           COUNT_U = COUNT_U +1;                                        03447429
+                                                                        03447529
+      IF ( COUNT_U   ^= 19 & COUNT_U   ^= 0    ) THEN DO;               03448029
+         RC = 1;                                                        03450008
+         MSG='пяепеи ма упаявоум 19 еццяажес тупоу U '!!COUNT_U;        03460029
+       ERLIN2=MSG;                                                      03470024
+         RETURN (RC) ;                                                  03500008
+      END;                                                              03510008
+      IF ( COUNT_I   ^= 19 & COUNT_I   ^= 0    ) THEN DO;               03511029
+         RC = 1;                                                        03512016
+         MSG='пяепеи ма упаявоум 19 еццяажес тупоу I '!!COUNT_I;        03513029
+       ERLIN2=MSG;                                                      03513124
+         RETURN (RC) ;                                                  03514016
+      END;                                                              03515016
+      IF ( COUNT_D   ^= 19 & COUNT_D   ^= 0    ) THEN DO;               03516029
+         RC = 1;                                                        03517016
+         MSG='пяепеи ма упаявоум 19 еццяажес тупоу D '!!COUNT_D;        03518029
+       ERLIN2=MSG;                                                      03518124
+         RETURN (RC) ;                                                  03519016
+      END;                                                              03519116
+                                                                        03520008
+                                                                        03610008
+  IF (CTL_FIELD1 ^= LIT_FIELD1) THEN DO;                                03620009
+         RC = 1;                                                        03630009
+         MSG='TO педио CTL_FIELD1 пяепеи ма пеяиевеи  '!!LIT_FIELD1!!   03640009
+             ' акка пеяиевеи '!!CTL_FIELD1;                             03650009
+       ERLIN2=MSG;                                                      03651024
+         RETURN (RC) ;                                                  03660009
+  END;                                                                  03670009
+                                                                        03680009
+  IF (CTL_FIELD2 ^= LIT_FIELD2) THEN DO;                                03690009
+         RC = 1;                                                        03700009
+         MSG='TO педио CTL_FIELD2 пяепеи ма пеяиевеи  '!!LIT_FIELD2!!   03710009
+             ' акка пеяиевеи '!!CTL_FIELD2;                             03720009
+       ERLIN2=MSG;                                                      03721024
+         RETURN (RC) ;                                                  03730009
+  END;                                                                  03740009
+                                                                        03750009
+  IF (CTL_FIELD3 ^= LIT_FIELD3) THEN DO;                                03760009
+         RC = 1;                                                        03770009
+         MSG='TO педио CTL_FIELD3 пяепеи ма пеяиевеи  '!!LIT_FIELD3!!   03780009
+             ' акка пеяиевеи '!!CTL_FIELD3;                             03790009
+       ERLIN2=MSG;                                                      03791024
+         RETURN (RC) ;                                                  03800009
+  END;                                                                  03810009
+                                                                        03820009
+  IF (CTL_FIELD4 ^= LIT_FIELD4) THEN DO;                                03830009
+         RC = 1;                                                        03840009
+         MSG='TO педио CTL_FIELD4 пяепеи ма пеяиевеи  '!!LIT_FIELD4!!   03850009
+             ' акка пеяиевеи '!!CTL_FIELD4;                             03860009
+       ERLIN2=MSG;                                                      03861024
+         RETURN (RC) ;                                                  03870009
+  END;                                                                  03880009
+                                                                        03890009
+  IF (CTL_FIELD5 ^= LIT_FIELD5) THEN DO;                                03900009
+         RC = 1;                                                        03910009
+         MSG='TO педио CTL_FIELD5 пяепеи ма пеяиевеи  '!!LIT_FIELD5!!   03920009
+             ' акка пеяиевеи '!!CTL_FIELD5;                             03930009
+       ERLIN2=MSG;                                                      03931024
+         RETURN (RC) ;                                                  03940009
+  END;                                                                  03950009
+                                                                        03960009
+  IF (CTL_FIELD6 ^= LIT_FIELD6) THEN DO;                                03970009
+         RC = 1;                                                        03980009
+         MSG='TO педио CTL_FIELD6 пяепеи ма пеяиевеи  '!!LIT_FIELD6!!   03990009
+             ' акка пеяиевеи '!!CTL_FIELD6;                             04000009
+       ERLIN2=MSG;                                                      04001024
+         RETURN (RC) ;                                                  04010009
+  END;                                                                  04020009
+                                                                        04030009
+  IF (CTL_FIELD7 ^= LIT_FIELD7) THEN DO;                                04040009
+         RC = 1;                                                        04050009
+         MSG='TO педио CTL_FIELD7 пяепеи ма пеяиевеи  '!!LIT_FIELD7!!   04060009
+             ' акка пеяиевеи '!!CTL_FIELD7;                             04070009
+       ERLIN2=MSG;                                                      04071024
+         RETURN (RC) ;                                                  04080009
+  END;                                                                  04090009
+  IF (CTL_FIELD8 ^= LIT_FIELD8) THEN DO;                                04091020
+         RC = 1;                                                        04092020
+         MSG='TO педио CTL_FIELD8 пяепеи ма пеяиевеи  '!!LIT_FIELD8!!   04093020
+             ' акка пеяиевеи '!!CTL_FIELD8;                             04094020
+       ERLIN2=MSG;                                                      04094124
+         RETURN (RC) ;                                                  04095020
+  END;                                                                  04096020
+                                                                        04097020
+  IF (CTL_FIELD9 ^= LIT_FIELD9) THEN DO;                                04098022
+         RC = 1;                                                        04099022
+         MSG='TO педио CTL_FIELD9 пяепеи ма пеяиевеи  '!!LIT_FIELD9!!   04100022
+             ' акка пеяиевеи '!!CTL_FIELD8;                             04110022
+       ERLIN2=MSG;                                                      04111024
+         RETURN (RC) ;                                                  04120022
+  END;                                                                  04130022
+                                                                        04140022
+  IF (CTL_FIELD10 ^= LIT_FIELD10) THEN DO;                              04150022
+         RC = 1;                                                        04160022
+         MSG='TO педио CTL_FIELD10 пяепеи ма пеяиевеи '!!LIT_FIELD10!!  04170022
+             ' акка пеяиевеи '!!CTL_FIELD10;                            04171022
+         RETURN (RC) ;                                                  04172022
+  END;                                                                  04173022
+                                                                        04174022
+  IF (CTL_FIELD11 ^= LIT_FIELD11) THEN DO;                              04175022
+         RC = 1;                                                        04176022
+         MSG='TO педио CTL_FIELD11 пяепеи ма пеяиевеи '!!LIT_FIELD11!!  04177022
+             ' акка пеяиевеи '!!CTL_FIELD11;                            04178022
+         RETURN (RC) ;                                                  04179022
+  END;                                                                  04179122
+                                                                        04179222
+  IF (CTL_FIELD12 ^= LIT_FIELD12) THEN DO;                              04179322
+         RC = 1;                                                        04179422
+         MSG='TO педио CTL_FIELD12 пяепеи ма пеяиевеи '!!LIT_FIELD12!!  04179522
+             ' акка пеяиевеи '!!CTL_FIELD12;                            04179622
+         RETURN (RC) ;                                                  04179822
+  END;                                                                  04179922
+                                                                        04180022
+  IF (CTL_FIELD13 ^= LIT_FIELD13) THEN DO;                              04180122
+         RC = 1;                                                        04180222
+         MSG='TO педио CTL_FIELD13 пяепеи ма пеяиевеи '!!LIT_FIELD13!!  04180322
+             ' акка пеяиевеи '!!CTL_FIELD13;                            04180422
+       ERLIN2=MSG;                                                      04180524
+         RETURN (RC) ;                                                  04180722
+  END;                                                                  04180822
+                                                                        04180922
+  IF (CTL_FIELD14 ^= LIT_FIELD14) THEN DO;                              04181022
+         RC = 1;                                                        04181122
+         MSG='TO педио CTL_FIELD14 пяепеи ма пеяиевеи '!!LIT_FIELD14!!  04181222
+             ' акка пеяиевеи '!!CTL_FIELD14;                            04181322
+       ERLIN2=MSG;                                                      04181424
+         RETURN (RC) ;                                                  04181622
+  END;                                                                  04181722
+                                                                        04181822
+  IF (CTL_FIELD15 ^= LIT_FIELD15) THEN DO;                              04181922
+         RC = 1;                                                        04182022
+         MSG='TO педио CTL_FIELD15 пяепеи ма пеяиевеи '!!LIT_FIELD15!!  04182122
+             ' акка пеяиевеи '!!CTL_FIELD15;                            04182222
+       ERLIN2=MSG;                                                      04182324
+         RETURN (RC) ;                                                  04182522
+  END;                                                                  04182622
+                                                                        04182722
+  IF (CTL_FIELD16 ^= LIT_FIELD16) THEN DO;                              04182822
+         RC = 1;                                                        04182922
+         MSG='TO педио CTL_FIELD16 пяепеи ма пеяиевеи '!!LIT_FIELD16!!  04183022
+             ' акка пеяиевеи '!!CTL_FIELD16;                            04183129
+       ERLIN2=MSG;                                                      04183224
+         RETURN (RC) ;                                                  04183422
+  END;                                                                  04183522
+                                                                        04183622
+  IF (CTL_FIELD17 ^= LIT_FIELD17) THEN DO;                              04183722
+         RC = 1;                                                        04183822
+         MSG='TO педио CTL_FIELD17 пяепеи ма пеяиевеи '!!LIT_FIELD17!!  04183922
+             ' акка пеяиевеи '!!CTL_FIELD17 ;                           04184029
+       ERLIN2=MSG;                                                      04184124
+         RETURN (RC) ;                                                  04184322
+  END;                                                                  04184422
+                                                                        04184522
+  IF (CTL_FIELD18 ^= LIT_FIELD18) THEN DO;                              04184629
+         RC = 1;                                                        04184729
+         MSG='TO педио CTL_FIELD18 пяепеи ма пеяиевеи '!!LIT_FIELD18!!  04184829
+             ' акка пеяиевеи '!!CTL_FIELD18;                            04184929
+       ERLIN2=MSG;                                                      04185029
+         RETURN (RC) ;                                                  04185129
+  END;                                                                  04185229
+  IF (CTL_FIELD19 ^= LIT_FIELD19) THEN DO;                              04185329
+         RC = 1;                                                        04185429
+         MSG='TO педио CTL_FIELD19 пяепеи ма пеяиевеи '!!LIT_FIELD19!!  04185529
+             ' акка пеяиевеи '!!CTL_FIELD19;                            04185629
+       ERLIN2=MSG;                                                      04185729
+         RETURN (RC) ;                                                  04185829
+  END;                                                                  04185929
+                                                                        04186029
+  IF(CTL_PRODUCT^='CORE' &  CTL_PRODUCT ^= 'B2B') THEN DO;              04187029
+         RC = 1;                                                        04190010
+         MSG='TO педио CTL_PRODUCT Kыдийос пяоиомтос '!!                04200010
+             'EINAI кахос,пяепеи ма пеяиевеи б2б '!!                    04210010
+             'H CORE,олыс пеяиевеи '!! CTL_PRODUCT    ;                 04220010
+         RETURN (RC) ;                                                  04230010
+  END;                                                                  04240010
+  IF (VERIFY(CTL_TT,'0123456789')^=0 ) THEN DO;                         04250010
+         RC = 1;                                                        04260010
+         MSG='TO педио CTL_TT тавудяолийос йыдийас '!!                  04270010
+             'EINAI кахос,пеяиевеи лг аяихлгтийа ьгжиа '!!              04280010
+              CTL_TT  ;                                                 04290010
+       ERLIN2=MSG;                                                      04291024
+         RETURN (RC) ;                                                  04300010
+  END;                                                                  04310010
+  IF (CTL_COUNTRY         ^= 'GR' ) THEN DO;                            04320010
+         RC = 1;                                                        04330010
+         MSG='TO педио CTL_COUNTRY йыдийос выяас '!!                    04340010
+             'EINAI кахос,пяепеи ма еимаи GR Aкка еимаи '!!             04350010
+              CTL_COUNTRY;                                              04360010
+       ERLIN2=MSG;                                                      04361024
+         RETURN (RC) ;                                                  04370010
+  END;                                                                  04380010
+                                                                        04410010
+  IF VALID(CTL_COMM_CUST) = '0'B    THEN DO;                            04420029
+         RC = 1;                                                        04421029
+         MSG='TO педио CTL_COMM_CUST пяолгхеиа пекатг '!!               04422029
+             'EINAI кахос,евеи кахос FORMAT '!!                         04423029
+              CTL_COMM_CUST;                                            04424029
+       ERLIN2=MSG;                                                      04425029
+       RETURN (RC) ;                                                    04426029
+  END;                                                                  04427029
+  IF VALID(CTL_COMM_COMP) = '0'B    THEN DO;                            04430029
+         RC = 1;                                                        04440029
+         MSG='TO педио CTL_COMM_COMP пяолгхеиа ояцамислоу '!!           04450029
+             'EINAI кахос,евеи кахос FORMAT '!!                         04460029
+              CTL_COMM_COMP;                                            04470029
+       ERLIN2=MSG;                                                      04480029
+       RETURN (RC) ;                                                    04490029
+  END;                                                                  04500029
+      RETURN (RC) ;                                                     04540010
+    END VALIDATE_READER;                                                04550010
+   /**************************************************************/     04560010
+   /*VALIDATE_READER END                                         */     04570010
+   /**************************************************************/     04580010
+                                                                        04590010
+   /**************************************************************/     04600010
+   /*UPDATE_CTDDOR86 START                                       */     04610010
+   /**************************************************************/     04620010
+    UPDATE_CTDDOR86: PROC   ;                                           04640010
+                                                                        04641027
+   CTDDOR86 = ' ';                                                      04642010
+   CTDDOR86.CHR_USER           = 'DDINS86 ';                            04643010
+   CTDDOR86.FLG_STATUS_PROCESS = '0';                                   04644010
+   CTDDOR86.FLG_DIRECTION      = 'I';                                   04645010
+   CTDDOR86.CHR_C_S_I_I_517    = CTL_C_S_I_I_517;                       04647010
+   CTDDOR86.CHR_C_S_I_I_T_518  = 'GR';                                  04648010
+   CTDDOR86.CHR_CR_NAME        = CTL_NAME ;                             04649010
+   CTDDOR86.CHR_PRODUCT        = CTL_PRODUCT;                           04649110
+   CTDDOR86.CHR_CR_ADDR_LINE1  = CTL_STREET!!' '!!CTL_TT;               04649213
+   CTDDOR86.CHR_CR_ADDR_LINE2  = CTL_CITY;                              04649313
+   CTDDOR86.CHR_CR_ADDR_CNTRY  = CTL_COUNTRY;                           04649413
+   CTDDOR86.FLG_CANCEL         = CTL_CANCEL ;                           04649520
+   CTDDOR86.CHR_MODEL          = CTL_MODEL           ;                  04650122
+   CTDDOR86.CHR_19AM           = CTL_19AM            ;                  04650722
+   CTDDOR86.CHR_CYCLE          = CTL_CYCLE           ;                  04651322
+   CTDDOR86.CHR_NATIONAL_CHAR  = CTL_NATIONAL_CHAR   ;                  04651922
+   CTDDOR86.CHR_DMF            = CTL_DMF             ;                  04652522
+   CTDDOR86.CHR_RESPON_NAME    = CTL_RESPON_NAME     ;                  04653122
+   CTDDOR86.CHR_RESPON_TITLE   = CTL_RESPON_TITLE    ;                  04653722
+   CTDDOR86.CHR_RESPON_TEL     = CTL_RESPON_TEL      ;                  04654322
+   CTDDOR86.NUM_CIDB           = CTL_CIDB            ;                  04654922
+   CTDDOR86.AMT_COMM_CUST      = CTL_COMM_CUST       ;                  04655029
+   CTDDOR86.AMT_COMM_COMP      = CTL_COMM_COMP       ;                  04655129
+   EXEC SQL UPDATE CTDDOR86                                             04655229
+        SET                                                             04655329
+             CHR_C_S_I_I_T_518  =:CTDDOR86.CHR_C_S_I_I_T_518,           04655429
+             CHR_CR_NAME        =:CTDDOR86.CHR_CR_NAME,                 04655529
+             CHR_CR_ADDR_LINE1  =:CTDDOR86.CHR_CR_ADDR_LINE1,           04655629
+             CHR_CR_ADDR_LINE2  =:CTDDOR86.CHR_CR_ADDR_LINE2,           04656013
+             CHR_CR_ADDR_CNTRY  =:CTDDOR86.CHR_CR_ADDR_CNTRY,           04660013
+             CHR_ULT_CR_NAME    =:CTDDOR86.CHR_ULT_CR_NAME,             04670013
+             CHR_ULT_CR_ID      =:CTDDOR86.CHR_ULT_CR_ID,               04671013
+             CHR_PRODUCT        =:CTDDOR86.CHR_PRODUCT,                 04672013
+             CHR_TERMID         =:CTDDOR86.CHR_TERMID,                  04673013
+             CHR_USER           =:CTDDOR86.CHR_USER,                    04674013
+             FLG_DIRECTION      =:CTDDOR86.FLG_DIRECTION,               04675013
+             FLG_STATUS_PROCESS =:CTDDOR86.FLG_STATUS_PROCESS,          04676013
+             FLG_CANCEL         =:CTDDOR86.FLG_CANCEL,                  04677013
+             CHR_DIAS           =:CTDDOR86.CHR_DIAS,                    04678013
+             CHR_CBOG           =:CTDDOR86.CHR_CBOG,                    04679013
+             CHR_MODEL          =:CTDDOR86.CHR_MODEL           ,        04679122
+             CHR_19AM           =:CTDDOR86.CHR_19AM            ,        04679222
+             CHR_CYCLE          =:CTDDOR86.CHR_CYCLE           ,        04679322
+             CHR_NATIONAL_CHAR  =:CTDDOR86.CHR_NATIONAL_CHAR   ,        04679422
+             CHR_DMF            =:CTDDOR86.CHR_DMF             ,        04679522
+             CHR_RESPON_NAME    =:CTDDOR86.CHR_RESPON_NAME     ,        04679622
+             CHR_RESPON_TITLE   =:CTDDOR86.CHR_RESPON_TITLE    ,        04679722
+             CHR_RESPON_TEL     =:CTDDOR86.CHR_RESPON_TEL      ,        04679822
+             NUM_CIDB           =:CTDDOR86.NUM_CIDB            ,        04679922
+             AMT_COMM_CUST      =:CTDDOR86.AMT_COMM_CUST       ,        04680029
+             AMT_COMM_COMP      =:CTDDOR86.AMT_COMM_COMP       ,        04680129
+             DAT_DATETIME_INIT  = CURRENT TIMESTAMP,                    04680329
+             DAT_DATETIME_PROC  = CURRENT TIMESTAMP,                    04680429
+             DAT_DATETIME_END   = CURRENT TIMESTAMP                     04680529
+        WHERE                                                           04680629
+             CHR_C_S_I_I_517    =:CTDDOR86.CHR_C_S_I_I_517;             04680729
+                                                                        04681022
+        IF SQLCODE = 0 THEN DO;                                         04681713
+           EXEC SQL COMMIT;                                             04681828
+           CNT_UPDATE_MD10 = CNT_UPDATE_MD10 + 1;                       04682013
+        END;                                                            04682113
+        IF SQLCODE ^= 0 THEN DO;                                        04682213
+           CNT_NOUPDATE_MD10 = CNT_NOUPDATE_MD10 + 1;                   04682513
+         MYLINE = SOURCELINE();                                         04682613
+         MYMSG  = "кахос стгм летабокг сто пимайа_CTDDOR86"!!           04682713
+                  " SQLCODE = "!! CHAR(SQLCODE);                        04682813
+         IF SQLCODE = -803 THEN DO;                                     04682913
+            MYMSG  = "кахос стгм летабокг сто пимайа CTDDOR86"!!        04683013
+                  " упаявеи гдг O ORGANIS:"!!                           04683113
+                   CTDDOR86.CHR_C_S_I_I_517;                            04683213
+         END;                                                           04683313
+         CALL ERROR1(MYMSG);                                            04683413
+        END;                                                            04683513
+                                                                        04684010
+    END UPDATE_CTDDOR86;                                                04690010
+   /**************************************************************/     04700009
+   /*UPDATE_CTDDOR86 END                                         */     04710010
+   /**************************************************************/     04720009
+                                                                        04730009
+   /**************************************************************/     04740009
+   /*INSERT_CTDDOR86 START                                       */     04750009
+   /**************************************************************/     04760009
+  INSERT_CTDDOR86:PROC   ;                                              04770009
+   CTDDOR86 = ' ';                                                      04790009
+   CTDDOR86.CHR_USER           = 'DDINS86 ';                            04800009
+   CTDDOR86.FLG_STATUS_PROCESS = '0';                                   04810009
+   CTDDOR86.FLG_DIRECTION      = 'I';                                   04820009
+   CTDDOR86.FLG_CANCEL         = '0';                                   04830009
+   CTDDOR86.CHR_C_S_I_I_517    = CTL_C_S_I_I_517;                       04840009
+   CTDDOR86.CHR_C_S_I_I_T_518  = 'GR';                                  04850009
+   CTDDOR86.CHR_CR_NAME        = CTL_NAME ;                             04860009
+   CTDDOR86.CHR_PRODUCT        = CTL_PRODUCT;                           04870009
+   CTDDOR86.CHR_CR_ADDR_LINE1  = CTL_STREET!!' '!!CTL_TT;               04880013
+   CTDDOR86.CHR_CR_ADDR_LINE2  = CTL_CITY;                              04890013
+   CTDDOR86.CHR_CR_ADDR_CNTRY  = CTL_COUNTRY;                           04900013
+   CTDDOR86.CHR_MODEL          = CTL_MODEL           ;                  04901022
+   CTDDOR86.CHR_19AM           = CTL_19AM            ;                  04902022
+   CTDDOR86.CHR_CYCLE          = CTL_CYCLE           ;                  04903022
+   CTDDOR86.CHR_NATIONAL_CHAR  = CTL_NATIONAL_CHAR   ;                  04904022
+   CTDDOR86.CHR_DMF            = CTL_DMF             ;                  04905022
+   CTDDOR86.CHR_RESPON_NAME    = CTL_RESPON_NAME     ;                  04906022
+   CTDDOR86.CHR_RESPON_TITLE   = CTL_RESPON_TITLE    ;                  04907022
+   CTDDOR86.CHR_RESPON_TEL     = CTL_RESPON_TEL      ;                  04908022
+   CTDDOR86.NUM_CIDB           = CTL_CIDB            ;                  04909022
+   CTDDOR86.AMT_COMM_CUST      = CTL_COMM_CUST       ;                  04909129
+   CTDDOR86.AMT_COMM_COMP      = CTL_COMM_COMP       ;                  04909229
+                                                                        04910009
+   EXEC SQL INSERT INTO CTDDOR86                                        04920009
+           ( CHR_C_S_I_I_517 ,                                          04930009
+             CHR_C_S_I_I_T_518 ,                                        04940009
+             CHR_CR_NAME ,                                              04950009
+             CHR_CR_ADDR_LINE1 ,                                        04960009
+             CHR_CR_ADDR_LINE2 ,                                        04970009
+             CHR_CR_ADDR_CNTRY ,                                        04980009
+             CHR_ULT_CR_NAME ,                                          04990009
+             CHR_ULT_CR_ID ,                                            05000009
+             CHR_PRODUCT ,                                              05010009
+             CHR_TERMID ,                                               05020009
+             CHR_USER ,                                                 05030009
+             FLG_DIRECTION ,                                            05040009
+             FLG_STATUS_PROCESS ,                                       05050009
+             FLG_CANCEL ,                                               05060009
+             CHR_DIAS ,                                                 05070009
+             CHR_CBOG ,                                                 05080009
+             CHR_MODEL ,                                                05081022
+             CHR_19AM ,                                                 05082022
+             CHR_CYCLE ,                                                05083022
+             CHR_NATIONAL_CHAR,                                         05084022
+             CHR_DMF          ,                                         05085022
+             CHR_RESPON_NAME  ,                                         05086022
+             CHR_RESPON_TITLE ,                                         05087022
+             CHR_RESPON_TEL   ,                                         05088022
+             NUM_CIDB         ,                                         05089022
+             AMT_COMM_CUST ,                                            05089129
+             AMT_COMM_COMP ,                                            05089229
+             DAT_DATETIME_INIT,                                         05090009
+             DAT_DATETIME_PROC ,                                        05100009
+             DAT_DATETIME_END                                           05110009
+     )                                                                  05120009
+     VALUES                                                             05130009
+    (                                                                   05140009
+   :CTDDOR86.CHR_C_S_I_I_517                ,                           05150009
+   :CTDDOR86.CHR_C_S_I_I_T_518              ,                           05160009
+   :CTDDOR86.CHR_CR_NAME                    ,                           05170009
+   :CTDDOR86.CHR_CR_ADDR_LINE1              ,                           05180009
+   :CTDDOR86.CHR_CR_ADDR_LINE2              ,                           05190009
+   :CTDDOR86.CHR_CR_ADDR_CNTRY              ,                           05200009
+   :CTDDOR86.CHR_ULT_CR_NAME                ,                           05210009
+   :CTDDOR86.CHR_ULT_CR_ID                  ,                           05220009
+   :CTDDOR86.CHR_PRODUCT                    ,                           05230009
+   :CTDDOR86.CHR_TERMID                     ,                           05240009
+   :CTDDOR86.CHR_USER                       ,                           05250009
+   :CTDDOR86.FLG_DIRECTION                  ,                           05260009
+   :CTDDOR86.FLG_STATUS_PROCESS             ,                           05270009
+   :CTDDOR86.FLG_CANCEL                     ,                           05280009
+   :CTDDOR86.CHR_DIAS                       ,                           05290009
+   :CTDDOR86.CHR_CBOG                       ,                           05300009
+   :CTDDOR86.CHR_MODEL           ,                                      05301022
+   :CTDDOR86.CHR_19AM            ,                                      05301122
+   :CTDDOR86.CHR_CYCLE           ,                                      05301222
+   :CTDDOR86.CHR_NATIONAL_CHAR   ,                                      05301322
+   :CTDDOR86.CHR_DMF             ,                                      05301422
+   :CTDDOR86.CHR_RESPON_NAME     ,                                      05301522
+   :CTDDOR86.CHR_RESPON_TITLE    ,                                      05301622
+   :CTDDOR86.CHR_RESPON_TEL      ,                                      05301722
+   :CTDDOR86.NUM_CIDB            ,                                      05301822
+   :CTDDOR86.AMT_COMM_CUST ,                                            05301929
+   :CTDDOR86.AMT_COMM_COMP ,                                            05302029
+   CURRENT TIMESTAMP                        ,                           05310009
+   CURRENT TIMESTAMP                        ,                           05320009
+   CURRENT TIMESTAMP                                                    05330009
+   );                                                                   05340009
+        IF SQLCODE = 0 THEN DO;                                         05350009
+           EXEC SQL COMMIT;                                             05360028
+           CNT_Insert_MD10 = CNT_Insert_MD10 + 1;                       05380009
+        END;                                                            05390009
+        IF SQLCODE ^= 0 THEN DO;                                        05400009
+           CNT_NOINSERT_MD10 = CNT_NOINSERT_MD10 + 1;                   05430009
+           MYLINE = SOURCELINE();                                       05440028
+           MYMSG  = "кахос стгм еисацыцг сто пимайа_CTDDOR86"!!         05450028
+                  " SQLCODE = "!! CHAR(SQLCODE);                        05460009
+         IF SQLCODE = -803 THEN DO;                                     05470009
+            MYMSG  = "кахос стгм еисацыцг сто пимайа CTDDOR86"!!        05480009
+                  " упаявеи гдг O ORGANIS:"!!                           05490009
+                   CTDDOR86.CHR_C_S_I_I_517;                            05500009
+         END;                                                           05510009
+         CALL ERROR1(MYMSG);                                            05520009
+        END;                                                            05530009
+  END INSERT_CTDDOR86     ;                                             05540009
+                                                                        05540115
+  DELETE_CTDDOR86:PROC   ;                                              05541015
+   EXEC SQL DELETE FROM CTDDOR86                                        05541116
+        WHERE                                                           05541215
+             CHR_C_S_I_I_517    =:CTL_C_S_I_I_517;                      05541317
+                                                                        05541415
+        IF SQLCODE = 0 THEN DO;                                         05541515
+           put skip list("---------> OKDELETE_CTDDOR86 ",               05541615
+                   CTL_C_S_I_I_517 );                                   05541718
+           CNT_DELETE_MD10 = CNT_DELETE_MD10 + 1;                       05541815
+        END;                                                            05541915
+        IF SQLCODE ^= 0 THEN DO;                                        05542015
+            put skip list("---------> NOT OKDELETE_CTDDOR86 ",          05542115
+                    CTL_C_S_I_I_517 );                                  05542218
+            CNT_NODELETE_MD10 = CNT_NODELETE_MD10 + 1;                  05542315
+            MYLINE = SOURCELINE();                                      05542415
+            MYMSG  = "кахос стгм диацяажг сто пимайа_CTDDOR86"!!        05542515
+                  " SQLCODE = "!! CHAR(SQLCODE);                        05542615
+            CALL ERROR1(MYMSG);                                         05542715
+        END;                                                            05543115
+  END DELETE_CTDDOR86     ;                                             05544015
+   /**************************************************************/     05550009
+   /*INSERT_CTDDOR86 END                                         */     05560009
+   /**************************************************************/     05570009
+   /**************************************************************/     05580009
+   /*ERROR1          START                                       */     05590009
+   /**************************************************************/     05600009
+ ERROR1:PROC (MSG  ) ;                                                  05610009
+    DCL MSG      CHAR  (132)  ;                                         05620000
+    DCL WS_BOOM   FIXED(1) INIT(1);                                     05630000
+    DCL WS_ZERO   FIXED(1) INIT(0);                                     05640000
+                                                                        05650000
+       ERLIN1='1';                                                      05660000
+       ERLIN2='***************************************************';    05670000
+       WRITE FILE(PRT) FROM(ERLINE);                                    05680000
+       ERLIN1='0';                                                      05690000
+                                                                        05700000
+       ERLIN2=' * DDINS86  глеяа яогс         = '!!DATE ();             05710001
+       WRITE FILE(PRT) FROM(ERLINE);                                    05720000
+       ERLIN1=' ';                                                      05730000
+                                                                        05740000
+       ERLIN2='пяобкгла сто пяоцяалла DDINS86 Tо пяоцяалла ха сйасеи';  05750008
+       WRITE FILE(PRT) FROM(ERLINE);                                    05760000
+       ERLIN2=MSG;                                                      05770000
+       WRITE FILE(PRT) FROM(ERLINE);                                    05780000
+       WS_BOOM  = WS_BOOM/WS_ZERO ;                                     05790008
+   END ERROR1       ;                                                   05800000
+   /**************************************************************/     05810008
+   /*ERROR1          END                                         */     05820008
+   /**************************************************************/     05830008
+                                                                        05840000
+ TELOS :                                                                05850000
+   CLOSE FILE(READER) ;                                                 05851020
+   CTLCHR = '1';                                                        05860000
+   GRAMH =' *сЩМОКА пЯОЦЯэЛЛАТОР DDINS86 *';                            05870001
+   WRITE FILE(PRT) FROM(LINE);                                          05880000
+   CTLCHR = ' ';                                                        05890000
+   GRAMH =                                                              05900000
+  ' *************************************************************** ' ; 05910000
+   WRITE FILE(PRT) FROM(LINE);                                          05920000
+   GRAMH =' *гЛщЯА йАъ ыЯА яОчР :  '!!OT_DATETIME;                      05930000
+   WRITE FILE(PRT) FROM(LINE);                                          05940000
+   GRAMH =                                                              05950000
+  ' *************************************************************** ' ; 05960000
+   WRITE FILE(PRT) FROM(LINE);                                          05970000
+   CNT = CNT_Records_READ;                                              05980014
+   GRAMH =' INPUT       '!!CNT!!' ЕЦЦЯАЖщР               ';             05990014
+   WRITE FILE(PRT) FROM(LINE);                                          06000000
+   CNT = CNT_Records_READ / 8;                                          06000121
+   GRAMH =' INPUT ояцам:'!!CNT!!' ЕЦЦЯАЖщР               ';             06000214
+   WRITE FILE(PRT) FROM(LINE);                                          06000314
+   CNT = CNT_INSERT_MD10 ;                                              06001014
+   GRAMH =' INSERT IN   '!!CNT!!' ЕЦЦЯАЖщР СТОУР CTDDOR86';             06002014
+   WRITE FILE(PRT) FROM(LINE);                                          06003014
+   CNT = CNT_NOINSERT_MD10 ;                                            06010000
+   GRAMH =' NOINSERT IN '!!CNT!!' ЕЦЦЯАЖщР СТОУР CTDDOR86';             06020000
+   WRITE FILE(PRT) FROM(LINE);                                          06030000
+   CNT = CNT_UPDATE_MD10 ;                                              06031014
+   GRAMH =' UPDATE IN   '!!CNT!!' ЕЦЦЯАЖщР СТОУР CTDDOR86';             06032014
+   WRITE FILE(PRT) FROM(LINE);                                          06033014
+   CNT = CNT_NOUPDATE_MD10 ;                                            06034014
+   GRAMH =' NOUPDATE IN '!!CNT!!' ЕЦЦЯАЖщР СТОУР CTDDOR86';             06035014
+   WRITE FILE(PRT) FROM(LINE);                                          06036014
+   CNT = CNT_DELETE_MD10 ;                                              06036115
+   GRAMH =' DELETE IN   '!!CNT!!' ЕЦЦЯАЖщР СТОУР CTDDOR86';             06037015
+   WRITE FILE(PRT) FROM(LINE);                                          06038015
+   CNT = CNT_NODELETE_MD10 ;                                            06039015
+   GRAMH =' NODELETE IN '!!CNT!!' ЕЦЦЯАЖщР СТОУР CTDDOR86';             06039115
+   WRITE FILE(PRT) FROM(LINE);                                          06039215
+                                                                        06040000
+   CLOSE FILE(PRT) ;                                                    06050000
+  END  DDINS86;                                                         06060001
+

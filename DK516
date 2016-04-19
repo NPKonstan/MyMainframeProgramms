@@ -1,0 +1,168 @@
+* PROCESS XOPTS(DLI);                                                   00010000
+ DK516    : PROCEDURE OPTIONS(MAIN);                                    00030056
+ /********************************************************************/
+ /* PLI + IMS                                                        */
+ /********************************************************************/
+ /* ƒ«Ã…œ’—√…¡ ¡—◊≈…œ’ ‘œ ¡—…»ÃŸÕ ¡–œ ¡—◊≈…œ ‘œ ¡—…»ÃŸÕ  ¡… DB       */
+ /********************************************************************/
+ /* NPK 25-02-2008                                                   */
+ /********************************************************************/
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+ /*-----------------------------------------------------------------*/
+ DCL TOKAR      FILE RECORD INPUT  ENV(FB RECSIZE(240));
+ /*-----------------------------------------------------------------*/
+ DCL NTOKAR     FILE RECORD OUTPUT ENV(FB RECSIZE(240));
+ /*------------------------------------------------------------------*/
+ DCL PRT FILE SEQUENTIAL OUTPUT ENV(FB RECSIZE(133) CTLASA);
+ /*------------------------------------------------------------------*/
+ DCL 1   LINE1,
+      2  CC1                 CHAR(01)      INIT(' '),
+      2  LINE                CHAR(132)     INIT(' ');
+ /*------------------------------------------------------------------*/
+ %INCLUDE  KSDBMAP ;
+ /* %INCLUDE  TOKARIR;*/
+ DCL  ( KFIOROOT, KFIOSADD ) POINTER;
+ DCL      TKRREC    CHAR(240)           ;
+ DCL  1   TKRRECR   BASED(ADDR(TKRREC)) ,
+       2  TKRTRAP   PIC '(01)9'         ,  /* TPApEZA                */
+       2  TKRKATMA  FIXED(03,0)         ,  /* KATArTHMA              */
+       2  TKRKATOL  FIXED(07,0)         ,  /* MEPIdA KAhOkIKOY       */
+       2  TKRARLOG  FIXED(09,0)         ,  /* APIhMOr kOcAPIArMOY    */
+       2  TKRPERID  PIC '(01)9'         ,  /* ENdEInH pEPIOdOY 1 - 4 */
+       2  TKRPTKR1  FIXED(15,0)         ,  /* TOKAPIhMOI pIrTxTIKOI 1*/
+       2  TKRPTOK1  FIXED(15,0)         ,  /* TOKOI      pIrTxTIKOI 1*/
+       2  TKRPTKR2  FIXED(15,0)         ,  /* TOKAPIhMOI pIrTxTIKOI 2*/
+       2  TKRPTOK2  FIXED(15,0)         ,  /* TOKOI      pIrTxTIKOI 2*/
+       2  TKRPTKR3  FIXED(15,0)         ,  /* TOKAPIhMOI pIrTxTIKOI 3*/
+       2  TKRPTOK3  FIXED(15,0)         ,  /* TOKOI      pIrTxTIKOI 3*/
+       2  TKRXTKR1  FIXED(15,0)         ,  /* TOKAPIhMOI XPExrTIKOI 1*/
+       2  TKRXTOK1  FIXED(15,0)         ,  /* TOKOI      XPExrTIKOI 1*/
+       2  TKRXTKR2  FIXED(15,0)         ,  /* TOKAPIhMOI XPExrTIKOI 2*/
+       2  TKRXTOK2  FIXED(15,0)         ,  /* TOKOI      XPExrTIKOI 2*/
+       2  TKREDFR   FIXED(15,0)         ,  /* EIdIKOr uOPOr          */
+       2  TKRPSAF   FIXED(15,2)         ,  /* pOrO EpOM.pEP.(AuETHP) */
+       2  TKRNEOS   PIC '(01)9'         ,  /* = 1 ---> NEOr EnAMHNOY */
+       2  TKRTAXES  FIXED(15,0)         ,  /* pOrO EuOPIAr           */
+       2  TKRKATEP  CHAR (01)           ,  /* 1 -> kOc.ME EpITOKIO   */
+       2  TKRHMPER  FIXED(05,0)         ,  /* HMEPEr pEPIOdOY29.01.01*/
+       2  TKRE3000  FIXED(05,0)         ,  /* EuTE 5078 ME XPHrH XEp2*/
+       2  TKRDATE   FIXED(07)           ,  /* kHnH EKTOKIrMOY 8.12.99*/
+       2  TKRCOPEN  CHAR (01)           ,  /* S=rYNAdEkuOI    8.12.99*/
+       2  TKRNOMIS  CHAR (01)           ,  /* E=EYPx,SP.=dPX 29.01.01*/
+       2  TKRMESYP  FIXED(15,2)         ,  /* MErO YpOkOIpO pEPIOdOY */
+       2  TKROVERD  PIC '(01)9' ,     /* FLAG cIA OVERDRAFT 15.06.04 */
+       2  TKRFIL1   CHAR (48)   ,     /* KENO                        */
+       2  TKRKATAX  FIXED(15,2)         ,  /* TOKOr pOY KATAXxPHhHKE */
+       2  TKRKATP   FIXED(15,2)         ,  /* pIrT.KATAX.TOKOr(MIS)  */
+       2  TKRKATX   FIXED(15,2)         ,  /* XPExrT.KATAX.TOKOr(MIS)*/
+       2  TKRKATF   FIXED(15,2)         ,  /* KATAXxPHhEIr uOPOr     */
+       2  TKRFIL2   CHAR (20)   ;     /* KENO  13.10.2006            */
+ /*    2  TKRFIL2   CHAR (28)   ;              13.10.2006            */
+ /*    2  TKRKENON  CHAR (01)           ;     K E N O        29.01.01*/
+ DCL  1   TKRBKATM  BASED(ADDR(TKRKATMA)),
+       2  TKRBKAT0  BIT  (12)            ,
+       2  TKRBKAT1  BIT  (04)            ;
+ DCL  1   TKRBKTLQ  BASED(ADDR(TKRKATOL)),
+       2  TKRBKTL0  BIT  (28)            ,
+       2  TKRBKTL1  BIT  (04)            ;
+ DCL  1   TKRBARLG  BASED(ADDR(TKRARLOG)),
+       2  TKRBLOG0  BIT  (36)            ,
+       2  TKRBLOG1  BIT  (04)            ;
+
+
+ /*------------------------------------------------------------------*/
+ DCL ADDR      BUILTIN;
+ DCL     PREC1               PIC 'ZZ.ZZZ.ZZ9';
+ DCL     PAMOUN1             PIC 'ZZ.ZZZ.ZZZ.ZZ9V,99-';
+ DCL     READ_REC            FIXED(15,0)   INIT(0);
+ DCL     WRITE_REC           FIXED(15,0)   INIT(0);
+ DCL  WRKAREA          CHAR(450);
+ DCL  MY_KSRARLOG      FIXED (09)  INIT(0);
+ DCL 1 MARLOG1   BASED (ADDR(MY_KSRARLOG)),
+       2 LOGAR1        BIT (36),
+       2 FILBIT        BIT (4);
+
+ DCL     ERR_FLAG            PIC '9'       INIT(0);
+ DCL     I                   PIC '99'      INIT(0);
+ DCL     A                   PIC '9'       INIT(0);
+ DCL     B                   PIC '9'       INIT(0);
+ DCL     SW1                 PIC '9'       INIT(0);
+ DCL     U1                  PIC '99'      INIT(0);
+
+   DCL    NEWKATOL  PIC'(06)9' INIT(0)  ;
+   DCL    WSKATOL5  FIXED(5,0) INIT(0)  ;
+   DCL    WSKATOL7  FIXED(7,0) INIT(0)  ;
+   DCL    WSARLOG   FIXED(9,0) INIT(0)  ;
+   DCL    WSKWDEP   CHAR(02)   INIT(' ');
+   DCL    WSFN      CHAR(01)   INIT(' ');
+
+ /*-----------------------------------------------------------------*/
+
+ KFIOROOT = ADDR(WRKAREA) ;             /* 24.10.2005 */
+ KFIOSADD = ADDR(WRKAREA) ;
+         /*---------------------------------------------------------*/
+ OPEN FILE(NTOKAR),FILE(TOKAR),FILE(PRT);
+
+         ON ENDFILE(TOKAR) GOTO EXIT1;
+
+ RR1:    READ FILE(TOKAR)  INTO(TKRREC);
+         READ_REC = READ_REC + 1;
+         DCL MY_KATHOL FIXED(5);
+         MY_KATHOL  = TKRKATOL/100;
+         IF( MY_KATHOL = 5060 ! MY_KATHOL = 5121 !MY_KATHOL = 5122 )
+         THEN DO;
+               CALL READ_ROOT_UN;
+               IF ERR_FLAG = 1 THEN  GOTO EXIT1;
+               ELSE DO;
+                  IF  ((KSRFN = 'N') &
+                      (KSRKWDEP = '70' !
+                       KSRKWDEP = '71' !
+                       KSRKWDEP = '72' !
+                       KSRKWDEP = '73' !
+                       KSRKWDEP = '38' ))THEN DO;
+                     WRITE FILE(NTOKAR) FROM(TKRREC);
+                     WRITE_REC = WRITE_REC + 1;
+                  END;
+               END;
+         END;
+         GOTO RR1;
+  /* ----------------------------------------------------------- */
+  /*          READ ROOT SEGMENT DIRECT         */
+  /* ----------------------------------------------------------- */
+  READ_ROOT_UN: PROC;
+     ERR_FLAG = 0;
+     DCL MY_KSRARLOG FIXED(9);
+     MY_KSRARLOG = TKRARLOG ;
+     FILBIT = '1111'B;
+     EXEC DLI
+          GU USING PCB(2)
+          SEGMENT (KROOTSEG)
+          WHERE (KSRARLOG=MY_KSRARLOG)
+          INTO (WRKAREA);
+
+     IF DIBSTAT ^=' ' THEN DO;
+           CC1 = '0';
+      LINE  = '*** READ ERROR - D/B KATAHEREXN, ' !!
+      'STATUS = ' !! DIBSTAT !!' KOC/MOR : ' !! CHAR(MY_KSRARLOG);
+           WRITE FILE (PRT) FROM (LINE1);
+           ERR_FLAG = 1;
+     END;
+  END READ_ROOT_UN;
+
+
+ EXIT1: ;
+         CC1='0';
+         LINE=(05)' '!!'”’ÕœÀ¡ –—œ√—¡ÃÃ¡‘œ” DK516  ';
+         WRITE FILE(PRT)       FROM(LINE1);
+         CC1='0';
+         PREC1=READ_REC;
+         LINE=(05)' '!!'ƒ…¡¬¡”«» ¡Õ  :  '!!PREC1;
+         WRITE FILE(PRT)       FROM(LINE1);
+         CC1=' ';
+         PREC1=WRITE_REC;
+         LINE=(05)' '!!'√—¡÷‘« ¡Õ    :  '!!PREC1;
+         WRITE FILE(PRT)    FROM(LINE1);
+         CLOSE FILE(NTOKAR),FILE(TOKAR),
+               FILE(PRT);
+ END DK516;
+

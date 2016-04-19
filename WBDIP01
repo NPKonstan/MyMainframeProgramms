@@ -1,0 +1,451 @@
+* PROCESS XOPTS(CICS,SP);
+ WBDIP01: PROC(COM_PTR) OPTIONS(MAIN,REENTRANT) ;
+ /********************************************************************/
+ /*                                                                  */
+ /*   ONLINE PLI + DB2      MEMBER = WBDIP01                         */
+ /*                                                                  */
+ /*   WBD1 TRANSACTION                                               */
+ /********************************************************************/
+ /* DIP LEGALIZATION                                                 */
+ /*                                                                  */
+ /* ƒ≈◊≈‘¡… ”¡Õ INPUT:                                               */
+ /*                   TO CIDB ‘«” ≈‘¡…—≈…¡”,ÂﬂÙÂ ÙÔ afm ÙÁÚ ÂÙ·ÈÒÂﬂ·Ú*/
+ /* ≈–…”‘—≈÷≈…:                                                      */
+ /*            ¡)«Ã≈—œÃ«Õ…¡ À«Œ«” ÕœÃ…Ãœ–œ…«”«”                      */
+ /*            ¬)≈ –—œ”Ÿ–œ’” ≈‘¡…—≈…¡”                               */
+ /*            √)–≈—…œ—…”Ãœ’” ≈ –—œ”Ÿ–ŸÕ                             */
+ /********************************************************************/
+ /* ‘· Î‹ËÁ ÂÈÛÙÒ›ˆÔÌÙ·È ÛÙ· ÈÔ Í‹Ù˘ Â‰ﬂ· :                       */
+ /* CA_ANSWER_CODE  PIC '(3)9'                                       */
+ /* CA_ANSWER_DESC  CHAR(100)                                        */
+ /********************************************************************/
+ /* NPK 06-07-2011                                                   */
+ /********************************************************************/
+ /* NPK 05-09-2011                                                   */
+ /* ≈Ì·ÎÎ·ÍÙÈÍ‹,·Ì·ÊﬁÙÁÛÁ ÏÂ     ¡÷Ã,ÂÍÙ¸Ú ÙÔı CIDB ÙÁÚ ÂÙ·ÈÒÂﬂ·Ú    */
+ /********************************************************************/
+ /* NPK 13-10-2011  ¡ÎÎ·„ﬁ                                           */
+ /* «  ÁÏ/Ìﬂ· ÎﬁÓÁÚ ÌÔÏÈÏÔÔﬂÁÛÁÚ ‰ÂÌ ÂﬂÌ·È Á T04LEB01.FEC_DURATION, */
+ /* ·ÎÎ‹ Á T04FUL50.DAT_EXP_DATE                                     */
+ /********************************************************************/
+ /********************************************************************/
+ /* NPK 23-11-2011  ¡ÎÎ·„ﬁ                                           */
+ /* 1)–ÒÔÛËﬁÍÁ 3 Ì›˘Ì Â‰ﬂ˘Ì:                                        */
+ /*   CA_TXT_CONSTRAINTS,CA_TXT_NOTES,CA_TXT_CONSTRAINTS2            */
+ /* 2)¡ÎÎ·„ﬁ Ã¡◊ ·¸ 99 ÛÂ 80                                        */
+ /* 3)–ÒÔÛËﬁÍÁ GET_T04LEB01_DATA                                     */
+ /********************************************************************/
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+ DCL MAX   FIXED(3) VALUE(80);
+ % INCLUDE  EFHWEBDS ;           /* WEB COMMAREA                 */
+ DCL 1 DAT_IO     BASED(ADDR(COM_AREA_DATA)),
+ 2  CA_CIDB            PIC '(9)9',/* CIDB                  INPUT */
+ 2  CA_AFM             PIC '(9)9',/* AFM                   INPUT */
+ 2  CA_LEGAL_DATE      CHAR(10),  /*                       OUTPUT*/
+ 2  CA_PAGING_FLAG     CHAR(01),  /*                       OUTPUT*/
+ 2  CA_TXT_CONSTRAINTS  CHAR(2001),/*                    OUTPUT*/
+ 2  CA_TXT_NOTES        CHAR(0501),/*                    OUTPUT*/
+ 2  CA_TXT_CONSTRAINTS2 CHAR(1001),/*                    OUTPUT*/
+ 2  CA_RETRIEVED_PROP   PIC'(3)9', /*                       OUTPUT*/
+ 2  CA_MATRIX (MAX)   ,
+   5 CA_REPR_CIDB       PIC '(9)9',/*                      OUTPUT*/
+   5 CA_REPR_NAME       CHAR(60)  ,/*                      OUTPUT*/
+   5 CA_CONSTR_DESCR    CHAR(125) ,/*                      OUTPUT*/
+   5 CA_CONSTR_LIMIT    PIC '(13)9.V99',/*                 OUTPUT*/
+   5 CA_CONSTR_END_DATE CHAR(10)    ;  /*                  OUTPUT*/
+
+
+ DCL I    FIXED DEC(3) INIT(0);
+ DCL EOC1 BIN(1) INIT('0'B);
+ DCL EOC2 BIN(1) INIT('0'B);
+   /*
+   DAT_IO  = '';
+   DAT_IO.
+   */
+ /****************************************************************
+          INCLUDED TABLES
+ ***************************************************************/
+  EXEC SQL INCLUDE SQLCA      ;
+  EXEC SQL INCLUDE T04FUL50   ;/*                                     */
+  EXEC SQL INCLUDE T04LEA01   ;/*PARTICIPANTS FOR A COMPANY  */
+  EXEC SQL INCLUDE T04LEB01   ;/*                 A COMPANY  */
+  EXEC SQL INCLUDE T04LEC01   ;/*CONSTRAINTS FOR A  COMPANY   */
+  EXEC SQL INCLUDE T06TC002   ;/*KCOD TABLE                   */
+  EXEC SQL INCLUDE T04DBA01   ;/*”‘œ…◊≈…¡ –≈À¡‘«              */
+  /**************************************************************/
+  /*
+
+
+
+    PUT SKIP LIST('WBDIP01  START : ',DATETIME());
+    PUT SKIP LIST('CA_CIDB        : ',CA_CIDB   );
+    PUT SKIP LIST('CA_AFM         : ',CA_AFM    );
+    */
+ /***************************************************************/
+ /*  DECLARE CURSORS                                  ========  */
+ /***************************************************************/
+ /******************* CURSOR1 ***********************************/
+     EXEC SQL DECLARE CURSOR1 CURSOR WITH HOLD FOR SELECT
+      COD_PERSONA_REPR
+     FROM T04LEA01
+     WHERE
+      FEC_FIN     = '31.12.9999'           AND
+      COD_PERSONA = :T04LEA01.COD_PERSONA  AND
+      COD_VINCULO = :T04LEA01.COD_VINCULO
+     WITH UR;
+ /******************* CURSOR2 ***********************************/
+     EXEC SQL DECLARE CURSOR2 CURSOR WITH HOLD FOR SELECT
+      IMP_CONSTRAINT,
+      FEC_CONSTRAINT,
+      COD_TRANSACTION
+     FROM T04LEC01
+     WHERE
+      COD_EMPRESA      = '0012'                             AND
+      FEC_FIN          = '31.12.9999'                       AND
+      COD_PERSONA      = :T04LEC01.COD_PERSONA              AND
+      COD_PERSONA_REPR = :T04LEC01.COD_PERSONA_REPR
+     WITH UR;
+ /***************************************************************/
+  CA_LEGAL_DATE     = '';
+  CA_PAGING_FLAG    = '';
+  CA_RETRIEVED_PROP = '';
+  CA_MATRIX         = '';
+
+  CA_ANSWER_CODE = 0 ;
+  CA_ANSWER_DESC = '';
+ /*  =============================================  */
+     IF( CA_CIDB = 0) THEN
+        CA_CIDB = GET_CIDB(CA_AFM);
+     CALL GET_DURATION   ;
+     CALL OPEN_CURSOR1   ;
+     CALL FETCH_ROWS1    ;
+     DO WHILE(EOC1 ='0'B )     ;
+        CALL FETCH_ROWS1 ;
+     END; /*DO WHILE END*/
+     CALL CLOSE_CURSOR1;
+   /*
+   PUT SKIP LIST('CA_REPR_CIDB      ',CA_MATRIX(1).CA_REPR_CIDB     );
+   PUT SKIP LIST('CA_REPR_NAME      ',CA_MATRIX(1).CA_REPR_NAME     );
+   PUT SKIP LIST('CA_CONSTR_DESCR   ',CA_MATRIX(1).CA_CONSTR_DESCR  );
+   PUT SKIP LIST('CA_CONSTR_LIMIT   ',CA_MATRIX(1).CA_CONSTR_LIMIT  );
+   PUT SKIP LIST('CA_CONSTR_END_DATE',CA_MATRIX(1).CA_CONSTR_END_DATE);
+   PUT SKIP LIST('CA_REPR_CIDB      ',CA_MATRIX(2).CA_REPR_CIDB     );
+   PUT SKIP LIST('CA_REPR_NAME      ',CA_MATRIX(2).CA_REPR_NAME     );
+   PUT SKIP LIST('CA_CONSTR_DESCR   ',CA_MATRIX(2).CA_CONSTR_DESCR  );
+   PUT SKIP LIST('CA_CONSTR_LIMIT   ',CA_MATRIX(2).CA_CONSTR_LIMIT  );
+   PUT SKIP LIST('CA_CONSTR_END_DATE',CA_MATRIX(2).CA_CONSTR_END_DATE);
+   PUT SKIP LIST('CA_TXT_CONSTRAINTS =',CA_TXT_CONSTRAINTS );
+   PUT SKIP LIST('CA_TXT_NOTES       =',CA_TXT_NOTES       );
+   PUT SKIP LIST('CA_TXT_CONSTRAINTS2=',CA_TXT_CONSTRAINTS2);
+   */
+    /****************************************************************
+    ** OPEN_CURSOR1                                               **
+    *****************************************************************/
+     OPEN_CURSOR1:  PROC;
+     /*PUT SKIP LIST(PROCEDURENAME());*/
+     T04LEA01.COD_PERSONA  = DAT_IO.CA_CIDB ;
+     T04LEA01.COD_VINCULO  = '3027';/*ƒ≈”Ã≈’≈‘¡… ¡–œ...*/
+     EXEC SQL   OPEN CURSOR1;
+     IF SQLCODE ^= 0 THEN DO;
+           CA_ANSWER_CODE = 1;
+           CA_ANSWER_DESC =
+          'À¡»œ” OPENING CURSOR (1) SQLCODE = '!!SQLCODE   ;
+
+          EXEC CICS SYNCPOINT ROLLBACK;
+          EXEC CICS RETURN;
+     END;
+     END OPEN_CURSOR1;
+     /****************************************************************
+     ** OPEN_CURSOR2                                               **
+     *********************************************************/
+     OPEN_CURSOR2:  PROC;
+     /*PUT SKIP LIST(PROCEDURENAME());*/
+
+     T04LEC01.COD_PERSONA        = T04LEA01.COD_PERSONA;
+     T04LEC01.COD_PERSONA_REPR   = T04LEA01.COD_PERSONA_REPR;
+     EXEC SQL   OPEN CURSOR2;
+       IF SQLCODE ^= 0 THEN DO;
+             CA_ANSWER_CODE = 1;
+             CA_ANSWER_DESC =
+            'À·ËÔÚ Opening Cursor (2) SQLCODE = '!!SQLCODE   ;
+
+            EXEC CICS SYNCPOINT ROLLBACK;
+            EXEC CICS RETURN;
+       END;
+     END OPEN_CURSOR2;
+    /****************************************************************
+    ** FETCH_ROWS1;                                              **
+    ***************************************************************/
+      FETCH_ROWS1:PROC;
+     /*PUT SKIP LIST(PROCEDURENAME());*/
+          EXEC SQL FETCH CURSOR1 INTO
+               :T04LEA01.COD_PERSONA_REPR  ;
+          IF SQLCODE = 100 THEN DO;
+             EOC1='1'B;
+          END;
+          ELSE DO;/* */
+            IF SQLCODE ^= 0 THEN DO;
+               CA_ANSWER_CODE = 2;
+               CA_ANSWER_DESC =
+               'ERROR FETCHING CURSOR (1) SQLCODE = '!!SQLCODE   ;
+                EXEC CICS SYNCPOINT ROLLBACK;
+                EXEC CICS RETURN;
+            END;
+            ELSE DO;/* */
+               EOC2='0'B;
+               CALL GET_T04LEB01_DATA; /*NPK 23-11-2011*/
+               CALL OPEN_CURSOR2   ;
+               CALL FETCH_ROWS2    ;
+               DO WHILE(EOC2 ='0'B  )     ;
+                  CALL FETCH_ROWS2 ;
+               END; /*DO WHILE END*/
+               CALL CLOSE_CURSOR2;
+            END;
+         END;
+      END FETCH_ROWS1 ;
+    /****************************************************************
+    ** FETCH_ROWS2;                                              **
+    ***************************************************************/
+      FETCH_ROWS2:PROC;
+     /*PUT SKIP LIST(PROCEDURENAME());*/
+
+          EXEC SQL FETCH CURSOR2 INTO
+                 :T04LEC01.IMP_CONSTRAINT,
+                 :T04LEC01.FEC_CONSTRAINT,
+                 :T04LEC01.COD_TRANSACTION;
+          IF SQLCODE = 100 THEN DO;
+             EOC2='1'B;
+          END;
+          ELSE DO;/*b*/
+            IF SQLCODE ^= 0 THEN DO;
+              CA_ANSWER_CODE = 2;
+              CA_ANSWER_DESC =
+              'ERROR FETCHING CURSOR (2) SQLCODE = '!!SQLCODE   ;
+          EXEC CICS SYNCPOINT ROLLBACK;
+          EXEC CICS RETURN;
+            END;
+            ELSE DO;/*a*/
+              I = I + 1;
+              IF I > MAX THEN   DO;
+              CA_ANSWER_CODE = 9;
+              CA_ANSWER_DESC =
+              '–≈—…”œ‘≈—≈” ¡–œ '!!MAX!!' ¡–¡Õ‘«”≈…”  '  ;
+
+              EXEC CICS SYNCPOINT ROLLBACK;
+              EXEC CICS RETURN;
+              END;
+              CA_LEGAL_DATE             = T04FUL50.DAT_EXP_DATE;
+              CA_PAGING_FLAG            ='N';
+              CA_RETRIEVED_PROP         = I;
+
+              CA_MATRIX(I).CA_REPR_CIDB =
+              T04LEC01.COD_PERSONA_REPR;
+
+              CA_MATRIX(I).CA_REPR_NAME =
+              GET_NAME(T04LEC01.COD_PERSONA_REPR);
+
+              CA_MATRIX(I).CA_CONSTR_DESCR =
+              GET_CONSTR_DESCR(T04LEC01.COD_TRANSACTION);
+
+              CA_MATRIX(I).CA_CONSTR_LIMIT =
+              T04LEC01.IMP_CONSTRAINT;
+
+              CA_MATRIX(I).CA_CONSTR_END_DATE =
+              T04LEC01.FEC_CONSTRAINT;
+
+            END;
+          END;
+      END FETCH_ROWS2 ;
+      /*****************************************************************
+      ** CLOSE_CURSOR1                                              **
+      ****************************************************************/
+       CLOSE_CURSOR1        : PROC;
+     /*PUT SKIP LIST(PROCEDURENAME());*/
+
+           EXEC SQL  CLOSE CURSOR1;
+           IF SQLCODE ^= 0 THEN DO;
+               CA_ANSWER_CODE = 3;
+               CA_ANSWER_DESC =
+               'Error Closing  Cursor (1) SQLCODE = '!!SQLCODE   ;
+
+               EXEC CICS SYNCPOINT ROLLBACK;
+               EXEC CICS RETURN;
+           END;
+       END CLOSE_CURSOR1;
+      /*****************************************************************
+      ** CLOSE_CURSOR2                                              **
+      ****************************************************************/
+       CLOSE_CURSOR2        : PROC;
+     /*PUT SKIP LIST(PROCEDURENAME());*/
+        /*CALL DISPL;*/
+
+           EXEC SQL  CLOSE CURSOR2;
+           IF SQLCODE ^= 0 THEN DO;
+               CA_ANSWER_CODE = 3;
+               CA_ANSWER_DESC =
+               'Error Closing  Cursor (2) SQLCODE = '!!SQLCODE   ;
+
+               EXEC CICS SYNCPOINT ROLLBACK;
+               EXEC CICS RETURN;
+           END;
+       END CLOSE_CURSOR2;
+   /**************************************************************/
+   /*GET_CONSTR_DESCR    START                                   */
+   /**************************************************************/
+    GET_CONSTR_DESCR   : PROC (COD_TRANS  ) RETURNS(CHAR(125));
+     /*PUT SKIP LIST(PROCEDURENAME());*/
+      DCL CONSTR_DESCR    CHAR(125);
+      DCL COD_TRANS       PIC'999' ;
+      DCL WS_COD_TRANS    CHAR(3) ;
+      WS_COD_TRANS = COD_TRANS;
+     EXEC SQL
+     SELECT DEL_REGISTRO
+     INTO  :T06TC002.DEL_REGISTRO
+     FROM T06TC002
+     WHERE
+     COD_TABLA_ID = 'PE38LEGA' AND
+     CODIGO_REGISTRO = :WS_COD_TRANS
+     WITH UR;
+
+     IF SQLCODE = 0 THEN DO;
+        CONSTR_DESCR  = T06TC002.DEL_REGISTRO    ;
+     END;
+     ELSE DO;
+        CONSTR_DESCR  = '' ;
+     END;
+      RETURN (CONSTR_DESCR);
+    END GET_CONSTR_DESCR ;
+   /**************************************************************/
+   /*GET_CONSTR_DESCR         END                                */
+   /**************************************************************/
+   /**************************************************************/
+   /*GET_NAME        START                                       */
+   /**************************************************************/
+    GET_NAME : PROC (REPR_CIDB) RETURNS(CHAR(60));
+     /*PUT SKIP LIST(PROCEDURENAME());*/
+
+      DCL  REPR_CIDB       DEC FIXED(9,0);
+      DCL  REPR_NAME       CHAR(60)    ;
+
+      T04DBA01.COD_PERSONA  = REPR_CIDB ;
+
+     EXEC SQL
+     SELECT NOM_DENOM_SOCIAL
+     INTO  :T04DBA01.NOM_DENOM_SOCIAL
+     FROM   T04DBA01
+     WHERE  COD_PERSONA = :T04DBA01.COD_PERSONA AND
+            COD_EMPRESA = '0012'
+     WITH UR;
+     IF SQLCODE = 0 THEN DO;
+        REPR_NAME = T04DBA01.NOM_DENOM_SOCIAL;
+     END;
+     ELSE DO;
+        REPR_NAME = '' ;
+     END;
+
+      RETURN (REPR_NAME ) ;
+    END GET_NAME       ;
+   /**************************************************************/
+   /*GET_NAME        END                                         */
+   /**************************************************************/
+   /**************************************************************/
+   /*GET_CIDB        START                                       */
+   /**************************************************************/
+    GET_CIDB : PROC (WS_AFM) RETURNS(PIC '(9)9');
+     /*PUT SKIP LIST(PROCEDURENAME());*/
+
+     DCL  WS_AFM        PIC '(9)9'  ;
+     DCL  WS_CIDB       PIC '(9)9'  ;
+
+     T04DBA01.COD_AFM  = '       '!!WS_AFM ;
+
+     EXEC SQL
+     SELECT COD_PERSONA
+     INTO  :T04DBA01.COD_PERSONA
+     FROM   T04DBA01
+     WHERE  COD_AFM     = :T04DBA01.COD_AFM AND
+            COD_EMPRESA = '0012'
+     WITH UR;
+     IF SQLCODE = 0 THEN DO;
+        WS_CIDB = T04DBA01.COD_PERSONA;
+     END;
+     ELSE DO;
+        WS_CIDB = 0 ;
+     END;
+
+      RETURN (WS_CIDB) ;
+    END GET_CIDB       ;
+   /**************************************************************/
+   /*GET_CIDB        END                                         */
+   /**************************************************************/
+   /**************************************************************/
+   /*GET_DURATION    START                                       */
+   /**************************************************************/
+    GET_DURATION : PROC ;
+     /*PUT SKIP LIST(PROCEDURENAME());*/
+
+    T04FUL50.COD_PERSONA = DAT_IO.CA_CIDB ;
+
+    EXEC SQL
+    SELECT DAT_EXP_DATE
+     INTO :T04FUL50.DAT_EXP_DATE
+    FROM T04FUL50
+    WHERE
+      COD_PERSONA = :T04FUL50.COD_PERSONA AND
+      COD_EMPRESA = '0012'
+    WITH UR;
+    IF SQLCODE ^= 0 THEN DO;
+        T04FUL50.DAT_EXP_DATE= '';
+    END;
+
+    END GET_DURATION ;
+   /**************************************************************/
+   /*GET_DURATION    END                                         */
+   /**************************************************************/
+   /**************************************************************/
+   /*GET_T04LEB01_DATA START                                     */
+   /**************************************************************/
+    GET_T04LEB01_DATA : PROC ;
+
+   T04LEB01.COD_PERSONA = T04LEA01.COD_PERSONA ;
+
+     EXEC SQL SELECT
+      TXT_CONSTRAINTS  ,
+      TXT_NOTES        ,
+      TXT_CONSTRAINTS2
+      INTO
+      :T04LEB01.TXT_CONSTRAINTS ,
+      :T04LEB01.TXT_NOTES ,
+      :T04LEB01.TXT_CONSTRAINTS2
+     FROM T04LEB01
+     WHERE
+      COD_EMPRESA      = '0012'                             AND
+      FEC_FIN          = '31.12.9999'                       AND
+      COD_PERSONA      = :T04LEB01.COD_PERSONA
+     WITH UR;
+     IF SQLCODE = 0 THEN DO;
+       CA_TXT_CONSTRAINTS = T04LEB01.TXT_CONSTRAINTS ;
+       CA_TXT_NOTES       = T04LEB01.TXT_NOTES ;
+       CA_TXT_CONSTRAINTS2= T04LEB01.TXT_CONSTRAINTS2;
+     END;
+     ELSE DO;
+       CA_TXT_CONSTRAINTS = '' ;
+       CA_TXT_NOTES       = '' ;
+       CA_TXT_CONSTRAINTS2= '' ;
+     END;
+     /*
+      PUT SKIP LIST('INTO GET_T04LEB01 SQLCODE =  ',CHAR(SQLCODE) );
+      PUT SKIP LIST('CA_TXT_CONSTRAINTS = ',
+      substr(CA_TXT_CONSTRAINTS,1,20) );
+      PUT SKIP LIST('CA_TXT_NOTES       = ',
+      substr(CA_TXT_NOTES,1,20)       );
+      PUT SKIP LIST('CA_TXT_CONSTRAINTS2 = ',
+       substr(CA_TXT_CONSTRAINTS2,1,20));
+    */
+    END GET_T04LEB01_DATA;
+   /**************************************************************/
+   /*GET_T04LEB01_DATA END                                       */
+   /**************************************************************/
+  EXEC CICS RETURN;
+ END   WBDIP01;
+

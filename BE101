@@ -1,0 +1,544 @@
+  /*---------------------BE101--------------------------------------*/
+  /*                     pli-db2                                    */
+  /*----------------------------------------------------------------*/
+  /*----------------- ΠΡΟΣΟΧΗ ΠΡΟΣΟΧΗ HARD-CODED -------------------*/
+  /*----------------------------------------------------------------*/
+  /*          Προσοχή εχει Hard-Coded Τους Κωδικούς των ΠΕΚ καταστ. */
+  /*----------------------------------------------------------------*/
+  /*----------------------------------------------------------------*/
+  /*          Προσοχή εχει Hard-Coded Τους Κωδικούς των ΠΕΚ καταστ. */
+  /*----------------------------------------------------------------*/
+  /*-NPK 08-10-2007 ------------------------------------------------*/
+  /*----------------------------------------------------------------*/
+  /*-NPK 03-01-2008 ΝΕΟΙ ΚΩΔΙΚΟΙ 643,644,646,655,656  --------------*/
+  /*----------------------------------------------------------------*/
+  /*-KTH 20-06-2008 ΝΕΟΙ ΚΩΔΙΚΟΙ 657,658,659,639,642,645 -----------*/
+  /*----------------------------------------------------------------*/
+  /*-NPK 02-01-2009 ΔΙΟΡΘΩΣΗ     RC FIXED (3)  NOT FIXED (1)--------*/
+  /*----------------------------------------------------------------*/
+  BE101 : PROC  OPTIONS ( MAIN );
+  DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+  DCL CZX3VDAT CHAR(6); FETCH CZXDATEP;
+  DCL CZXDATEP ENTRY OPTIONS(INTER,ASM) ;
+  DCL   CHECK2D FILE RECORD DIRECT UPDATE KEYED ENV ( VSAM );
+  DCL   CHECK2  FILE RECORD SEQUENTIAL INPUT KEYED ENV ( VSAM GENKEY );
+  DCL   PRT FILE RECORD OUTPUT  ENV(FB RECSIZE(133)CTLASA);
+  DATE: PROC IRREDUCIBLE RETURNS(CHAR(6)) ;
+
+        CALL CZXDATEP          ( CZX3VDAT) ;
+        RETURN (CZX3VDAT) ;
+        END DATE ;
+ /*------------------------------------------------------------------*/
+ /*      VSAM KSDS CHECK2  FILE                                      */
+ /*      RECORD  CHECK2  FILE FOR TP        RECSIZE=90   KEYSIZE=14  */
+ /*------------------------------------------------------------------*/
+  DCL     RLENGTH             FIXED BIN(15)    INIT(90);
+  DCL     SAVE_HEADER         CHAR(90) INIT('');
+  DCL     IOAREA              CHAR(90);
+  DCL 1   IOAREA1     BASED(ADDR(IOAREA)),  /* CONTROL RECORD */
+      2  EEKEY1              PIC '(14)9',   /* APIΘMOΣ KATAXΩPHΣHΣ   */
+                                            /* CONTROL RECORD +      */
+                                            /* DATE AΓOPAΣ EΠIT.     */
+                                            /* ANEΣTPAMENH  (YYMMDD) */
+      2  EETYPE1             PIC '9',       /* RECORD TYPE           */
+                                            /* 1=CONTROL RECORD      */
+                                            /* 2=RECORD EΠITAΓHΣ     */
+      2  EEAGOR1             CHAR(01),      /* ENΔEIΞH EΠIΣTP.EΠITAΓ.*/
+                                            /* EINAI ΠANTA  'E'      */
+      2  EEFACC1             PIC '(8)9',    /* ΠPΩTOΣ ΔIAΘEΣIMOΣ     */
+                                            /* APIΘMOΣ EΠITAΓHΣ      */
+      2  EENUMB1             PIC '(5)9',    /* ΣYNOΛ.APIΘMOΣ EΠIΣTP. */
+                                            /* EΠITAΓΩN ANA KAT/MA   */
+      2  EETOTAL1            FIXED(15,2),   /* ΣYNOΛ.ΠOΣO EΠIΣTPEΦOM.*/
+                                            /* EΠITAΓΩN ANA KAT/MA   */
+      2  EEFIL1              CHAR(53);      /* FILLER...             */
+      /*-------------------------------------------------------------*/
+         DCL 1 VSAMKEY1   BASED(ADDR(EEKEY1)) ,
+               2 KEYKATMA1  PIC'(3)9',
+               2 KEYFILL    PIC'(5)9',
+               2 KEYDATE1   PIC'(6)9';
+  DCL 1   IOAREA2     BASED(ADDR(IOAREA)), /* RECORD EΠITAΓHΣ */
+      2  EEKEY2              PIC '(14)9',   /* APIΘMOΣ KATAXΩPHΣHΣ   */
+                                            /* EΠITAΓHΣ   +          */
+                                            /* DATE AΓOPAΣ EΠITAΓHΣ  */
+                                            /* ANEΣTPAMENH  (YYMMDD) */
+      2  EETYPE2             PIC '9',       /* RECORD TYPE           */
+                                            /* 1=CONTROL RECORD      */
+                                            /* 2=RECORD EΠITAΓHΣ     */
+      2  EEAGOR2             CHAR(01),      /* ENΔEIΞH EΠIΣTP.EΠITAΓ.*/
+                                            /* EINAI ΠANTA  'E'      */
+      2  EESTATUS            PIC '9',       /* RECORD STATUS         */
+                                            /* 0=ΣE IΣXY 1=AKYPΩMENO */
+      2  EEBANK2             PIC '999',     /* TPAΠEZA EKΔ.EΠITAΓHΣ  */
+      2  EEBRANCH2           PIC '999',     /* KATAΣTHMA EKΔ.EΠITAΓ. */
+      2  EEACCN2             PIC '(13)9',   /* APIΘMOΣ ΛOΓAPIAΣMOY   */
+      2  EECHECKN2           PIC '(9)9',    /* APIΘMOΣ EΠITAΓHΣ      */
+      2  EEDATE2A            PIC '(6)9',    /* DATE EKΔOΣHΣ EΠITAΓHΣ */
+                                            /* ANEΣTPAMENH  (YYMMDD) */
+      2  EEAMOUNT            FIXED(15,2),   /* ΠOΣO EΠITAΓHΣ         */
+      2  EECOURR             CHAR(03),      /* KΩΔIKOΣ NOMIΣMATOΣ    */
+      2  EESIGN2             PIC '99',      /* ENΔEIΞH EΠITAΓHΣ      */
+                                            /* 01 ===> AKAΛYΠTH      */
+                                            /* 02 ===> EΠIΣTPEΦOMENH */
+                                            /*     ΓIA AΛΛOYΣ ΛOΓOYΣ */
+      2  EERTERM             CHAR(07),      /* TERMINAL-ID  EΓΓPAΦHΣ */
+      2  EECDATE             PIC '(6)9',    /* HMEPOMHNIA AKYPΩΣHΣ   */
+                                            /* ANEΣTPAMENH  (YYMMDD) */
+                                            /* H THN TPAΠEZA KAI TO  */
+                                            /* KAT/MA ΠOY AΓOPAΣE THN*/
+                                            /* EΠITAΓH               */
+      2  EECTERM             CHAR(07),      /* TERMINAL-ID AKYPΩΣHΣ  */
+      2  EEREALBR            PIC'999',      /* REAL PAYING BRANCH    */
+      2  EEFIL2              CHAR(03);      /* FILLER...             */
+  DCL   NEW_KEY      CHAR(14)  ;
+  DCL 1 VSAMKEY2 ,
+       2 KEYNUM2  PIC'(8)9',
+       2 KEYDATE2 PIC'(6)9';
+  DCL     LINE                CHAR (133);
+  DCL 1   LNX                 BASED(ADDR(LINE)),
+      2  CTLCHR              CHAR(1)      INIT('1'),
+      2  GRAMH               CHAR(132)    INIT(' ');
+     /*-------------------------------------------------------------*/
+     /*=============================================================*/
+
+  /* Υποθέτουμε ότι αυτοι θα είναι οι κωδικοί των πεκ νπκ 01-10-2007*/
+  DCL  PEK_LIMIT FIXED(3) INIT(21);
+  DCL 1 PINAX_PEK(PEK_LIMIT)  ,/*                           */
+       2 PEK_KATMA    CHAR(3) ,
+       2 PEK_IO       CHAR(90),
+       2 PEK_EENUMB1  PIC '(5)9', /*ΣYNOΛO EΠIΣTPEΦOMENΩΝ ΕΠΙΤΑΓΩΝ*/
+       2 PEK_EETOTAL1 FIXED(15,2),/*ΣYNOΛ.ΠOΣO EΠIΣTPEΦOM.*/
+       2 PEK_MAX      FIXED(4),   /*ΜΕΓΙΣΤΟΣ ΑΑ ΕΠΙΤΑΓΗΣ ΣΤΟ ΠΕΚ*/
+       2 PEK_INS_UPD  FIXED(1);   /*ΥΠΉΡΧΕ ΣΤΟ VSAM 1=ΝΑΙ 2=ΟΧΙ */
+  PINAX_PEK = '';
+  PINAX_PEK(1).PEK_KATMA  = '649';
+  PINAX_PEK(2).PEK_KATMA  = '650';
+  PINAX_PEK(3).PEK_KATMA  = '651';
+  PINAX_PEK(4).PEK_KATMA  = '640';
+  PINAX_PEK(5).PEK_KATMA  = '641';
+  PINAX_PEK(6).PEK_KATMA  = '647';
+  PINAX_PEK(7).PEK_KATMA  = '648';
+  PINAX_PEK(8).PEK_KATMA  = '652';
+  PINAX_PEK(9).PEK_KATMA  = '653';
+  PINAX_PEK(10).PEK_KATMA = '654';
+  PINAX_PEK(11).PEK_KATMA = '643';/*NPK 03-01-2008 FROM MARCH START*/
+  PINAX_PEK(12).PEK_KATMA = '644';/*NPK 03-01-2008 FROM MARCH START*/
+  PINAX_PEK(13).PEK_KATMA = '646';/*NPK 03-01-2008 FROM MARCH START*/
+  PINAX_PEK(14).PEK_KATMA = '655';/*NPK 03-01-2008 FROM MARCH START*/
+  PINAX_PEK(15).PEK_KATMA = '656';/*NPK 03-01-2008 FROM MARCH START*/
+  PINAX_PEK(16).PEK_KATMA = '657';
+  PINAX_PEK(17).PEK_KATMA = '658';
+  PINAX_PEK(18).PEK_KATMA = '659';
+  PINAX_PEK(19).PEK_KATMA = '639';
+  PINAX_PEK(20).PEK_KATMA = '642';
+  PINAX_PEK(21).PEK_KATMA = '645';
+
+
+  DCL 1 EPITAGES(*) CONTROLLED  ,/*        */
+       2 EPIT_KATMA CHAR (03),
+       2 EPIT_IO    CHAR (90),
+       2 EPIT_FOUND FIXED(01);
+
+  DCL COUNT_PEK FIXED(15) INIT(0);
+
+  DCL READ_KATMA  CHAR (3)  INIT('');
+  DCL IND         FIXED(15) INIT(0);
+  DCL EOF         FIXED(1)  INIT(0);
+  DCL PEK_FLG     FIXED(3)  INIT(0);
+  DCL RET_ERROR   FIXED(1)  INIT(0);
+  DCL RET_KATMA   CHAR(3);
+  DCL PIC_EEACCN2 PIC '(8)9';
+  DCL COUNT_EPIT FIXED(15) INIT(0);
+  DCL  I      FIXED (15);
+  DCL  SAVE_I FIXED (15);
+  DCL 1 MY_REC CONTROLLED  ,
+        2  C_KATMA   CHAR (3) ,
+        2  C_IOAREA  CHAR(90) ;
+
+   DCL 1 COUNTERS ,
+      2 CNT_REC_READ               PIC 'ZZZ.ZZZ.ZZ9' ,
+      2 CNT_REC_REJECT             PIC 'ZZZ.ZZZ.ZZ9' ,
+      2 CNT_REC_PROCCED            PIC 'ZZZ.ZZZ.ZZ9' ,
+      2 CNT_HEADER                 PIC 'ZZZ.ZZZ.ZZ9' ,
+      2 CNT_DETAIL                 PIC 'ZZZ.ZZZ.ZZ9' ,
+      2 CNT_EPITAGON               PIC 'ZZZ.ZZZ.ZZ9' ,
+      2 CNT_INSERTED_PEK           PIC 'ZZZ.ZZZ.ZZ9' ,
+      2 CNT_UPDATED_PEK            PIC 'ZZZ.ZZZ.ZZ9' ;
+
+   COUNTERS  = '';
+  EXEC SQL INCLUDE CTHBCUDE ;
+  EXEC SQL INCLUDE T04CNV97 ;
+  EXEC SQL INCLUDE SQLCA ;
+  /*================================================================*/
+   DCL (ONCODE ,ADDR,SUBSTR,CHAR,NULL,DATETIME)  BUILTIN ;
+  /*------------------------------------------------------------------*/
+   EOF      =  0  ;
+   ON ENDFILE ( CHECK2 )
+      BEGIN;
+        EOF = 1   ;
+        /*CLOSE FILE(CHECK2);*/
+        OPEN FILE(CHECK2D);
+      END;
+  /*------------------------------------------------------------------*/
+   ON KEY ( CHECK2D )
+      BEGIN;
+        SELECT ( ONCODE );
+           WHEN ( 51 )                              /* KEY NOT FOUND */
+             GRAMH= 'CANNOT FIND SPECIFIED KEY : '!!
+                 KEYKATMA1  !!' '!!
+                 KEYFILL    !!' '!!
+                 KEYDATE1  ;
+           WHEN ( 52 )                              /* DUPLICATE KEY */
+             GRAMH= 'DUPLICATE KEY : '!!KEYNUM2!!KEYDATE2;
+           WHEN ( 53 )                               /*     KEY LESS */
+             GRAMH= 'FOR SEQUENTIAL WRITE, KEY OUT OF SEQUENCE :'!!
+                   ' '!!KEYNUM2!!KEYDATE2;
+           WHEN ( 55 )                               /* INVALID  KEY */
+             GRAMH= 'INVALID KEY : '!!KEYNUM2!!KEYDATE2;
+           WHEN ( 56 )                               /* OUT OF LIMITS*/
+             GRAMH= 'ATTEMPT TO READ A KEY OUTSIDE THE LIMITS OF'!!
+                        ' THE DATA SET : '!!KEYNUM2!!KEYDATE2;
+           WHEN ( 57 )                               /* NO SPACE     */
+             GRAMH= 'FOR WRITE, NO SPACE TO ADD A RECORD : '!!
+                   KEYNUM2!!KEYDATE2;
+           WHEN ( 58 )                               /*WRITE KEY LESS*/
+             GRAMH= 'FOR WRITE, KEY IS OUTSIDE THE LIMITS OF THE '!!    !
+                   'DATA SET : '!!KEYNUM2!!KEYDATE2;
+           WHEN ( 92 )                               /* INVALID OPEN */
+             GRAMH= 'ERROR FOUND BY O.S. ON ATTEMPT TO OPEN : '!!
+                   'CHECK2D';
+           WHEN ( 93 )                               /* INVALID OPEN */
+             GRAMH= 'ERROR FOUND BY VSAM ON ATTEMPT TO OPEN : '!!
+                   'CHECK2D';
+           OTHERWISE
+             GRAMH= ' APXEIO ( CHECK2D )  ONCODE : '!!ONCODE!!
+                      ' KΛΕΙΔΙ : '!!KEYNUM2!!KEYDATE2;
+        END; /* SELECT */
+        WRITE FILE ( PRT ) FROM ( LINE );
+
+        CLOSE  FILE ( CHECK2D ), FILE ( PRT );
+        STOP ;              /* CAUSES RETURN CODE 1000 !!!  */
+      END; /* BEGIN */
+  /*------------------------------------------------------------------*/
+  /*=========    A P X H   Π P O Γ P A M M A T O Σ  ==================*/
+  OPEN FILE(CHECK2);
+  OPEN FILE(CHECK2D);
+
+  CTLCHR = '0';
+
+  READ  FILE ( CHECK2  ) INTO  (IOAREA); /*READ FIRST HEADER*/
+
+  DO WHILE  ( EOF = 0 );
+     IF ( SUBSTR(IOAREA,1,3) ^= '000' ) &
+        ( SUBSTR(IOAREA,4,1)='8' ! SUBSTR(IOAREA,4,1)='9') THEN DO;
+     READ_KATMA    = SUBSTR(IOAREA ,1 ,3);
+     CNT_REC_READ  = CNT_REC_READ+ 1;
+     PEK_FLG       = IS_PEK(READ_KATMA);
+     IF (EETYPE1 = '1') THEN DO ; /*HERE HEADER RECORDS ONLY*/
+        SAVE_HEADER = IOAREA;
+        CNT_REC_PROCCED = CNT_REC_PROCCED + 1 ;
+        CNT_HEADER      = CNT_HEADER + 1 ;
+        IF PEK_FLG > 0 THEN DO;/* PEK_FLG > 0 Τo κατάστημα είναι ΠΕΚ*/
+           PINAX_PEK(PEK_FLG).PEK_IO       = IOAREA;
+           PINAX_PEK(PEK_FLG).PEK_MAX      = 0;
+ /* PEK_INS_UPD = 3 το ΠΕΚ υπήρχε στο αρχείο,υποψήφιο για Update */
+ /* πρέπει να έχει εισαχθεί επιταγή που το αφορά για να γίνει Update */
+           PINAX_PEK(PEK_FLG).PEK_INS_UPD  = 3;
+           PINAX_PEK(PEK_FLG).PEK_EENUMB1  = EENUMB1; /*ΠΛΗΘΟΣ ΕΠΙΤ*/
+           PINAX_PEK(PEK_FLG).PEK_EETOTAL1 = EETOTAL1;/*ΠΟΣΟ ΕΠΙΤΑΓ*/
+        END; /* PEK_FLG > 0 Τo κατάστημα είναι ΠΕΚ*/
+     END; /* HEADER RECORD */
+     ELSE DO;/*HERE DETAIL RECORDS */
+     /*Μας Ενδιαφέρουν ΜΟΝΟΝ οι επιταγές καταστ. που ΔΕΝ ειναι PEK*/
+         IF PEK_FLG = 0 THEN DO; /*detail:το κατάστημα δεν εινai PEK*/
+            CNT_REC_PROCCED =  CNT_REC_PROCCED + 1 ;
+            CNT_DETAIL      =  CNT_DETAIL +  1;
+            PIC_EEACCN2 = EEACCN2 ;
+            RET_ERROR   = BELONGS_TO_PEK(PIC_EEACCN2,RET_KATMA);
+         /*Ο λογαριασμός ανήκει σε καταστημα ΠΕK,οταν RET_ERROR = 0 */  /
+            IF RET_ERROR = 0 THEN DO;
+                ALLOCATE  MY_REC;
+                MY_REC.C_KATMA  = RET_KATMA ;
+                MY_REC.C_IOAREA = IOAREA;
+                /*CALL  IS_NEW(RET_KATMA)  ; */
+                /*Σύνολο επιταγών για εισαγωγή σε κάποιο ΠΕΚ*/
+                COUNT_EPIT = COUNT_EPIT +1;
+            END; /* IF RET_ERROR = 0*/
+         END ;/* PEK_FLG = 0 */
+         ELSE DO;/* PEK_FLG ^ 0 Detail:το κατάστημα  εινai PEK*/
+            DCL REC_AA PIC'(3)9';
+            /*Tα τέσσερα ψηφία ειναι η αυξουσα αρίθμηση της εγγραφής*/
+            /*Ομως υπάρχουν και κάποιες επιταγές που ξεκινάνε την   */
+            /*Αρίθμηση απο το 9000 οπότε ας διαλέξουμε τριψήφιο     */
+            REC_AA = SUBSTR(IOAREA,6,3);
+            /*Πάρε την μεγαλύτερη αριθμηση επιταγής-στο δεδομένο ΠEK*/
+            IF PINAX_PEK(PEK_FLG).PEK_MAX < REC_AA  THEN
+                  PINAX_PEK(PEK_FLG).PEK_MAX = REC_AA;
+         END;/* PEK_FLG ^ 0Tο Record ανήκει σε ΠΕΚ με α.α.PEK_FLG  */
+      END;  /*DETAIL RECORD */
+     END; /* SUBSTR(IOAREA,1,3) ^= '000'  */
+     READ  FILE ( CHECK2  ) INTO  (IOAREA); /*READ AGAIN       */
+   END;/* WHILE  ( EOF = 0 )*/
+
+
+  IF COUNT_EPIT > 0 THEN DO;
+    CALL LOAD_TABLE ;
+
+   /***************************************************************/
+   /****************  Επεξεργασία Επιταγών             ************/
+   /***************************************************************/
+   DO IND = 1 TO PEK_LIMIT ;/*Για όλα τα καταστήματα ΠΕΚ ...*/
+      DO I = 1 TO COUNT_EPIT ;/*Για όλες τις επιταγές */
+         IF ( EPITAGES(I).EPIT_KATMA =
+              PINAX_PEK(IND).PEK_KATMA)  &
+              (EPITAGES(I).EPIT_FOUND = 0) THEN DO;
+             /*IOAREA = PINAX_PEK(IND).PEK_IO;npk 15-01-2009*/
+             EPITAGES(I).EPIT_FOUND = 1;
+             PINAX_PEK(IND).PEK_EENUMB1  =
+                            PINAX_PEK(IND).PEK_EENUMB1  + 1;
+             /*IOAREA = EPITAGES(I).EPIT_IO;npk 15-01-2009*/
+             PINAX_PEK(IND).PEK_EETOTAL1 =
+                            PINAX_PEK(IND).PEK_EETOTAL1 + EEAMOUNT;
+ /* RESET KEYS   NPK 15-01-2009                              */
+             /*IOAREA = PINAX_PEK(IND).PEK_IO;npk 15-01-2009*/
+ /* PEK_INS_UPD = 2 το ΠΕΚ δεν υπήρχε στο αρχείο,ΘΑ εισαχθεί */
+             IF  PINAX_PEK(IND).PEK_INS_UPD = 0 THEN
+                        PINAX_PEK(IND).PEK_INS_UPD = 2 ;
+ /* PEK_INS_UPD = 3 το ΠΕΚ  υπήρχε στο αρχείο,ΘΑ γινει UPDATE */
+             IF  PINAX_PEK(IND).PEK_INS_UPD = 3 THEN
+                        PINAX_PEK(IND).PEK_INS_UPD = 1 ;
+             CALL WRITE_EPITAGI;
+         END;/*  IF (EPITAGES(I)             */
+      END;/* DO I = 1 TO COUNT_EPIT          */
+   END; /*DO IND = 1 TO PEK_LIMIT ; */
+
+   /***************************************************************/
+   /****************  Επεξεργασία Καταστημάτων         ************/
+   /***************************************************************/
+   DO IND = 1 TO PEK_LIMIT ;/*Για όλα τα καταστήματα ΠΕΚ ...*/
+          IF  PINAX_PEK(IND).PEK_INS_UPD = 1 THEN
+                   CALL UPDATE_PEK;/*Tο κατάστημα υπήρχε στο check2*/
+          IF  PINAX_PEK(IND).PEK_INS_UPD = 2 THEN
+              CALL INSERT_PEK;/*Το κατάστ.δεν υπήρχε,θα εισαχθεί*/
+   END; /*DO IND = 1 TO PEK_LIMIT ; */
+
+  END; /* IF COUNT_EPIT > 0*/
+  ELSE GOTO TELOS;
+  /*==================================================================*/
+
+  /*************************************************************/
+  /* LOAD_TABLE     START                                      */
+  /*************************************************************/
+  LOAD_TABLE   :PROC ;
+
+   DCL K FIXED(15) INIT(0);
+   ALLOCATE EPITAGES(COUNT_EPIT);
+   /*LOAD REVERSE */
+   DO K = COUNT_EPIT TO 1 BY -1 ;
+        EPITAGES(K).EPIT_KATMA = MY_REC.C_KATMA ;
+        EPITAGES(K).EPIT_IO    = MY_REC.C_IOAREA ;
+        EPITAGES(K).EPIT_FOUND = 0          ;
+        FREE MY_REC ;/*RELEASE A GENERATION*/
+   END;
+  END LOAD_TABLE    ;
+  /*************************************************************/
+  /* LOAD_TABLE     END                                        */
+  /*************************************************************/
+  /*************************************************************/
+  /* WRITE_EPITAGI  START                                      */
+  /*************************************************************/
+  WRITE_EPITAGI:PROC ;
+
+  DCL 1 KEYNUM2_R          BASED(ADDR(NEW_KEY)),
+       2 KEY_KATMA  PIC'(3)9',
+       2 KEY_9      PIC'(1)9',
+       2 KEY_XXXX   PIC'(1)9',
+       2 KEY_COUNT  PIC'(3)9',
+       2 KEYDATE_R  CHAR(6)  ;
+       /*                           ί */
+       PINAX_PEK(IND).PEK_MAX =PINAX_PEK(IND).PEK_MAX+ 1;
+       /* Φτιάξε το Καινούργιο Κλειδί */
+       KEY_KATMA  = PINAX_PEK(IND).PEK_KATMA;
+       KEY_9      = SUBSTR(EPITAGES(I).EPIT_IO,4,1);/*keep 4 byte*/
+       KEY_XXXX   = 2 ;
+       KEY_COUNT  = PINAX_PEK(IND).PEK_MAX ;
+       KEYDATE_R  = SUBSTR(EPITAGES(I).EPIT_IO,9,6);
+
+       /* Αντικατάσταση Παλαιού Κλειδιού με το Καινούργιο  */
+       SUBSTR(EPITAGES(I).EPIT_IO,1,14) = NEW_KEY;
+       PUT SKIP LIST('NPK WRITE_EPITAGI ',NEW_KEY         );
+       WRITE FILE (CHECK2D) FROM(EPITAGES(I).EPIT_IO) KEYFROM(NEW_KEY) ;
+
+        CNT_EPITAGON  = CNT_EPITAGON+ 1;
+  END WRITE_EPITAGI ;
+  /*************************************************************/
+  /* WRITE_EPITAGI  END                                        */
+  /*************************************************************/
+  /*************************************************************/
+  /* INSERT_PEK     START                                      */
+  /*************************************************************/
+  INSERT_PEK   :PROC ;
+
+    /* Φτιάξε το Καινούργιο Κλειδί */
+    IOAREA = SAVE_HEADER;
+    KEYKATMA1  =   PINAX_PEK(IND).PEK_KATMA;
+    KEYFILL    =   SUBSTR(IOAREA,4,5);
+    KEYDATE1   =   SUBSTR(IOAREA,9,6);
+    EENUMB1    =   PINAX_PEK(IND).PEK_EENUMB1;
+    EETOTAL1   =   PINAX_PEK(IND).PEK_EETOTAL1;
+    PUT SKIP LIST('*** INSERT_PEK ********************');
+    PUT SKIP LIST('NPK INSERT_PEK EEKEY1 ' , EEKEY1         );
+    PUT SKIP LIST(' KEYKATMA1  =         ' , KEYKATMA1      );
+    PUT SKIP LIST(' KEYFILL    =         ' , KEYFILL        );
+    PUT SKIP LIST(' KEYDATE1   =         ' , KEYDATE1       );
+    PUT SKIP LIST(' EENUMB1    =         ' , EENUMB1        );
+    PUT SKIP LIST(' EETOTAL1   =         ' , EETOTAL1       );
+    PUT SKIP LIST('***********************************');
+
+    WRITE FILE (CHECK2D) FROM(IOAREA)  KEYFROM( EEKEY1 ) ;
+    CNT_INSERTED_PEK   = CNT_INSERTED_PEK + 1;
+  END INSERT_PEK    ;
+  /*************************************************************/
+  /* INSERT_PEK     END                                        */
+  /*************************************************************/
+  /*************************************************************/
+  /* UPDATE_PEK     START                                      */
+  /*************************************************************/
+  UPDATE_PEK   :PROC ;
+
+       /* Φτιάξε το Καινούργιο Κλειδί */
+    IOAREA     =   SAVE_HEADER;
+    KEYKATMA1  =   PINAX_PEK(IND).PEK_KATMA;
+    KEYFILL    =   SUBSTR(IOAREA,4,5);
+    KEYDATE1   =   SUBSTR(IOAREA,9,6);
+    EENUMB1    =   PINAX_PEK(IND).PEK_EENUMB1;
+    EETOTAL1   =   PINAX_PEK(IND).PEK_EETOTAL1;
+    PUT SKIP LIST('*** UPDATE_PEK ********************');
+    PUT SKIP LIST('NPK UPDATE_PEK EEKEY1 ' , EEKEY1         );
+    PUT SKIP LIST(' KEYKATMA1  =         ' , KEYKATMA1      );
+    PUT SKIP LIST(' KEYFILL    =         ' , KEYFILL        );
+    PUT SKIP LIST(' KEYDATE1   =         ' , KEYDATE1       );
+    PUT SKIP LIST(' EENUMB1    =         ' , EENUMB1        );
+    PUT SKIP LIST(' EETOTAL1   =         ' , EETOTAL1       );
+    PUT SKIP LIST('***********************************');
+
+    CNT_UPDATED_PEK  = CNT_UPDATED_PEK + 1;
+
+    PUT SKIP LIST('NPK UPDATE_PEK    ',EEKEY1          );
+    REWRITE FILE (CHECK2D) FROM(IOAREA) KEY( EEKEY1 ) ;
+  END UPDATE_PEK    ;
+  /*************************************************************/
+  /* UPDATE_PEK     END                                        */
+  /*************************************************************/
+  /*************************************************************/
+  /* BELONGS_TO_PEK  START                                      */
+  /* Δοθέντος Λογαριασμού Επιστρέφει κωδικό Καταστήματος ΠΕΚ   */
+  /* Επιστρέφει 0 = Σωστό,1 όταν είναι Λάθος                   */
+  /*************************************************************/
+  /* Προσοχή : Μόνο τα καταστήματα με κωδικό 0649,EΩΣ ,0658    */
+  /*           Θεωρούνται ΠΕΚ σήμερα την 28-09-2007            */
+  /*************************************************************/
+  /*-NPK 03-01-2008 ΝΕΟΙ ΚΩΔΙΚΟΙ 643,644,646,655,656  ----------*/
+  /*************************************************************/
+  BELONGS_TO_PEK: PROC(IN_LOGAR,OUT_KATMA) RETURNS (FIXED(1));
+
+    DCL IN_LOGAR   PIC '(8)9';
+    DCL OUT_KATMA  CHAR(3)   ;
+    DCL RC FIXED (1) INIT(9) ;
+    T04CNV97.NUM_AR_LOGAR = IN_LOGAR !!'        01';
+
+    EXEC SQL
+       SELECT COD_BRA_RESP_G
+       INTO :CTHBCUDE.COD_BRA_RESP_G
+       FROM CTHBCUDE
+       WHERE CTHBCUDE.COD_BRA_RESP_G IN
+            ( '0649','0650','0651','0640','0641',
+            '0647','0648','0652','0653','0654',
+            '0643','0644','0646','0655','0656',
+            '0657','0658','0659','0639','0642','0645')
+       AND   CTHBCUDE.COD_CUSTOMER     =
+            ( SELECT COD_PELATH
+              FROM T04CNV97
+              WHERE COD_EFARM ='70'
+              AND NUM_AR_LOGAR = :T04CNV97.NUM_AR_LOGAR )
+    WITH UR ;
+    IF (SQLCODE ^= 0 )                     THEN  DO;
+            OUT_KATMA = ''; RC = 1;
+            GRAMH = 'ΠΡΟΒΛΗΜΑ : ΕΥΡΕΣΗ ΠΕΛΑΤΗ ΣΤΟΝ T04CNV97 : '         !!
+                   !!' AΡΙΘΜ.ΛΟΓΑΡ. '
+                   !! CHAR(T04CNV97.NUM_AR_LOGAR)
+                   !!'  SQLCODE  : '!!SQLCODE;
+            IF SQLCODE ^= 100    THEN /* ONLY REAL ERRORS */
+                         WRITE FILE(PRT) FROM(LINE);
+    END;
+    ELSE DO ;
+            OUT_KATMA = SUBSTR(COD_BRA_RESP_G ,2,3 );
+            RC = 0;
+    END;
+
+    RETURN (RC);
+
+   END BELONGS_TO_PEK;
+ /*************************************************************/
+ /* BELONGS_TO_PEK END                                        */
+ /*************************************************************/
+ /*************************************************************/
+ /* IS_PEK         START                                      */
+ /* Επιστρέφει 0 αν δεν είναι ΠΕΚ το Κατάστημα και Κ εάν είναι*/
+ /* οπου Κ η θέση του κωδικού καταστήματος στον πινακα PINAX_PEK*/
+ /*************************************************************/
+ /* Προσοχή : Μόνο τα καταστήματα με κωδικό 0649,0650,0651    */
+ /*           Θεωρούνται ΠΕΚ σήμερα την 28-09-2007            */
+ /*************************************************************/
+  IS_PEK :PROC (IN_KATMA) RETURNS(FIXED(3));
+
+    DCL IN_KATMA  CHAR(3)   ;
+    DCL RC FIXED (3) INIT(0) ;
+    DCL K  FIXED (3) INIT(0) ;
+    DO K = 1          TO PEK_LIMIT;
+        IF PINAX_PEK(K).PEK_KATMA  =  IN_KATMA  THEN
+            RC  =  K   ;
+
+    END;/*DO END*/
+
+    RETURN (RC);
+
+  END IS_PEK        ;
+ /*************************************************************/
+ /* IS_PEK         END                                        */
+ /*************************************************************/
+ /*==================================================================*/
+  TELOS: ;
+  FREE EPITAGES ;
+  CTLCHR = '1';
+  GRAMH = 'EMΠOPIKH TPAΠEZA THΣ EΛΛAΔOΣ                     '
+               !!' *** BE101           ***';
+  WRITE FILE(PRT) FROM(LINE);
+  DCL MY_DATETIME PIC '9999.99.99B9999' ;
+      MY_DATETIME = SUBSTR(DATETIME(),1,12);
+  GRAMH = 'Hμέρα και Ωρα Ροής :                             '
+               !!char(DATETIME());
+  GRAMH = 'Hμέρα και Ωρα Ροής :                             '
+               !!MY_DATETIME;
+  WRITE FILE(PRT) FROM(LINE);
+  CTLCHR = ' ';
+  GRAMH = 'Διαβάσθηκαν '!! CNT_REC_READ !!' Εγγραφές ';
+  WRITE FILE(PRT) FROM(LINE);
+  GRAMH = 'Επεξεργάσθηκαν '!!CNT_REC_PROCCED!!' Εγγραφές ';
+  WRITE FILE(PRT) FROM(LINE);
+  GRAMH = 'Επεξεργάσθηκαν '!!CNT_HEADER     !!' Εγγραφές Καταστημάτων';
+  WRITE FILE(PRT) FROM(LINE);
+  GRAMH = 'Επεξεργάσθηκαν '!!CNT_DETAIL     !!' Εγγραφές Επιταγών    ';
+  WRITE FILE(PRT) FROM(LINE);
+  GRAMH = 'Σύνολο Επιταγών για εισαγωγή : '!! CNT_EPITAGON;
+  WRITE FILE(PRT) FROM(LINE);
+  GRAMH = 'Σύνολο Kαταστημ.ΠΕΚ για εισαγωγή : '!!CNT_INSERTED_PEK;
+  WRITE FILE(PRT) FROM(LINE);
+  GRAMH = 'Σύνολο Kαταστημ.ΠΕΚ για Update: '!!CNT_UPDATED_PEK;
+  WRITE FILE(PRT) FROM(LINE);
+
+  CLOSE FILE(CHECK2D);
+  CLOSE FILE(CHECK2);
+
+  END BE101;
+

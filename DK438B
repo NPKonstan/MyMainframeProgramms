@@ -1,0 +1,738 @@
+ /* PROCESS A,GOSTMT,ESD,MAP,NEST,OPT(TIME),AG,MI('$'),S,X,OF,INCLUDE;*/
+ /* DK438B- MErO rTAhMIKO EpITOKIO cIA TPApEZA EkkAdOr               */
+ /*         MONO cIA TPApEZA ATTIKHr                                 */
+ /*   Ã    TRANSLATE   GRREK CHARACTERS                              */
+
+ /*                             TEkEYTAIA AkkAcH  :  08.03.1998      */
+ /* TPEXEI ANA dEKAHMEPO AYrTHPA.                                    */
+
+ DK438B: PROCEDURE  OPTIONS(MAIN);
+ DCL PLIXOPT CHAR(39) VAR EXT  INIT ('ERRCOUNT(0)');
+ DCL CZX3VDAT CHAR(6); FETCH CZXDATEP;
+ DCL CZXDATEP ENTRY OPTIONS(INTER,ASM) ;
+
+ DCL   KINHSF  FILE  RECORD  INPUT  ENV( FB RECSIZE(078) );
+ DCL   PRINTF  FILE  RECORD  OUTPUT ENV( FB RECSIZE(133) CTLASA);
+ DCL   MSSGEF  FILE  RECORD  OUTPUT ENV( FB RECSIZE(133) CTLASA);
+ DCL   CREADF  FILE  RECORD  INPUT  ENV( FB RECSIZE(080) );
+
+ % INCLUDE RECIST  ;
+ % INCLUDE DAYATNS ;
+                                                                        00010001
+   DCL    PRINTR      CHAR(133) INIT(' '); /* RECORD APXEIOY PRINTF  */
+   DCL    MSSGER      CHAR(133) INIT(' '); /* RECORD APXEIOY MSSGEF  */
+
+   DCL    CREADR      CHAR(080) INIT(' '); /* RECORD APXEIOY CREADF  */
+   DCL 1  CREADRR1    BASED(ADDR(CREADR)),
+        2 CRCODE      CHAR(02)           ,
+        2 CRFIL1      CHAR(01)           ,
+        2 CRKATOL     PIC'(04)9'         ,
+        2 CRFIL2      CHAR(01)           ,
+        2 CRAPOHM     PIC'(06)9'         ,
+        2 CRFIL3      CHAR(01)           ,
+        2 CREOSHM     PIC'(06)9'         ,
+        2 CRFIL4      CHAR(01)           ,
+        2 CRAPOPOSO   PIC'(11)9'         ,
+        2 CRFIL5      CHAR(01)           ,
+        2 CREOSPOSO   PIC'(11)9'         ,
+        2 CRFIL6      CHAR(01)           ,
+        2 CREPITOK    PIC'(2)9V99'       ,
+        2 CRFIL7      CHAR(01)           ,
+        2 CRPERIODOS  CHAR(01)           ,
+        2 CRFIL8      CHAR(28);/*npk changes for enter_pli 22-05-2007*/
+
+
+   DCL 1  WSHMNIA     PIC '(7)9' INIT (0);
+   DCL 1  MINHMNIA    PIC '(6)9' INIT (999999);
+   DCL 1  MAXHMNIA    PIC '(6)9' INIT (0);
+   DCL 1  MINHMNIA1   PIC '(6)9' INIT (999999);
+   DCL 1  MAXHMNIA1   PIC '(6)9' INIT (0);
+   DCL 1  WSDATE BASED(ADDR(WSHMNIA)),
+          2 WSCC      PIC '9',
+          2 WSYY      PIC '99',
+          2 WSMM      PIC '99',
+          2 WSDD      PIC '99';
+   DCL    WORKHMNIA1  PIC'(6)9'INIT (0);
+   DCL    WORKHMNIA2  PIC'(6)9'INIT (0);
+   DCL    WORKHMNIA3  CHAR(6) INIT ('0');
+   DCL    WORKHMNIA4  CHAR(6) INIT ('0');
+   DCL    WORKPEDIO   CHAR(2) INIT ('0');
+   DCL    WKSMHMNIA   PIC '(6)9' INIT (0);
+   DCL    WTSMHMNIA   PIC '(6)9' INIT (0);
+
+   DCL 1  COUNTERS                     , /* METPHTEr                 */
+        2 SINPCC1   FIXED(12,0) INIT(0), /* INPUT CONTROL CARDS C1   */
+        2 SINPKIN   FIXED(12,0) INIT(0), /* INPUT RECORDS KINHr.     */
+        2 SINPEMP   FIXED(12,0) INIT(0), /* INPUT RECORDS KINHr.     */
+        2 SINPNOEMP FIXED(12,0) INIT(0), /* INPUT RECORDS KINHr.     */
+        2 SINPKMOV  FIXED(12,0) INIT(0), /* INPUT RECORDS KINHr.     */
+        2 SINPTMOV  FIXED(12,0) INIT(0); /* INPUT RECORDS KINHr.     */
+   DCL  DISPKIN   PIC 'ZZZ.ZZZ.ZZ9' INIT(0);
+   DCL  DISPPOSO  PIC 'ZZZZ.ZZZ.ZZZ.ZZ9' INIT(0);
+   DCL  DISPPOS1  PIC 'ZZZZ.ZZZ.ZZZ.ZZ9' INIT(0);
+   DCL  DISPPOS2  PIC 'ZZZZZZZZ9' INIT(0);
+   DCL  DISPPOS3  PIC 'ZZZZZZZZ9' INIT(0);
+   DCL  DISPEPIT  PIC 'Z9V.99' INIT(0);
+   DCL 1  POSA                         , /* POSA                     */
+        2 SAMTCC1   FIXED(15,2) INIT(0), /* INPUT CONTROL CARDS C1   */
+        2 SAMTKIN   FIXED(15,2) INIT(0); /* INPUT RECORDS KINHr.     */
+
+   DCL   SWITCHED  BIT(01)  INIT('1'B);
+   DCL   ORIOP     FIXED(9) INIT(015);   /* MAXIMUM ENTRY  P1KATOL   */
+   DCL   ORIOT     FIXED(9) INIT(003);   /* pkHhOr TPApEZxN-rTHkxN   */
+   DCL   WEPITOK   FIXED(4,2) INIT(0);
+
+   DCL    LEKTIKO       CHAR(30)        INIT (' ');
+
+   DCL 1  P2EPITK(99)  ,  /* EpITOKIA ANA KAhOkIKO,ApO CONTROL CARDS */
+        2 P2KATOL      FIXED(5,0),
+        2 P2APOHM      FIXED(6,0),
+        2 P2EOSHM      FIXED(6,0),
+        2 P2APOPOSO    FIXED(11),
+        2 P2EOSPOSO    FIXED(11),
+        2 P2EPITOK     FIXED(7,5),
+        2 P2MESO       FIXED(7,5),
+        2 P2AA         FIXED(15,2),
+        2 P2EKTAM      FIXED(15,0),
+        2 P2SYNOLO     FIXED(15,0);
+   DCL 1  ENTRY_SAVE,
+        2 P3KATOL      FIXED(5,0),
+        2 P3APOHM      FIXED(6,0),
+        2 P3EOSHM      FIXED(6,0),
+        2 P3APOPOSO    FIXED(11),
+        2 P3EOSPOSO    FIXED(11),
+        2 P3EPITOK     FIXED(7,5),
+        2 P3MESO       FIXED(7,5),
+        2 P3AA         FIXED(15,2),
+        2 P3EKTAM      FIXED(15,0),
+        2 P3SYNOLO     FIXED(15,0);
+   DCL  SAVE_KATOL     FIXED(5,0) INIT (0);
+   DCL  WSYNOLO        FIXED(15,2) INIT (0);
+   DCL  WEPITOK1       FIXED(15,7) INIT (0);
+   DCL 1  SEKTAM       FIXED(15,2) INIT (0);
+   DCL 1  SGINOM       FIXED(15,0) INIT (0);
+   DCL 1  SMESO        FIXED(7,5)  INIT (0);
+
+   DCL   SWEOFCR   FIXED(9,0) INIT(0);   /* =1 TEkOr APXEIOY C.CARDS */
+   DCL   SWEOFKN   FIXED(9,0) INIT(0);   /* =1 TEkOr APXEIOY KINHrExN*/
+   DCL   SWABT     FIXED(9,0) INIT(0);   /* >0 KApOY BPEhHKE kAhOr   */
+   DCL   SWEPIK    FIXED(9,0) INIT(1);   /* =1 ==> WRITE EpIKEuIkIdEr*/
+   DCL   SWFIND    FIXED(9,0) INIT(0);   /* = 0 : TAM20 XxPIr BCE    */
+
+   DCL    WREVDATE  PIC'(06)9' INIT(0);
+   DCL 1  WREVDATR  BASED(ADDR(WREVDATE)),
+        2 WREVHMER  PIC'(02)9'           ,
+        2 WREVMHN   PIC'(02)9'           ,
+        2 WREVETOS  PIC'(02)9'           ;
+   DCL    WSDTINP   PIC'99.99.99'      INIT(0);
+   DCL    WSDTOUT   PIC'99.99.99'      INIT(0);
+   DCL    WSTMINP   PIC'99.99.99.999'  INIT(0);
+   DCL 1  WSTMINR   BASED(ADDR(WSTMINP)),
+        2 WSTMINHR  PIC'(02)9'          ,
+        2 WSTMINF1  CHAR(01)            ,
+        2 WSTMINMN  PIC'(02)9'          ;
+   DCL    WSTMOUT   PIC'99.99.99.999'  INIT(0);
+
+   DCL    WSTKTMA   PIC'(07)9'          ;
+   DCL    WSTKTMB   PIC'(07)9'          ;
+   DCL    II        FIXED(9,0) INIT(0)  ;
+   DCL    JJ        FIXED(9,0) INIT(0)  ;
+   DCL    ZERO      FIXED(9,0) INIT(0)  ;
+   DCL    MSEL      FIXED(9,0) INIT(90) ; /*cPAMMEr ANA rEk EKTYpxrHr*/
+   DCL    AASEL1    FIXED(9,0) INIT(00) ; /*A/A rEkIdAr ANA KAT/MA   */
+   DCL    AASEL2    FIXED(9,0) INIT(00) ; /*A/A rEkIdAr rYNOkIKA     */
+
+   DCL    WSTRAP    PIC '(01)9'INIT(0)  ; /* EKTOKIZOMENH TPApEZA    */
+   DCL    WSKATM    FIXED(3,0) INIT(0)  ; /* EKTOKIZOMENO KATArTHMA  */
+   DCL    WSKATOL   FIXED(7,0) INIT(0)  ; /* EKTOKIZOMENO KAhOkIKO   */
+
+   DCL    WSTRKAT   PIC'(04)9' INIT(0)  ; /* TPAp-KAT/MA cIA APX.TOKP*/
+   DCL 1  WSTRKSTR  BASED(ADDR(WSTRKAT)) ,
+        2 WSTRP     PIC '(01)9'          ,
+        2 WSKTM     PIC '(03)9'          ;
+
+
+
+   DCL   PRIORITY  BUILTIN;
+   DATE: PROC IRREDUCIBLE RETURNS(CHAR(6)) ;
+         CALL CZXDATEP          ( CZX3VDAT) ;
+         RETURN (CZX3VDAT) ;
+         END DATE ;
+   DCL   TIME      BUILTIN;
+   DCL   MOD       BUILTIN;
+   DCL   STRING    BUILTIN;
+   DCL   DIVIDE    BUILTIN;
+   DCL   ADDR      BUILTIN;
+   DCL   ROUND     BUILTIN;
+   DCL   TRANSLATE BUILTIN;
+   DCL   VERIFY    BUILTIN;
+   DCL   SUBSTR    BUILTIN;
+   DCL   MULTIPLY  BUILTIN;
+
+ DCL  EKXOR  ENTRY(CHAR(3),CHAR(14))
+      OPTIONS(INTER,ASM) ;
+ FETCH EKXOR   ;
+ DCL  VALDAY  EXTERNAL ENTRY(CHAR(44))
+      OPTIONS(INTER,ASM);
+ FETCH VALDAY  ;
+
+ DCL  INPEKX    CHAR(03)   INIT (' ');
+ DCL  INPEKN    PIC'(03)9' BASED(ADDR(INPEKX));
+ DCL  RETEKX    CHAR(14)   INIT (' ');
+ DCL  RETEXX    CHAR(08)   BASED(ADDR(RETEKX));
+ DCL   CUA                         CHAR(44);
+ DCL  1  CUE  BASED(ADDR(CUA)),
+        2   CUATRKWD               CHAR(4),
+        2   CUAFW                  CHAR(4),
+        2   CUAFW1                 CHAR(4),
+        2   CUAKLEIT               CHAR(2),
+        2   CUAEKAE                CHAR(1),
+        2   CUAEHMER               CHAR(1),
+        2   CUAHMERX               CHAR(2),
+        2   CUAHMRXP               FIXED(7),
+        2   CUAAPANT               CHAR(1),
+        2   CUAOFORM               CHAR(1),
+        2   CUAHMERZ               CHAR(2),
+        2   CUAHMRZP               FIXED(7),
+        2   CUAARHMR               FIXED(5),
+        2   CUAKENO3               CHAR(3),
+        2   CUABIN3                BIT(8),
+        2   CUAHMTS                CHAR(6),
+        2   CUAKENON               CHAR(1);
+ DCL BHTA CHAR(27) INIT     ('ABCDEFGHIJKLMNOQRSUVWXYZ.P') ;
+ DCL ALFA CHAR(27) INIT     ('ABcdEZHhIKkMNnOpPrTYuXwx./') ;
+
+ DCL 1   LINE01                                                     ,
+      2  L01SKIP  CHAR(01) INIT('1')                                ,
+      2  L01FIL1  CHAR(38) INIT('EMpOPIKH TPApEZA THr EkkAdOr A.E.'),
+      2  L01FIL2  CHAR(94) INIT('                              ')   ;
+
+ %PAGE;
+
+   ON  ENDFILE(CREADF)  SWEOFCR = 1;
+   ON  ENDFILE(KINHSF)  GOTO TELOS;
+   CALL RINIT;
+   CALL RACC;
+
+ RDKIN:
+       READ  FILE(KINHSF)  INTO(RECISKAT);
+       SINPKIN = SINPKIN + 1;
+       IF ^( KSMTYPE = 'KMOVESEG' ! KSMTYPE = 'TMOVESEG' ) THEN DO;
+          GO TO RDKIN;
+       END;
+       WSHMNIA = KSMHMNIA;
+       WKSMHMNIA = KSMHMNIA;
+       IF WKSMHMNIA < MINHMNIA THEN DO;
+          MINHMNIA = WKSMHMNIA;
+       END;
+       IF WKSMHMNIA > MAXHMNIA THEN DO;
+          MAXHMNIA = WKSMHMNIA;
+       END;
+       IF KSMKATMA < 3000 THEN DO;
+          SINPNOEMP = SINPNOEMP + 1;
+          GO TO RDKIN;
+       END;
+       IF KSMKWDEG ^= '1' THEN DO;
+          GO TO RDKIN;
+       END;
+       IF TSMTRKWD = 'TH01' ! KSMTRKWD = 'KH01' THEN DO ;
+          GO TO RDKIN;
+       END ;
+       IF CRPERIODOS = 'A' & WSDD > 10 THEN DO ;
+          GO TO RDKIN;
+       END ;
+       IF CRPERIODOS = 'B' & ( WSDD < 11 ! WSDD > 20 ) THEN DO;
+          GO TO RDKIN;
+       END ;
+       IF CRPERIODOS = 'C' & WSDD < 21 THEN DO;
+          GO TO RDKIN;
+       END ;
+       WKSMHMNIA = KSMHMNIA;
+       IF WKSMHMNIA < MINHMNIA1 THEN DO;
+          MINHMNIA1 = WKSMHMNIA;
+       END;
+       IF WKSMHMNIA > MAXHMNIA1 THEN DO;
+          MAXHMNIA1 = WKSMHMNIA;
+       END;
+
+       SINPEMP = SINPEMP + 1;
+
+       /*           EPEJERGASIA POSOY */
+
+       IF KSMTYPE = 'KMOVESEG' THEN DO;
+          SINPKMOV = SINPKMOV + 1;
+          CALL FINDKATHOK;
+          IF JJ = 0 THEN DO;
+             MSSGER = ' *** '!!'kEIpEI KAPTA ME KAhOkIKO '!!KSMKATHO
+             !!' '!!KSMHMNIA!!' '!!KSMPOSON;
+             WRITE  FILE(MSSGEF)  FROM(MSSGER);
+             SWABT = 3;
+          END;
+          GO TO RDKIN;
+       END;
+       IF KSMTYPE = 'TMOVESEG' THEN DO;
+          SINPTMOV = SINPTMOV + 1;
+          CALL FINDKATHOT;
+          IF JJ = 0 THEN DO;
+             MSSGER = ' *** '!!'kEIpEI KAPTA ME KAhOkIKO '!!TSMKATHO
+             !!' '!!TSMHMNIA!!' '!!TSMPOSON;
+             WRITE  FILE(MSSGEF)  FROM(MSSGER);
+             SWABT = 3;
+          END;
+          GO TO RDKIN;
+       END;
+
+   GOTO  RDKIN;
+ /*
+       E N D   O F   M A I N   P R O G R A M
+                                                                     */
+ %PAGE;
+ RINIT:  PROC;
+   OPEN  FILE(KINHSF),
+         FILE(PRINTF),FILE(CREADF),FILE(MSSGEF);
+   WSDTINP  = DATE;
+   WSTMINP  = TIME;
+   P2EPITK  = '';
+   ENTRY_SAVE = '';
+   MSSGER = '1************************************************';
+   WRITE  FILE(MSSGEF)  FROM(MSSGER);
+   MSSGER = ' pPOcPAMMA DK438B- MErO rTAhMIKO EpITOKIO cIA    '!!
+            ' dEkTIO IdIxTIKxN KATAhErExN rE dPX              ';
+   WRITE  FILE(MSSGEF)  FROM(MSSGER);
+   MSSGER = ' ************************************************'!!
+            ' **********************************              ';
+   WRITE  FILE(MSSGEF)  FROM(MSSGER);
+ END  RINIT;
+
+ RACC:  PROC;
+   /* ANAcNxrH KAI EkEcXOr TxN CONTROL CARDS                         */
+   MSSGER = '0* ' !! (8)'1234567890';
+   WRITE  FILE(MSSGEF)  FROM(MSSGER);
+   II = 0;
+ RACCRD:
+   READ  FILE(CREADF)  INTO(CREADR);
+   IF  SWEOFCR = 1   THEN
+       GOTO  RACCEND;
+   MSSGER = ' * ' !! CREADR;
+   WRITE  FILE(MSSGEF)  FROM(MSSGER);
+   CALL  RACC1;
+   GOTO  RACCRD;
+
+
+ RACCEND:
+   IF  SINPCC1 = 0 THEN DO;
+       MSSGER = ' *** '!!'dEN YpAPXOYN CONTROL-CARDS ***';
+       WRITE  FILE(MSSGEF)  FROM(MSSGER);
+       SWABT = 3;
+   END;
+   MSSGER='1   ' ;
+   WRITE  FILE(MSSGEF)  FROM(MSSGER);
+   IF  SWABT > 0   THEN
+       GOTO  TELOS;
+ END  RACC;
+
+ RACC1:  PROC;
+ /*     EkEcXOr CONTROL-CARDS TYpOY C1                               */
+   SINPCC1 = SINPCC1 + 1;
+   IF  VERIFY(CRAPOHM,'0123456789') ^= 0   THEN DO;
+       MSSGER = ' *** MH APIhMHTIKH HMEPOMHNIA ApO *';
+       WRITE  FILE(MSSGEF)  FROM(MSSGER);
+       SWABT = 3;
+       RETURN;
+   END;
+   IF  VERIFY(CREOSHM,'0123456789') ^= 0   THEN DO;
+       MSSGER = ' *** MH APIhMHTIKH HMEPOMHNIA Exr *';
+       WRITE  FILE(MSSGEF)  FROM(MSSGER);
+       SWABT = 3;
+       RETURN;
+   END;
+   IF  CREOSHM < CRAPOHM  THEN DO;
+       MSSGER = ' *** Exr HMEPOMHNIA MIKPOTEPH ApO HMEPOMHNIA  *';
+       WRITE  FILE(MSSGEF)  FROM(MSSGER);
+       SWABT = 3;
+       RETURN;
+   END;
+   IF  VERIFY(CRAPOPOSO,'0123456789') ^= 0   THEN DO;
+       MSSGER = ' *** MH APIhMHTIKO pOrO       ApO *';
+       WRITE  FILE(MSSGEF)  FROM(MSSGER);
+       SWABT = 3;
+       RETURN;
+   END;
+   IF  VERIFY(CREOSPOSO,'0123456789') ^= 0   THEN DO;
+       MSSGER = ' *** MH APIhMHTIKO pOrO       Exr *';
+       WRITE  FILE(MSSGEF)  FROM(MSSGER);
+       SWABT = 3;
+       RETURN;
+   END;
+   IF  CREOSPOSO < CRAPOPOSO  THEN DO;
+       MSSGER = ' *** Exr pOrO MIKPOTEPO ApO pOrO  *';
+       WRITE  FILE(MSSGEF)  FROM(MSSGER);
+       SWABT = 3;
+       RETURN;
+   END;
+   IF  VERIFY(CREPITOK,'0123456789') ^= 0   THEN DO;
+       MSSGER = ' *** MH APIhMHTIKO EpITOKIO       *';
+       WRITE  FILE(MSSGEF)  FROM(MSSGER);
+       SWABT = 3;
+       RETURN;
+   END;
+   IF  VERIFY(CRPERIODOS,'ABC') ^= 0   THEN DO;
+       MSSGER = ' *** kAhOr pEPIOdOr A B C dEKTEr TIMEr MONO *';
+       WRITE  FILE(MSSGEF)  FROM(MSSGER);
+       SWABT = 3;
+       RETURN;
+   END;
+   IF II < 998 THEN DO;
+      II = II + 1;
+   END;
+   P2KATOL (II) = CRKATOL;
+   P2APOHM (II) = CRAPOHM;
+   P2EOSHM (II) = CREOSHM;
+   P2APOPOSO (II) = CRAPOPOSO;
+   P2EOSPOSO (II) = CREOSPOSO;
+   WEPITOK        = CREPITOK;
+   P2EPITOK  (II) = WEPITOK ;
+   P2AA      (II) = 0;
+   P2EKTAM   (II) = 0;
+   P2SYNOLO  (II) = 0;
+ END  RACC1;
+
+ FINDKATHOK:  PROC;
+   JJ = 0;
+   DO II = 1 TO 99;
+      IF KSMKATHO = P2KATOL(II) THEN DO;
+       WKSMHMNIA = KSMHMNIA;
+       IF WKSMHMNIA >= P2APOHM(II) & WKSMHMNIA < P2EOSHM(II) THEN DO;
+       IF KSMPOSON >= P2APOPOSO(II) & KSMPOSON < P2EOSPOSO(II) THEN DO;
+           JJ = JJ + 1;
+           P2AA (II) = P2AA (II) + 1;
+           CALL YPOLOGK;
+        END;
+       END;
+      END;
+   END;
+ END  FINDKATHOK;
+ YPOLOGK:  PROC;
+   P2EKTAM (II) = P2EKTAM (II) + KSMPOSON ;
+ /* WSYNOLO = MULTIPLY( KSMPOSON , P2EPITOK(II) ,15,2);
+   P2SYNOLO(II) = P2SYNOLO(II) + ROUND(WSYNOLO,0);
+   P2SYNOLO(II) = P2SYNOLO(II) + ( KSMPOSON * P2EPITOK(II) );
+   */
+ END  YPOLOGK;
+ FINDKATHOT:  PROC;
+   JJ = 0;
+   DO II = 1 TO 99;
+      IF TSMKATHO = P2KATOL(II) THEN DO;
+       WTSMHMNIA = TSMHMNIA;
+       IF WTSMHMNIA >= P2APOHM(II) & WTSMHMNIA < P2EOSHM(II) THEN DO;
+       IF TSMPOSON >= P2APOPOSO(II) & TSMPOSON < P2EOSPOSO(II) THEN DO;
+           JJ = JJ + 1;
+           P2AA (II) = P2AA (II) + 1;
+           CALL YPOLOGT;
+        END;
+       END;
+      END;
+   END;
+ END  FINDKATHOT;
+ YPOLOGT:  PROC;
+   P2EKTAM (II) = P2EKTAM (II) + TSMPOSON ;
+ /* P2SYNOLO(II) = P2SYNOLO(II) + ( TSMPOSON * P2EPITOK(II) );
+ */
+ END  YPOLOGT;
+ LEKTKAT: PROC;
+   LEKTIKO = ' ';
+   SELECT ( P2KATOL(II) );
+      WHEN (5060) LEKTIKO = 'kOcAPIArMxN KATAhErExN OwExr   ';
+      WHEN (5078) LEKTIKO = 'TPEXOYMENxN k/rMxN KATAhErExN  ';
+      WHEN (5300) LEKTIKO = 'TAMIEYTHPIOY rE dPAXMEr        ';
+      WHEN (5068) LEKTIKO = 'pPONOMIAKOr kOc/rMOr IdIxTxN   ';
+      WHEN (5080) LEKTIKO = 'KATAhErExN ApO OPc/rMOYr d.d.  ';
+      WHEN (5090) LEKTIKO = 'kOc/rMxN TPEXOYMENxN TPApEZxN  ';
+      WHEN (5100) LEKTIKO = 'EnxTEPIKxN kOc. K.O. rE dPX.   ';
+      WHEN (5114) LEKTIKO = 'KAT.dErMEYM.KATOIKxN EKTOr E.E.';
+      WHEN (5115) LEKTIKO = '>> >> >> >> >> >> >> >> >> >>  ';
+      WHEN (5116) LEKTIKO = '>> >> >> >> >> >> >> >> >> >>  ';
+      WHEN (5117) LEKTIKO = '>> >> >> >> >> >> >> >> >> >>  ';
+      WHEN (5120) LEKTIKO = 'KAT/rExN EccYHM.               ';
+      WHEN (5121) LEKTIKO = 'KATAh. EccYHM. rE dPAXMEr      ';
+      WHEN (5122) LEKTIKO = 'pPONOMIAKOr EpIXEIPHrExN       ';
+      WHEN (5150) LEKTIKO = 'ENTOKxN KAT/rExN OwExr Npdd    ';
+      END;
+ END  LEKTKAT;
+
+
+ /******/
+ TELOS:
+ /******/
+
+   DISPKIN = SINPCC1;
+   MSSGER=' * INPUT  CONTROL CARDS TYpOY C1     = ' !! DISPKIN;
+   DISPKIN = SINPKIN;
+   WRITE  FILE(MSSGEF)  FROM(MSSGER);
+   MSSGER=' * INPUT  KINHrEIr cIA               = ' !! DISPKIN;
+   DISPKIN = SINPNOEMP;
+   WRITE  FILE(MSSGEF)  FROM(MSSGER);
+   MSSGER=' * INPUT  KINHrEIr OXI THr EMpOPIKHr = ' !! DISPKIN;
+   DISPKIN = SINPEMP;
+   WRITE  FILE(MSSGEF)  FROM(MSSGER);
+   MSSGER=' * INPUT  KINHrEIr     THr EMpOPIKHr = ' !! DISPKIN;
+   WRITE  FILE(MSSGEF)  FROM(MSSGER);
+   DISPKIN = SINPKMOV;
+   MSSGER=' * INPUT  KINHrEIr  KMOVESEG         = ' !! DISPKIN;
+   WRITE  FILE(MSSGEF)  FROM(MSSGER);
+   DISPKIN = SINPTMOV;
+   MSSGER=' * INPUT  KINHrEIr  TMOVESEG         = ' !! DISPKIN;
+   WRITE  FILE(MSSGEF)  FROM(MSSGER);
+
+   WSDTOUT = DATE;
+   WSTMOUT = TIME;
+   MSSGER='-* TO RUN APXIrE THN '!!WSDTINP!!' rTIr '!!WSTMINP!!
+          ' KAI TEkEIxrE THN '!!WSDTOUT!!' rTIr '!!WSTMOUT;
+   WRITE  FILE(MSSGEF)  FROM(MSSGER);
+   IF  SWABT = 0   THEN DO;
+       PRINTR='1*** KANONIKO TEkOr YpOkOcIrMOY       DK438B***';
+       WRITE  FILE(PRINTF)  FROM(PRINTR);
+       MSSGER='0*** KANONIKO TEkOr YpOkOcIrMOY       DK438B***';
+       WRITE  FILE(MSSGEF)  FROM(MSSGER);
+   END;
+   IF  SWABT = 2   THEN DO;
+       PRINTR='1*** BPEhHKAN kAhH rTIr KINHrEIr       DK438B***';
+       WRITE  FILE(PRINTF)  FROM(PRINTR);
+       MSSGER='0*** BPEhHKAN kAhH rTIr KINHrEIr       DK438B***';
+       WRITE  FILE(MSSGEF)  FROM(MSSGER);
+   END;
+   IF  SWABT = 3   THEN DO;
+       PRINTR='1*** dIAKOpH TOY YpOkOcIrMOY       DK438B- '!!
+              ' BPEhHKAN kAhH rTA dEdOMENA - NA cINEI dIOPhxrH KAI E'!!
+              'pANAkHwH THr POHr ***';
+       WRITE  FILE(PRINTF)  FROM(PRINTR);
+       MSSGER='0*** dIAKOpH TOY YpOkOcIrMOY       DK438B- '!!
+              ' BPEhHKAN kAhH rTA dEdOMENA - NA cINEI dIOPhxrH KAI E'!!
+              'pANAkHwH THr POHr ***';
+       WRITE  FILE(MSSGEF)  FROM(MSSGER);
+       DISPLAY('*** DK438B-DIAKOPH LOGW SOBAROY SFALMATOS ***') ;
+       DISPLAY('*** DK438B-DIAKOPH LOGW SOBAROY SFALMATOS ***') ;
+       DISPLAY('*** DK438B-DIAKOPH LOGW SOBAROY SFALMATOS ***') ;
+   END;
+
+   MSSGER='0*** MINIMUM HMEPOMHNIA INPUT                 '!!MINHMNIA;
+   WRITE  FILE(MSSGEF)  FROM(MSSGER);
+   MSSGER='0*** MAXIMUM HMEPOMHNIA INPUT                 '!!MAXHMNIA;
+   WRITE  FILE(MSSGEF)  FROM(MSSGER);
+   MSSGER='0*** MINIMUM HMEPOMHNIA EpEnEPcArIAr KINHrExN '!!MINHMNIA1;
+   WRITE  FILE(MSSGEF)  FROM(MSSGER);
+   MSSGER='0*** MAXIMUM HMEPOMHNIA EpEnEPcArIAr KINHrExN '!!MAXHMNIA1;
+   WRITE  FILE(MSSGEF)  FROM(MSSGER);
+
+   IF MINHMNIA1 = 999999 THEN DO;
+      SWABT = 3;
+      PRINTR='1*** dIAKOpH TOY YpOkOcIrMOY  DK438B - '!!
+              ' dEN BPEhHKAN KINHrEIr  MAkkON EINAI kAhOr TO APXEIO '!!
+              'KINHSF TOY JCL    ***';
+       WRITE  FILE(PRINTF)  FROM(PRINTR);
+       MSSGER='0*** dIAKOpH TOY YpOkOcIrMOY       DK438B- '!!
+              ' BPEhHKAN kAhH rTA dEdOMENA - NA cINEI dIOPhxrH KAI E'!!
+              'pANAkHwH THr POHr ***';
+       WRITE  FILE(MSSGEF)  FROM(MSSGER);
+       DISPLAY('*** DK438B-DIAKOPH LOGW SOBAROY SFALMATOS ***') ;
+   END;
+
+   DO WHILE (SWITCHED);
+      SWITCHED = '0'B;
+      DO JJ = 1 TO 98;
+         IF P2KATOL(JJ) > P2KATOL(JJ+1)  THEN DO;
+       /*   P2APOHM(JJ) > P2APOHM(JJ+1)   THEN DO; */
+            ENTRY_SAVE = P2EPITK(JJ+1);
+            P2EPITK(JJ+1) = P2EPITK(JJ);
+            P2EPITK(JJ) = ENTRY_SAVE;
+            SWITCHED = '1'B;
+         END;
+      END;
+   END;
+
+   DO II = 1 TO 99;
+      IF P2KATOL(II) > 0 THEN DO;
+         WEPITOK1 = DIVIDE( P2EPITOK(II) , 100 ,15,7);
+         WSYNOLO = MULTIPLY( P2EKTAM(II) , WEPITOK1 ,15,0);
+    /*   WSYNOLO = DIVIDE( WSYNOLO , 100 ,15,2);  */
+         P2SYNOLO(II) = ROUND(WSYNOLO,0);
+
+         DISPKIN = P2AA(II);
+         DISPPOSO = P2SYNOLO(II);
+         DISPPOS1 = P2EKTAM(II);
+         DISPEPIT = P2EPITOK(II);
+
+         MSSGER='0 KAhOkIKO : '!!P2KATOL(II)!!' '!!
+                 P2APOHM(II)!!P2EOSHM(II)!!
+                 P2APOPOSO(II)!!P2EOSPOSO(II)!!
+                 DISPKIN!!DISPPOS1!!
+                 DISPEPIT!!
+                 DISPPOSO;
+         WRITE  FILE(MSSGEF)  FROM(MSSGER);
+      END;
+   END;
+
+   DO II = 1 TO 99;
+      IF P2KATOL(II) > 0 THEN DO;
+         DISPPOSO = P2SYNOLO(II);
+         DISPPOS1 = P2EKTAM(II);
+         DISPEPIT = P2EPITOK(II);
+         MSSGER='0 KAhOkIKO : '!!P2KATOL(II)!!' '!!
+                 DISPPOS1!!' '!!
+                 DISPEPIT!!' '!!
+                 DISPPOSO!!' '!!
+                 P2APOHM(II)!!P2EOSHM(II)!!
+                 P2APOPOSO(II)!!P2EOSPOSO(II);
+         WRITE  FILE(MSSGEF)  FROM(MSSGER);
+      END;
+   END;
+
+      /*                 TEkIKH EKTYpxrH                */
+   MSSGER='1 TPApEZA ATTIKHr  '!!(100)' '!!'** DK438B**';
+   WRITE  FILE(PRINTF)  FROM(MSSGER);
+   MSSGER='0'!!(40)' '!!
+          'dEkTIO  IdIxTIKxN  KATAhErExN  rE  dPAXMEr';
+   WRITE  FILE(PRINTF)  FROM(MSSGER);
+   MSSGER='0'!!(40)' '!!
+          '==========================================';
+   WRITE  FILE(PRINTF)  FROM(MSSGER);
+
+             WORKHMNIA1 = MINHMNIA1;
+             WORKHMNIA3 = WORKHMNIA1;
+             WORKPEDIO = SUBSTR(WORKHMNIA3,1,2);
+             SUBSTR(WORKHMNIA3,1,2) = SUBSTR(WORKHMNIA3,5,2);
+             SUBSTR(WORKHMNIA3,5,2) = WORKPEDIO;
+             WORKHMNIA2 = MAXHMNIA1;
+             WORKHMNIA4 = WORKHMNIA2;
+             WORKPEDIO = SUBSTR(WORKHMNIA4,1,2);
+             SUBSTR(WORKHMNIA4,1,2) = SUBSTR(WORKHMNIA4,5,2);
+             SUBSTR(WORKHMNIA4,5,2) = WORKPEDIO;
+
+   MSSGER='0  pEPIOdOr ApO :'!!SUBSTR(WORKHMNIA3,1,2)!!'.'!!
+          SUBSTR(WORKHMNIA3,3,2)!!'.'!!SUBSTR(WORKHMNIA3,5,2)!!' Exr :'
+          !!SUBSTR(WORKHMNIA4,1,2)!!'.'!!
+          SUBSTR(WORKHMNIA4,3,2)!!'.'!!SUBSTR(WORKHMNIA4,5,2);
+   WRITE  FILE(PRINTF)  FROM(MSSGER);
+   MSSGER='0  ====================================';
+   WRITE  FILE(PRINTF)  FROM(MSSGER);
+   MSSGER='0            '!!'                             KATAhErEIr(1) '
+                 !!'       TEk.EpITOKIO(2)'!!
+                 '    cINOMENO(3) '!!
+                 '      ApO Exr HMEP.        ApO Exr pOrO' ;
+   WRITE  FILE(PRINTF)  FROM(MSSGER);
+   SAVE_KATOL = 0;
+   SEKTAM     = 0;
+   SMESO      = 0;
+   SGINOM     = 0;
+   DO II = 1 TO 99;
+   IF P2KATOL(II) = 5080 ! P2KATOL(II) = 5090 ! P2KATOL(II) = 5100
+                         ! P2KATOL(II) = 5150 THEN DO;
+      GOTO NEXTII;
+   END;
+   XORIS:
+      IF P2KATOL(II) > 0 THEN DO;
+         IF SAVE_KATOL = 0 THEN DO;
+            SAVE_KATOL = P2KATOL(II);
+         END;
+         IF P2KATOL(II) = SAVE_KATOL THEN DO;
+            DISPPOSO = P2SYNOLO(II);
+            DISPPOS1 = P2EKTAM(II);
+            DISPPOS2 = P2APOPOSO(II);
+            DISPPOS3 = P2EOSPOSO(II);
+             DISPEPIT = P2EPITOK(II);
+             CALL LEKTKAT;
+             WORKHMNIA1 = P2APOHM(II);
+             WORKHMNIA3 = WORKHMNIA1;
+             WORKPEDIO = SUBSTR(WORKHMNIA3,1,2);
+             SUBSTR(WORKHMNIA3,1,2) = SUBSTR(WORKHMNIA3,5,2);
+             SUBSTR(WORKHMNIA3,5,2) = WORKPEDIO;
+             WORKHMNIA2 = P2EOSHM(II);
+             WORKHMNIA4 = WORKHMNIA2;
+             WORKPEDIO = SUBSTR(WORKHMNIA4,1,2);
+             SUBSTR(WORKHMNIA4,1,2) = SUBSTR(WORKHMNIA4,5,2);
+             SUBSTR(WORKHMNIA4,5,2) = WORKPEDIO;
+             MSSGER='0'!!LEKTIKO!!' '!!P2KATOL(II)!!' '!!
+                  DISPPOS1!!'             '!!
+                 DISPEPIT!!'%    '!!
+                 DISPPOSO!!'    '!!
+                 WORKHMNIA3!!'-'!!WORKHMNIA4!!
+                 DISPPOS2!!' '!!DISPPOS3;
+             WRITE  FILE(PRINTF)  FROM(MSSGER);
+         END;
+         IF P2KATOL(II) = SAVE_KATOL THEN DO;
+            SEKTAM     = SEKTAM  + P2EKTAM(II);
+            SGINOM     = SGINOM  + P2SYNOLO(II);
+         END;
+         IF P2KATOL(II) ^= SAVE_KATOL THEN DO;
+            IF SEKTAM > 0 THEN DO;
+               SMESO   = DIVIDE(SGINOM , SEKTAM , 7 ,5);
+               SMESO   = MULTIPLY(SMESO , 100 , 7 ,5);
+               SMESO   = ROUND( SMESO , 2);
+            END;
+            DISPPOSO = SGINOM;
+            DISPPOS1 = SEKTAM;
+            DISPEPIT = SMESO;
+            MSSGER='0            '!!'                            '!!
+              '================             =====     ================';
+            WRITE  FILE(PRINTF)  FROM(MSSGER);
+            MSSGER='0                                     '
+                    !!'r1='!!
+                    DISPPOS1!!'     M.r.E.= '!!
+                    DISPEPIT!!'% r3='!!
+                    DISPPOSO;
+            WRITE  FILE(PRINTF)  FROM(MSSGER);
+            MSSGER='0         ';
+            WRITE  FILE(PRINTF)  FROM(MSSGER);
+            SAVE_KATOL = 0;
+            SEKTAM     = 0;
+            SMESO      = 0;
+            SGINOM     = 0;
+            GO TO XORIS;  /* XANEI THN GRAMMH TOY PINAKA */
+         END;
+      END;
+   NEXTII:
+   END;
+   IF SEKTAM > 0 THEN DO;
+               SMESO   = DIVIDE(SGINOM , SEKTAM , 7 ,5);
+               SMESO   = MULTIPLY(SMESO , 100 , 7 ,5);
+               SMESO   = ROUND( SMESO , 2);
+   END;
+   DISPPOSO = SGINOM;
+   DISPPOS1 = SEKTAM;
+   DISPEPIT = SMESO;
+            MSSGER='0            '!!'                            '!!
+              '================             =====     ================';
+            WRITE  FILE(PRINTF)  FROM(MSSGER);
+            MSSGER='0                                     '
+                    !!'r1='!!
+                    DISPPOS1!!'     M.r.E.= '!!
+                    DISPEPIT!!'% r3='!!
+                    DISPPOSO;
+            WRITE  FILE(PRINTF)  FROM(MSSGER);
+            MSSGER='0       ';
+            WRITE  FILE(PRINTF)  FROM(MSSGER);
+            MSSGER='0 TO cINOMENO(3) = KATAhErEIr(1) * TEk.EpITOKIO(2)';
+            WRITE  FILE(PRINTF)  FROM(MSSGER);
+            MSSGER='0 TO MErO rTAhMIKO EpITOKIO r.M.E. = r3 / r1 ';
+            WRITE  FILE(PRINTF)  FROM(MSSGER);
+            MSSGER='0  ========================================'!!
+                   '==========================================='!!
+                   '===========================================';
+            WRITE  FILE(PRINTF)  FROM(MSSGER);
+   IF  SWABT = 3   THEN DO;
+       MSSGER='0 EINAI kAhOr TA ApOTEkErMATA KANETE EkEcXO EpANAkABETE';
+       WRITE  FILE(PRINTF)  FROM(MSSGER);
+       WRITE  FILE(PRINTF)  FROM(MSSGER);
+       WRITE  FILE(PRINTF)  FROM(MSSGER);
+       WRITE  FILE(PRINTF)  FROM(MSSGER);
+       WRITE  FILE(PRINTF)  FROM(MSSGER);
+
+   END;
+
+   CLOSE  FILE(KINHSF),
+          FILE(PRINTF),FILE(MSSGEF),FILE(CREADF);
+   IF  SWABT = 3   THEN DO;
+       ZERO = 100 / ZERO ;
+   END ;
+ END  DK438B;
+
